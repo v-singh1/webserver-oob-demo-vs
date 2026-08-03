@@ -189,12 +189,12 @@
 
             <a href="audio-dsp.html" class="nav-item active">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
-                Audio DSP with Analytics
+                DSP with Audio Analytics
             </a>
 
             <a href="dsp-compute.html" class="nav-item">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="4"/><line x1="8" y1="20" x2="8" y2="12"/><line x1="12" y1="20" x2="12" y2="2"/><line x1="16" y1="20" x2="16" y2="10"/><line x1="20" y1="20" x2="20" y2="6"/></svg>
-                DSP Compute Demos
+                DSP Compute
             </a>
 
             <div class="nav-lbl">Tools</div>
@@ -216,11 +216,6 @@
                 Logs
             </a>
 
-            <a href="#" class="nav-item" onclick="openPanel('settings');return false;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                Settings
-            </a>
-
             <a href="https://e2e.ti.com/support/processors/" target="_blank" class="nav-item">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
                 Help
@@ -240,8 +235,8 @@
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
                 </div>
                 <div>
-                    <div class="ph-title">Audio DSP with Analytics Demos</div>
-                    <div class="ph-sub">Explore real-time audio processing and AI-powered analytics demos optimized for AM62D.</div>
+                    <div class="ph-title">DSP with Audio Analytics</div>
+                    <div class="ph-sub">Explore real-time audio analytics powered by the C7x DSP. Experience AI-enabled audio processing, acoustic event detection, voice analytics, and intelligent audio pipelines optimized for AM62D.</div>
                 </div>
             </div>
             <div class="hdr-actions">
@@ -1874,7 +1869,7 @@ document.addEventListener('DOMContentLoaded', () => { _checkDspOverlayConflict()
         </div>
         <p style="font-size:13px;color:#94a3b8;line-height:1.7;">The DSP-controlled audio overlay is currently active:</p>
         <div style="font-family:monospace;font-size:11px;background:#03060e;border:1px solid #1e2a3a;border-radius:6px;padding:10px 12px;color:#fca5a5;word-break:break-all;">k3-am62d2-evm-dsp-controlled-audio.dtbo</div>
-        <p style="font-size:13px;color:#94a3b8;line-height:1.7;">This overlay is incompatible with the Audio DSP with Analytics demos. Remove it and reboot before continuing.</p>
+        <p style="font-size:13px;color:#94a3b8;line-height:1.7;">This overlay is incompatible with the DSP with Audio Analytics demos. Remove it and reboot before continuing.</p>
         <button id="dsp-overlay-remove-btn" onclick="_removeDspOverlayAndReboot()" style="padding:10px 16px;background:#dc2626;border:none;color:#fff;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;justify-content:center;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             Remove Overlay &amp; Reboot

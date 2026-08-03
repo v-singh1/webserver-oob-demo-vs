@@ -89,10 +89,15 @@ module.exports = function registerAudioOffload(app, wss, device) {
     let mockMetricInt = null;
     let offloadProc   = null;
 
-    const BIN_PATH = (device && device.demoConfig &&
-                      device.demoConfig['audio-offload'] &&
-                      device.demoConfig['audio-offload'].binPath)
-                     || '/usr/bin/rpmsg_audio_offload_example';
+    const BIN_PATH  = (device && device.demoConfig &&
+                       device.demoConfig['audio-offload'] &&
+                       device.demoConfig['audio-offload'].binPath)
+                      || '/usr/bin/rpmsg_audio_offload_example';
+
+    const DEF_HOST  = (device && device.demoConfig &&
+                       device.demoConfig['audio-offload'] &&
+                       device.demoConfig['audio-offload'].host)
+                      || '127.0.0.1';
 
     /* ------------------------------------------------------------ */
     /* Helpers                                                       */
@@ -338,12 +343,15 @@ module.exports = function registerAudioOffload(app, wss, device) {
     app.get('/audio-offload/run', (req, res) => {
         if (MOCK) { startMock(); return res.send('Audio offload started (MOCK)'); }
         if (offloadProc) {
-            if (!tcpConnected) connectTcp('127.0.0.1');
+            if (!tcpConnected) connectTcp(DEF_HOST);
             return res.send('rpmsg_audio_offload_example already running');
         }
         console.log(`[audio-offload] Spawning ${BIN_PATH}`);
         broadcast({ type: 'status', state: 'connecting', message: 'Starting rpmsg_audio_offload_example…' });
-        offloadProc = spawn(BIN_PATH, [], { stdio: ['ignore', 'pipe', 'pipe'] });
+        /* detached: true gives the binary its own process group so that
+         * killOffloadProc() can send SIGINT to the entire group (equivalent
+         * to Ctrl+C in a terminal), which triggers the binary's own cleanup. */
+        offloadProc = spawn(BIN_PATH, [], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
         offloadProc.stdout.on('data', d => process.stdout.write(`[rpmsg] ${d}`));
         offloadProc.stderr.on('data', d => process.stderr.write(`[rpmsg] ${d}`));
         offloadProc.on('exit', code => {
@@ -352,17 +360,14 @@ module.exports = function registerAudioOffload(app, wss, device) {
             if (tcpConnected) disconnectTcp();
         });
         /* Wait for binary to open TCP ports before connecting */
-        setTimeout(() => connectTcp('127.0.0.1'), 2000);
+        setTimeout(() => connectTcp(DEF_HOST), 2000);
         res.send('rpmsg_audio_offload_example started');
     });
 
     app.get('/audio-offload/stop', (req, res) => {
         if (MOCK) { stopMock(); return res.send('Audio offload stopped (MOCK)'); }
         disconnectTcp();
-        if (offloadProc) {
-            try { offloadProc.kill('SIGINT'); } catch (_) {}
-            offloadProc = null;
-        }
+        killOffloadProc();
         res.send('Audio offload stopped');
     });
 
@@ -421,9 +426,21 @@ module.exports = function registerAudioOffload(app, wss, device) {
         });
     });
 
+    /* Send SIGINT to the binary's entire process group (Ctrl+C equivalent).
+     * Falls back to direct signal if process group kill fails. */
+    function killOffloadProc() {
+        if (!offloadProc) return;
+        try {
+            process.kill(-offloadProc.pid, 'SIGINT');
+        } catch (_) {
+            try { offloadProc.kill('SIGINT'); } catch (_) {}
+        }
+        /* offloadProc is nulled by the 'exit' handler once the process terminates */
+    }
+
     function _cleanup() {
         if (MOCK) stopMock(); else disconnectTcp();
-        if (offloadProc) { try { offloadProc.kill('SIGINT'); } catch (_) {} offloadProc = null; }
+        killOffloadProc();
     }
     process.on('SIGTERM', _cleanup);
     process.on('SIGINT',  _cleanup);

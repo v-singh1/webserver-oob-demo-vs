@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>(function(){var B=1280;function r(){var s=window.innerWidth/B;document.documentElement.style.zoom=s<1?s:'';}r();window.addEventListener('resize',r);if(localStorage.getItem('theme')==='light')document.documentElement.dataset.theme='light';})();</script>
-    <title>DSP Compute Demos - TI AM62D Demo Portal</title>
+    <title>DSP Compute - TI AM62D Demo Portal</title>
     <style>
         :root {
             --bg-page:#0a0e1a; --bg-panel:#0d1117; --bg-inner:#05080f; --bg-deep:#03060e;
@@ -172,12 +172,12 @@
 
             <a href="audio-dsp.html" class="nav-item">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
-                Audio DSP with Analytics
+                DSP with Audio Analytics
             </a>
 
             <a href="dsp-compute.html" class="nav-item active">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="4"/><line x1="8" y1="20" x2="8" y2="12"/><line x1="12" y1="20" x2="12" y2="2"/><line x1="16" y1="20" x2="16" y2="10"/><line x1="20" y1="20" x2="20" y2="6"/></svg>
-                DSP Compute Demos
+                DSP Compute
             </a>
 
             <div class="nav-lbl">Tools</div>
@@ -199,11 +199,6 @@
                 Logs
             </a>
 
-            <a href="#" class="nav-item" onclick="openPanel('settings');return false;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                Settings
-            </a>
-
             <a href="https://e2e.ti.com/support/processors/" target="_blank" class="nav-item">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
                 Help
@@ -222,8 +217,8 @@
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="4"/><line x1="8" y1="20" x2="8" y2="12"/><line x1="12" y1="20" x2="12" y2="2"/><line x1="16" y1="20" x2="16" y2="10"/><line x1="20" y1="20" x2="20" y2="6"/></svg>
                 </div>
                 <div>
-                    <div class="ph-title">DSP Compute Demos</div>
-                    <div class="ph-sub">Real-time audio compute workloads offloaded to C7x DSP via RPMsg-DMA on AM62D.</div>
+                    <div class="ph-title">DSP Compute</div>
+                    <div class="ph-sub">Explore high-performance DSP compute demos showcasing Linux-to-C7x workload offload using RPMsg-DMA. Accelerate audio signal processing and DSP kernels while maximizing ARM CPU availability.</div>
                 </div>
             </div>
             <div class="hdr-actions">
@@ -1518,6 +1513,7 @@ function openPanel(type) {
     document.getElementById('side-panel').style.display='flex';
     if(type==='device') loadDevicePanel();
     else if(type==='logs') loadLogsPanel();
+    else if(type==='settings') loadSettingsPanel();
 }
 function closePanel() {
     document.getElementById('panel-overlay').style.display='none';
@@ -1535,6 +1531,58 @@ function loadDevicePanel() {
         document.getElementById('panel-body').innerHTML=html;
     }).catch(()=>{document.getElementById('panel-body').innerHTML='<div style="color:#ef4444;font-size:13px;">Failed to load device info</div>';});
 }
+function loadSettingsPanel() {
+    document.getElementById('panel-title').textContent = 'Settings';
+    document.getElementById('panel-body').innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    fetch('/device-info').then(r => r.json()).then(d => {
+        const ao  = (d.demoConfig && d.demoConfig['audio-offload'])   || {};
+        const fft = (d.demoConfig && d.demoConfig['2dfft'])           || {};
+        const bq  = (d.demoConfig && d.demoConfig['sigchain-biquad']) || {};
+        function _sec(t) { return `<div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:1px;margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid #1e2a3a;">${t}</div>`; }
+        function _field(id, label, val, ph) {
+            return `<div style="margin-bottom:11px;"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:4px;">${label}</div><input id="sp-${id}" type="text" value="${(val||'').replace(/"/g,'&quot;')}" placeholder="${ph||''}" style="width:100%;background:#05080f;border:1px solid #1e2a3a;color:#e2e8f0;font-size:12px;padding:6px 8px;border-radius:6px;outline:none;box-sizing:border-box;"></div>`;
+        }
+        function _row(l, v) { return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e2a3a;"><span style="color:#94a3b8;font-size:12px;">${l}</span><span style="color:#e2e8f0;font-size:12px;font-weight:500;">${v}</span></div>`; }
+        const isDark = document.documentElement.dataset.theme !== 'light';
+        const html = `
+        <div style="font-size:11px;color:#64748b;line-height:1.6;">Binary paths and connection settings. Saved to device.json — take effect on next demo start.</div>
+        ${_sec('DSP Demo Binaries')}
+        ${_field('ao-bin',  'Audio Offload Binary',  ao.binPath,  '/usr/bin/rpmsg_audio_offload_example')}
+        ${_field('fft-bin', '2D FFT Binary',          fft.binPath, '/usr/bin/rpmsg_2dfft_example')}
+        ${_field('bq-bin',  'Biquad Binary',          bq.binPath,  '/usr/bin/rpmsg_sigchain_biquad_example')}
+        ${_sec('Audio Offload Connection')}
+        ${_field('ao-host', 'Backend TCP Host', ao.host, '127.0.0.1')}
+        <div style="font-size:10px;color:#475569;margin-top:-6px;margin-bottom:12px;line-height:1.5;">Host where rpmsg_audio_offload_example opens TCP ports 8888–8891. Use 127.0.0.1 when the binary runs on the same board as this server.</div>
+        ${_sec('Interface')}
+        ${_row('Theme', `<button onclick="toggleTheme();loadSettingsPanel();" style="padding:3px 10px;background:#1e2a3a;border:1px solid #334155;color:#94a3b8;font-size:11px;border-radius:4px;cursor:pointer;">${isDark ? 'Dark — Switch' : 'Light — Switch'}</button>`)}
+        ${_row('Active Demos', d.activeDemos ? d.activeDemos.join(', ') : '-')}
+        <div id="sp-status" style="min-height:18px;margin:14px 0 8px;font-size:11px;"></div>
+        <button onclick="saveDspSettings()" style="width:100%;background:#1d4ed8;border:none;color:#fff;font-size:13px;font-weight:600;padding:10px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#1d4ed8'">Save Changes</button>
+        <div style="margin-top:10px;font-size:10px;color:#475569;">Active demos and server port require a service restart to change.</div>`;
+        document.getElementById('panel-body').innerHTML = html;
+    }).catch(() => { document.getElementById('panel-body').innerHTML = '<div style="color:#ef4444;font-size:13px;">Failed to load settings</div>'; });
+}
+
+function saveDspSettings() {
+    const g = id => { const e = document.getElementById('sp-' + id); return e ? e.value.trim() : ''; };
+    const status = document.getElementById('sp-status');
+    const aoBin  = g('ao-bin')  || '/usr/bin/rpmsg_audio_offload_example';
+    const fftBin = g('fft-bin') || '/usr/bin/rpmsg_2dfft_example';
+    const bqBin  = g('bq-bin')  || '/usr/bin/rpmsg_sigchain_biquad_example';
+    const aoHost = g('ao-host') || '127.0.0.1';
+    const body = { demoConfig: {
+        'audio-offload':   { binPath: aoBin,  host: aoHost },
+        '2dfft':           { binPath: fftBin },
+        'sigchain-biquad': { binPath: bqBin  }
+    }};
+    if (status) { status.textContent = 'Saving…'; status.style.color = '#64748b'; }
+    fetch('/device-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(r => r.json())
+        .then(d => {
+            if (status) { status.textContent = d.success ? 'Saved.' : 'Error: ' + (d.error || 'unknown'); status.style.color = d.success ? '#22c55e' : '#ef4444'; }
+        }).catch(e => { if (status) { status.textContent = 'Error: ' + e.message; status.style.color = '#ef4444'; } });
+}
+
 let _logInterval=null;
 function loadLogsPanel() {
     document.getElementById('panel-title').textContent='System Logs';
@@ -1544,6 +1592,13 @@ function loadLogsPanel() {
         document.getElementById('panel-body').innerHTML=`<div style="font-family:monospace;font-size:11px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:10px;overflow-y:auto;max-height:calc(100vh - 200px);">${lines.length?lines.map(l=>`<div style="padding:2px 0;color:${l.match(/error/i)?'#ef4444':l.match(/warn/i)?'#f59e0b':'#94a3b8'};word-break:break-all;">${l.replace(/</g,'&lt;')}</div>`).join(''):'<div style="color:#475569;text-align:center;padding:20px 0;">No log entries</div>'}</div>`;
     }).catch(()=>{document.getElementById('panel-body').innerHTML='<div style="color:#ef4444;font-size:13px;">Failed to load logs</div>';});
 }
+
+/* Stop running demos when navigating away so the backend sends proper SIGINT cleanup */
+window.addEventListener('pagehide', () => {
+    if (_aoRunning)       fetch('/audio-offload/stop',   { keepalive: true }).catch(() => {});
+    if (_biquadRunning)   fetch('/sigchain-biquad/stop', { keepalive: true }).catch(() => {});
+    if (_fft2dRunning)    fetch('/2dfft/stop',           { keepalive: true }).catch(() => {});
+});
 </script>
 
 <!-- ── HEALTH CHECK MODAL ── -->
