@@ -40,27 +40,50 @@ function parseAlsaOutput(stdout) {
     }).join('\n');
 }
 
-/* Return the PCM payload of a mono, signed-16-bit little-endian WAV. */
-function readPcmWav(filename) {
-    const wav = fs.readFileSync(filename);
-    if (wav.toString('ascii', 0, 4) !== 'RIFF' || wav.toString('ascii', 8, 12) !== 'WAVE') {
-        throw new Error('Only RIFF/WAV input is supported by the Edge-AI audio pipeline');
-    }
-    let offset = 12;
-    let fmt;
-    let data;
+/* Parse WAV chunks and return fmt + data buffers (throws on invalid files). */
+function _parseWavChunks(wav) {
+    if (wav.toString('ascii', 0, 4) !== 'RIFF' || wav.toString('ascii', 8, 12) !== 'WAVE')
+        throw new Error('Not a valid WAV file');
+    let offset = 12, fmt, data;
     while (offset + 8 <= wav.length) {
         const id = wav.toString('ascii', offset, offset + 4);
-        const length = wav.readUInt32LE(offset + 4);
-        const start = offset + 8;
-        if (id === 'fmt ') fmt = wav.subarray(start, start + length);
-        if (id === 'data') { data = wav.subarray(start, start + length); break; }
-        offset = start + length + (length & 1);
+        const len = wav.readUInt32LE(offset + 4);
+        if (id === 'fmt ') fmt = wav.subarray(offset + 8, offset + 8 + len);
+        if (id === 'data') { data = wav.subarray(offset + 8, offset + 8 + len); break; }
+        offset += 8 + len + (len & 1);
     }
-    if (!fmt || !data || fmt.readUInt16LE(0) !== 1 || fmt.readUInt16LE(2) !== 1 || fmt.readUInt16LE(14) !== 16) {
-        throw new Error('The Edge-AI demo requires a mono 16-bit PCM WAV file');
-    }
-    return { pcm: data, sampleRate: fmt.readUInt32LE(4) };
+    if (!fmt) throw new Error('Invalid WAV: missing fmt chunk');
+    return { fmt, data };
+}
+
+/* Validate and return PCM payload; requires 16-bit mono 48 kHz. */
+function readPcmWav(filename) {
+    const wav = fs.readFileSync(filename);
+    const { fmt, data } = _parseWavChunks(wav);
+    if (!data) throw new Error('Invalid WAV: missing data chunk');
+    const audioFmt = fmt.readUInt16LE(0);
+    const channels = fmt.readUInt16LE(2);
+    const sampleRate = fmt.readUInt32LE(4);
+    const bitsPerSample = fmt.readUInt16LE(14);
+    if (audioFmt !== 1)       throw new Error('WAV must be uncompressed PCM (got compressed format)');
+    if (channels !== 1)       throw new Error(`WAV must be mono (got ${channels} channels)`);
+    if (sampleRate !== 48000) throw new Error(`WAV must be 48 kHz (got ${sampleRate} Hz)`);
+    if (bitsPerSample !== 16) throw new Error(`WAV must be 16-bit (got ${bitsPerSample}-bit)`);
+    return { pcm: data, sampleRate };
+}
+
+/* Read WAV info without throwing; returns null on failure. */
+function readPcmWavInfo(filename) {
+    try {
+        const wav = fs.readFileSync(filename);
+        const { fmt, data } = _parseWavChunks(wav);
+        const channels = fmt.readUInt16LE(2);
+        const sampleRate = fmt.readUInt32LE(4);
+        const bitsPerSample = fmt.readUInt16LE(14);
+        const dataBytes = data ? data.length : 0;
+        const durationSec = sampleRate > 0 ? parseFloat((dataBytes / (sampleRate * channels * (bitsPerSample / 8))).toFixed(2)) : 0;
+        return { channels, sampleRate, bitsPerSample, durationSec };
+    } catch (_) { return null; }
 }
 
 module.exports = function registerSpeechEnhancement(app, wss, device) {
@@ -249,18 +272,25 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     app.get('/speech-output-devices', (req, res) => exec('aplay -l 2>/dev/null', (error, stdout) =>
         res.send(error ? 'No audio output devices found' : (parseAlsaOutput(stdout) || 'No audio output devices found'))));
 
+    app.get('/speech-enhancement/info', (req, res) => {
+        const wavInfo = readPcmWavInfo(inputPath);
+        res.json({ defaultFile: inputPath, defaultFileName: path.basename(inputPath), wavInfo });
+    });
+
     app.post('/upload-speech-enhancement-file', rawBody(50 * 1024 * 1024), (req, res) => {
         try {
             fs.mkdirSync(JOB_ROOT, { recursive: true });
-            const inputPath = path.join(JOB_ROOT, 'upload.wav');
-            fs.writeFileSync(inputPath, req.body);
-            readPcmWav(inputPath);
-            res.json({ path: inputPath });
+            const uploadPath = path.join(JOB_ROOT, 'upload.wav');
+            fs.writeFileSync(uploadPath, req.body);
+            readPcmWav(uploadPath);  // validates 16-bit mono 48 kHz
+            const wavInfo = readPcmWavInfo(uploadPath);
+            res.json({ path: uploadPath, wavInfo });
         } catch (error) { res.status(400).json({ error: error.message }); }
     });
 
     app.get('/start-speech-enhancement', (req, res) => {
-        try { startEdgeAi(inputPath); res.json({ status: 'started', backend: MOCK ? 'mock' : 'edge-ai-rpmsg', inputPath }); }
+        const fileToUse = req.query.file || inputPath;
+        try { startEdgeAi(fileToUse); res.json({ status: 'started', backend: MOCK ? 'mock' : 'edge-ai-rpmsg', inputPath: fileToUse }); }
         catch (error) { stopJob(); res.status(400).json({ error: error.message }); }
     });
     app.get('/stop-speech-enhancement', (req, res) => { stopJob(); res.json({ status: 'stopped' }); });

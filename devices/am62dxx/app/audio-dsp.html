@@ -362,10 +362,6 @@
                         </div>
                     </div>
                     </div>
-                    <button class="btn-run-this" id="midRunBtn" onclick="triggerRun(this)">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-                        Run This Demo
-                    </button>
                 </div>
 
                 <!-- Live TVM Inference panel (shown when TVM demo is selected) -->
@@ -404,10 +400,6 @@
                             </div>
                         </div>
                     </div>
-                    <button id="tvm-demo-btn" onclick="toggleTvmDemo()" class="btn-run-this">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-                        Run TVM Inference
-                    </button>
                 </div>
 
                 <!-- Live Audio Classification panel -->
@@ -492,10 +484,6 @@
                     <div id="audio-results" style="overflow-y:auto;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;min-height:80px;max-height:150px;font-size:12px;">
                         <div style="color:#475569;text-align:center;padding:16px 0;" id="audio-results-placeholder">Results will appear here when running</div>
                     </div>
-                    <button id="audio-run-btn" class="btn-run-this" disabled>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                        Not Supported Yet
-                    </button>
                 </div>
 
                 <!-- Live Speech Enhancement panel -->
@@ -515,17 +503,17 @@
                     <!-- Source toggle -->
                     <div class="sub-ttl">Audio Source</div>
                     <div style="display:flex;gap:6px;">
-                        <button id="sp-src-live-btn" onclick="setSpeechSource('live')" style="flex:1;padding:6px 8px;background:#1d4ed8;border:1px solid #2563eb;color:#e2e8f0;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                            Live Mic
-                        </button>
-                        <button id="sp-src-file-btn" onclick="setSpeechSource('file')" style="flex:1;padding:6px 8px;background:#0f172a;border:1px solid #1e2a3a;color:#64748b;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                        <button id="sp-src-file-btn" onclick="setSpeechSource('file')" style="flex:1;padding:6px 8px;background:#1d4ed8;border:1px solid #2563eb;color:#e2e8f0;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
                             Audio File
                         </button>
+                        <button id="sp-src-live-btn" onclick="setSpeechSource('live')" style="flex:1;padding:6px 8px;background:#0f172a;border:1px solid #1e2a3a;color:#64748b;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                            Live Mic
+                        </button>
                     </div>
                     <!-- Live Mic panel -->
-                    <div id="sp-src-live-panel">
+                    <div id="sp-src-live-panel" style="display:none;">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                             <div>
                                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -547,20 +535,29 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Kept hidden: RPMsg reads its predefined target-side WAV file. -->
-                    <div id="sp-src-file-panel" style="display:none;">
-                        <div class="sub-ttl">Audio File</div>
-                        <div id="speech-file-drop"
-                             onclick="document.getElementById('speech-file-input').click()"
-                             ondragover="event.preventDefault();this.style.borderColor='#3b82f6'"
-                             ondragleave="this.style.borderColor='#1e3a5f'"
-                             ondrop="event.preventDefault();this.style.borderColor='#1e3a5f';onSpeechFileDropped(event)"
-                             style="border:1.5px dashed #1e3a5f;background:#05080f;border-radius:6px;padding:14px 12px;text-align:center;cursor:pointer;transition:border-color .15s;">
-                            <input type="file" id="speech-file-input" accept=".wav,audio/wav" style="display:none" onchange="onSpeechFileSelected(this)">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" style="margin-bottom:5px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            <div id="speech-file-name" style="color:#64748b;font-size:12px;">Click or drag audio file here</div>
-                            <div style="font-size:10px;color:#334155;margin-top:3px;">16-bit mono PCM WAV &bull; 16 kHz recommended</div>
+                    <!-- Audio file panel -->
+                    <div id="sp-src-file-panel">
+                        <!-- Current file info card -->
+                        <div id="speech-file-card" style="display:flex;align-items:center;gap:10px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:10px 12px;margin-bottom:7px;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" stroke-width="1.5" flex-shrink="0" style="flex-shrink:0;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                            <div style="flex:1;min-width:0;">
+                                <div id="speech-file-name" style="font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Loading...</div>
+                                <div id="speech-file-meta" style="font-size:10px;color:#64748b;margin-top:2px;">--</div>
+                            </div>
+                            <span id="speech-file-badge" style="font-size:9px;font-weight:700;letter-spacing:.05em;padding:2px 6px;border-radius:3px;background:#1e3a5f;color:#60a5fa;flex-shrink:0;">DEFAULT</span>
                         </div>
+                        <!-- Upload error -->
+                        <div id="speech-upload-error" style="display:none;font-size:11px;color:#ef4444;background:#1a0a0a;border:1px solid #7f1d1d;border-radius:5px;padding:6px 9px;margin-bottom:7px;"></div>
+                        <!-- Upload controls -->
+                        <input type="file" id="speech-file-input" accept=".wav,audio/wav" style="display:none" onchange="onSpeechFileSelected(this)">
+                        <div style="display:flex;gap:6px;">
+                            <button onclick="document.getElementById('speech-file-input').click()" style="flex:1;padding:6px 10px;background:#0f172a;border:1px solid #1e3a5f;color:#60a5fa;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Upload WAV File
+                            </button>
+                            <button id="speech-file-clear-btn" onclick="clearSpeechUpload()" style="display:none;padding:6px 10px;background:#0f172a;border:1px solid #1e2a3a;color:#64748b;font-size:11px;border-radius:5px;cursor:pointer;">Use Default</button>
+                        </div>
+                        <div style="font-size:10px;color:#334155;margin-top:5px;">Required: 16-bit &bull; 48 kHz &bull; Mono PCM WAV</div>
                     </div>
                     <!-- Status -->
                     <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
@@ -635,10 +632,6 @@
                     <div id="speech-results" style="overflow-y:auto;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;min-height:80px;max-height:160px;font-size:11px;">
                         <div style="color:#475569;text-align:center;padding:16px 0;" id="speech-results-placeholder">RMS values will appear per batch when running</div>
                     </div>
-                    <button id="speech-run-btn" class="btn-run-this" onclick="toggleSpeechEnhancement()">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
-                        Run Edge-AI Speech Enhancement
-                    </button>
                 </div>
 
             </div>
@@ -721,7 +714,8 @@ document.querySelectorAll('.dsi').forEach((el, i) => {
         document.getElementById('live-audio-section').style.display  = isAudio  ? 'flex' : 'none';
         document.getElementById('live-tvm-section').style.display    = isTvm    ? 'flex' : 'none';
         document.getElementById('live-speech-section').style.display = isSpeech ? 'flex' : 'none';
-        _setRunBtnState(isTvm);
+        _setRunBtnState(isTvm || isSpeech);
+        _syncTopRunBtn(false);
         if (isAudio)       { loadAudioDevices(); loadAudioOutputDevices(); }
         else if (isSpeech) { loadSpeechOutputDevices(); }
         else if (!isTvm) {
@@ -766,13 +760,21 @@ function toggleSigFlow(hdr) {
 function triggerRun(btn) {
     const activeIdx = Array.from(document.querySelectorAll('.dsi')).findIndex(d => d.classList.contains('active'));
     if (activeIdx === TVM_DEMO_IDX) { toggleTvmDemo(); return; }
+    if (activeIdx === SPEECH_IDX)   { toggleSpeechEnhancement(); return; }
 }
 
-function _setRunBtnState(isTvm) {
+function _setRunBtnState(enabled) {
     const top = document.getElementById('topRunBtn');
-    const mid = document.getElementById('midRunBtn');
-    if (top) top.disabled = !isTvm;
-    if (mid) mid.disabled = !isTvm;
+    if (top) top.disabled = !enabled;
+}
+
+function _syncTopRunBtn(running, label) {
+    const btn = document.getElementById('topRunBtn');
+    if (!btn) return;
+    btn.classList.toggle('running', running);
+    const svg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>';
+    const stopSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="1"/></svg>';
+    btn.innerHTML = (running ? stopSvg : svg) + ' ' + (label || (running ? 'Stop Demo' : 'Run Demo'));
 }
 
 /* ── AUDIO CLASSIFICATION BACKEND ── */
@@ -990,27 +992,111 @@ function setSpeechSource(mode) {
     }
 }
 
-function onSpeechFileSelected(input) {
-    if (!input.files.length) return;
-    _speechFile = input.files[0];
-    const label = _speechFile.name + ' (' + (_speechFile.size / 1024).toFixed(0) + ' KB)';
-    const el = document.getElementById('speech-file-name');
-    el.textContent = label; el.style.color = '#e2e8f0';
-    if (_speechInputBlobUrl) URL.revokeObjectURL(_speechInputBlobUrl);
-    _speechInputBlobUrl = URL.createObjectURL(_speechFile);
-    _enableSpeechPlayer('in', _speechInputBlobUrl);
+let _speechUploadedPath = null;
+
+function parseBrowserWav(file) {
+    return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const buf = e.target.result;
+                const view = new DataView(buf);
+                const u8 = new Uint8Array(buf);
+                const str = (o, n) => Array.from(u8.slice(o, o + n)).map(c => String.fromCharCode(c)).join('');
+                if (str(0, 4) !== 'RIFF' || str(8, 4) !== 'WAVE') { resolve({ error: 'Not a valid WAV file' }); return; }
+                let off = 12;
+                while (off + 8 <= buf.byteLength) {
+                    const id = str(off, 4);
+                    const sz = view.getUint32(off + 4, true);
+                    if (id === 'fmt ') {
+                        resolve({
+                            audioFormat:   view.getUint16(off + 8, true),
+                            channels:      view.getUint16(off + 10, true),
+                            sampleRate:    view.getUint32(off + 12, true),
+                            bitsPerSample: view.getUint16(off + 22, true),
+                        });
+                        return;
+                    }
+                    off += 8 + sz + (sz & 1);
+                }
+                resolve({ error: 'WAV fmt chunk not found' });
+            } catch (ex) { resolve({ error: ex.message }); }
+        };
+        reader.onerror = () => resolve({ error: 'Failed to read file' });
+        reader.readAsArrayBuffer(file.slice(0, 512));
+    });
 }
 
-function onSpeechFileDropped(event) {
-    const file = event.dataTransfer && event.dataTransfer.files[0];
-    if (!file) return;
-    _speechFile = file;
-    const label = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
-    const el = document.getElementById('speech-file-name');
-    el.textContent = label; el.style.color = '#e2e8f0';
-    if (_speechInputBlobUrl) URL.revokeObjectURL(_speechInputBlobUrl);
-    _speechInputBlobUrl = URL.createObjectURL(file);
-    _enableSpeechPlayer('in', _speechInputBlobUrl);
+function showSpeechUploadError(msg) {
+    const el = document.getElementById('speech-upload-error');
+    if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+function hideSpeechUploadError() {
+    const el = document.getElementById('speech-upload-error');
+    if (el) el.style.display = 'none';
+}
+
+function setSpeechFileCard(name, meta, badge, badgeColor) {
+    const nm = document.getElementById('speech-file-name');
+    const mt = document.getElementById('speech-file-meta');
+    const bx = document.getElementById('speech-file-badge');
+    if (nm) nm.textContent = name;
+    if (mt) mt.textContent = meta;
+    if (bx) { bx.textContent = badge; bx.style.background = badgeColor === 'green' ? '#14532d' : '#1e3a5f'; bx.style.color = badgeColor === 'green' ? '#4ade80' : '#60a5fa'; }
+}
+
+function loadSpeechFileInfo() {
+    fetch('/speech-enhancement/info')
+        .then(r => r.json())
+        .then(d => {
+            const wi = d.wavInfo;
+            const meta = wi ? `${(wi.sampleRate/1000).toFixed(0)} kHz · ${wi.bitsPerSample}-bit · ${wi.channels === 1 ? 'Mono' : wi.channels + ' ch'} · ${wi.durationSec}s` : 'Details unavailable';
+            setSpeechFileCard(d.defaultFileName || d.defaultFile, meta, 'DEFAULT', 'blue');
+        })
+        .catch(() => setSpeechFileCard('input_audio.wav', 'Details unavailable', 'DEFAULT', 'blue'));
+}
+
+async function onSpeechFileSelected(input) {
+    if (!input.files.length) return;
+    const file = input.files[0];
+    hideSpeechUploadError();
+    const info = await parseBrowserWav(file);
+    if (info.error) { showSpeechUploadError('Invalid file: ' + info.error); input.value = ''; return; }
+    const errs = [];
+    if (info.audioFormat !== 1)       errs.push('must be uncompressed PCM');
+    if (info.channels !== 1)          errs.push(`must be mono (got ${info.channels} channels)`);
+    if (info.sampleRate !== 48000)    errs.push(`must be 48 kHz (got ${(info.sampleRate/1000).toFixed(1)} kHz)`);
+    if (info.bitsPerSample !== 16)    errs.push(`must be 16-bit (got ${info.bitsPerSample}-bit)`);
+    if (errs.length) { showSpeechUploadError('Invalid WAV: ' + errs.join(', ')); input.value = ''; return; }
+
+    setSpeechFileCard(file.name, 'Uploading...', 'UPLOADING', 'blue');
+    const body = await file.arrayBuffer();
+    fetch('/upload-speech-enhancement-file', { method: 'POST', body })
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) { showSpeechUploadError('Upload failed: ' + d.error); loadSpeechFileInfo(); return; }
+            _speechUploadedPath = d.path;
+            const wi = d.wavInfo;
+            const meta = wi ? `${(wi.sampleRate/1000).toFixed(0)} kHz · ${wi.bitsPerSample}-bit · ${wi.channels === 1 ? 'Mono' : wi.channels + ' ch'} · ${(file.size/1024).toFixed(0)} KB` : file.name;
+            setSpeechFileCard(file.name, meta, 'UPLOADED', 'green');
+            const clearBtn = document.getElementById('speech-file-clear-btn');
+            if (clearBtn) clearBtn.style.display = '';
+            if (_speechInputBlobUrl) URL.revokeObjectURL(_speechInputBlobUrl);
+            _speechInputBlobUrl = URL.createObjectURL(file);
+            _enableSpeechPlayer('in', _speechInputBlobUrl);
+        })
+        .catch(err => { showSpeechUploadError('Upload failed: ' + err.message); loadSpeechFileInfo(); });
+}
+
+function clearSpeechUpload() {
+    _speechUploadedPath = null;
+    hideSpeechUploadError();
+    const clearBtn = document.getElementById('speech-file-clear-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
+    const inp = document.getElementById('speech-file-input');
+    if (inp) inp.value = '';
+    loadSpeechFileInfo();
 }
 
 function toggleSpeechEnhancement() {
@@ -1026,7 +1112,8 @@ function startSpeechEnhancement() {
 
     {
         setSpeechStatus('Starting RPMsg pipeline...', '#f59e0b', false);
-        fetch('/start-speech-enhancement')
+        const startUrl = '/start-speech-enhancement' + (_speechUploadedPath ? '?file=' + encodeURIComponent(_speechUploadedPath) : '');
+        fetch(startUrl)
             .then(r => r.ok ? r.json() : r.json().then(j => Promise.reject(new Error(j.error || 'HTTP ' + r.status))).catch(e => { if (e instanceof SyntaxError) throw new Error('HTTP ' + r.status); throw e; }))
             .then(() => {
                 speechRunning = true;
@@ -1115,18 +1202,15 @@ function setSpeechStatus(msg, color, pulse) {
         bars.classList.toggle('active', pulse);
         bars.querySelectorAll('span').forEach(s => s.style.background = color);
     }
+    if (!pulse && speechRunning) {
+        speechRunning = false;
+        updateSpeechRunBtn(false);
+    }
 }
 
 function updateSpeechRunBtn(running) {
-    const btn = document.getElementById('speech-run-btn');
-    if (!btn) return;
-    if (running) {
-        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop Spectrum';
-        btn.style.background = '#dc2626';
-    } else {
-        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg> Start Spectrum';
-        btn.style.background = '';
-    }
+    const activeIdx = Array.from(document.querySelectorAll('.dsi')).findIndex(d => d.classList.contains('active'));
+    if (activeIdx === SPEECH_IDX) _syncTopRunBtn(running);
 }
 
 /* ── SPEECH SPECTROGRAM ─────────────────────────────────────────────────── */
@@ -1500,15 +1584,8 @@ function setTvmDemoStatus(msg, color, pulse) {
 }
 
 function updateTvmDemoBtn(running) {
-    const btn = document.getElementById('tvm-demo-btn');
-    if (!btn) return;
-    if (running) {
-        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop Inference';
-        btn.style.background = '#dc2626';
-    } else {
-        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Run TVM Inference';
-        btn.style.background = '';
-    }
+    const activeIdx = Array.from(document.querySelectorAll('.dsi')).findIndex(d => d.classList.contains('active'));
+    if (activeIdx === TVM_DEMO_IDX) _syncTopRunBtn(running);
 }
 
 /* ── STATUS BAR ── */
@@ -1528,7 +1605,7 @@ function pollCpuStatus() {
 }
 setInterval(pollCpuStatus, 1000);
 pollCpuStatus();
-_setRunBtnState(true); /* TVM is default active demo */
+_setRunBtnState(true); /* Speech Enhancement is default active demo */
 drawSpeechSpecIdle('in');
 drawSpeechSpecIdle('out');
 drawWaveformIdle('in');
@@ -1842,7 +1919,7 @@ function toggleTheme() {
 }
 (function(){ if(document.documentElement.dataset.theme==='light'){ const b=document.getElementById('theme-btn'); if(b) b.innerHTML='&#9790;'; } })();
 
-document.addEventListener('DOMContentLoaded', () => { _checkDspOverlayConflict(); _HC.start(); loadSpeechDevices(); loadSpeechOutputDevices(); _setRunBtnState(false); });
+document.addEventListener('DOMContentLoaded', () => { _checkDspOverlayConflict(); _HC.start(); loadSpeechDevices(); loadSpeechOutputDevices(); loadSpeechFileInfo(); });
 </script>
 
 <!-- ── DSP audio overlay conflict modal ── -->
