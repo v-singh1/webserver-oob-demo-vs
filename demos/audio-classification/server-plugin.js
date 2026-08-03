@@ -2,26 +2,93 @@
  * Copyright (C) 2024 Texas Instruments Incorporated - http://www.ti.com/
  *
  * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+/**
+ * @file server-plugin.js
+ * @memberof demos/audio-classification
+ * @brief Express + WebSocket server plugin for the YAMNet audio classification demo.
  *
- * audio-classification demo server plugin
- * Registers:
- *   GET  /audio-devices
- *   POST /upload-audio-classification-file   (raw binary, ?ext=wav)
- *   GET  /start-audio-classification?device=<alsa-device>
- *   GET  /start-audio-classification?source=file&filepath=<path>
- *   GET  /stop-audio-classification
- *   WebSocket path: /audio
+ * Registered REST endpoints:
+ * | Method | Path | Description |
+ * |--------|------|-------------|
+ * | GET  | /audio-devices | List ALSA capture devices |
+ * | GET  | /audio-output-devices | List ALSA playback devices |
+ * | POST | /upload-audio-classification-file | Store raw audio binary in /tmp |
+ * | GET  | /start-audio-classification | Start live-device or file-source pipeline |
+ * | GET  | /stop-audio-classification  | Stop the active pipeline |
  *
- * Uses fifo-reader.js child process for blocking FIFO reads.
- * Supports MOCK=1 env var for development on x86 without GStreamer.
+ * WebSocket path: @c /audio  — broadcasts @c {class, timestamp} JSON messages.
+ *
+ * Data flow (device source):
+ * @code
+ *   audio_utils start_gst → GStreamer/NNStreamer → FIFO
+ *   → fifo-reader.js child → stdout JSON → WebSocket /audio → browser
+ * @endcode
+ *
+ * Set @c MOCK=1 to run on x86 without GStreamer; random YAMNet labels are
+ * emitted every 2 s instead.
  */
 
 'use strict';
 
 const { exec, execSync, spawn } = require('child_process');
-const express                   = require('express');
 const fs                        = require('fs');
 const path                      = require('path');
+
+/**
+ * @brief Create an Express middleware that buffers the raw request body.
+ *
+ * Avoids a hard dependency on the `express` npm package (which is not
+ * resolvable from the plugin path on the EVM).  Uses only Node.js
+ * built-in stream events.
+ *
+ * @param {number} limitBytes - Maximum allowed body size; responds 413 if exceeded.
+ * @returns {Function} Express-compatible middleware @c (req, res, next).
+ */
+function rawBody(limitBytes) {
+    return (req, res, next) => {
+        const chunks = [];
+        let size = 0;
+        req.on('data', chunk => {
+            size += chunk.length;
+            if (size > limitBytes) { res.status(413).send('Payload too large'); req.destroy(); return; }
+            chunks.push(chunk);
+        });
+        req.on('end', () => { req.body = Buffer.concat(chunks); next(); });
+        req.on('error', () => res.status(400).send('Bad request'));
+    };
+}
+
+/**
+ * @brief Parse @c arecord @c -l or @c aplay @c -l stdout into pipe-delimited device entries.
+ *
+ * Each card+device combination in the output becomes an independent
+ * entry — no deduplication by card number.  Entries matching webcam,
+ * camera, or cape are filtered out.
+ *
+ * Input line format:
+ * @verbatim
+ * card N: SHORT [CARD_NAME], device D: LONG_NAME SHORT_NAME [...]
+ * @endverbatim
+ *
+ * Output format per entry: @c "plughw:N,D|CARD_NAME: DEV_SHORT"
+ *
+ * @param {string} stdout - Raw stdout from arecord/aplay.
+ * @returns {string} Newline-separated device entries, or empty string if none.
+ */
+function parseAlsaOutput(stdout) {
+    const results = [];
+    for (const line of stdout.split('\n')) {
+        if (!line.startsWith('card')) continue;
+        const m = line.match(/card (\d+):.*?\[([^\]]+)\],\s*device (\d+):\s*\S+\s+(\S+)/);
+        if (!m) continue;
+        const [, cardNum, cardName, devNum, devShort] = m;
+        if (/webcam|camera|cape/i.test(cardName)) continue;
+        results.push(`plughw:${cardNum},${devNum}|${cardName}: ${devShort}`);
+    }
+    return results.join('\n');
+}
 
 const WS_OPEN = 1; /* WebSocket.OPEN — spec constant, no ws import needed */
 
@@ -43,6 +110,18 @@ const MOCK_CLASSES = [
     'Clapping', 'Cough', 'Dog bark', 'Water', 'Wind'
 ];
 
+/**
+ * @brief Plugin entry point called by server.js at startup.
+ *
+ * Registers all REST routes and the WebSocket @c /audio handler.
+ * State is scoped to this closure so multiple require() calls would
+ * produce independent plugin instances (not currently used).
+ *
+ * @param {object} app    - Express application instance.
+ * @param {object} wss    - ws.WebSocketServer instance shared across plugins.
+ * @param {object} device - Parsed device.json; use @c device.demoConfig['audio-classification']
+ *                          for per-device tuning parameters.
+ */
 module.exports = function registerAudioClassification(app, wss, device) {
 
     let fifoReaderProcess = null;
@@ -57,20 +136,35 @@ module.exports = function registerAudioClassification(app, wss, device) {
 
     app.get('/audio-devices', (req, res) => {
         if (MOCK) {
-            return res.send('plughw:0,0|Mock USB Microphone\nplughw:1,0|Mock Built-in Mic');
+            return res.send('plughw:0,0|Mock Card: mock-input-0\nplughw:1,0|Mock Card: mock-input-1');
         }
-        exec('/usr/bin/audio_utils devices', (error, stdout) => {
+        exec('arecord -l 2>/dev/null', (error, stdout) => {
             if (error) {
-                console.error('[audio] audio_utils devices error:', error);
-                return res.status(500).send('Error listing audio devices');
+                console.error('[audio] arecord -l error:', error);
+                return res.status(500).send('Error listing audio input devices');
             }
-            res.send(stdout);
+            const out = parseAlsaOutput(stdout);
+            res.send(out || 'No audio input devices found');
+        });
+    });
+
+    app.get('/audio-output-devices', (req, res) => {
+        if (MOCK) {
+            return res.send('plughw:0,0|Mock Card: mock-output-0\nplughw:0,1|Mock Card: mock-output-1');
+        }
+        exec('aplay -l 2>/dev/null', (error, stdout) => {
+            if (error) {
+                console.error('[audio] aplay -l error:', error);
+                return res.status(500).send('Error listing audio output devices');
+            }
+            const out = parseAlsaOutput(stdout);
+            res.send(out || 'No audio output devices found');
         });
     });
 
     /* File upload — saves raw audio binary to /tmp for later classification */
     app.post('/upload-audio-classification-file',
-        express.raw({ type: '*/*', limit: '50mb' }),
+        rawBody(50 * 1024 * 1024),
         (req, res) => {
             if (MOCK) {
                 return res.json({ path: '/tmp/mock_audio.wav' });
@@ -152,12 +246,18 @@ module.exports = function registerAudioClassification(app, wss, device) {
     /* Pipeline helpers                                             */
     /* ------------------------------------------------------------ */
 
+    /** @brief Create the classification FIFO if it does not already exist. */
     function ensureFifo() {
         if (!fs.existsSync(fifoPath)) {
             try { execSync(`mkfifo "${fifoPath}"`); } catch (_) {}
         }
     }
 
+    /**
+     * @brief Assemble the gst-launch-1.0 command string for file-source classification.
+     * @param {string} filepath - Absolute path to the audio file to classify.
+     * @returns {string} Shell command string ready for exec().
+     */
     function buildFilePipelineCmd(filepath) {
         return [
             'gst-launch-1.0 -e',
@@ -180,6 +280,13 @@ module.exports = function registerAudioClassification(app, wss, device) {
     /* FIFO reader child process                                     */
     /* ------------------------------------------------------------ */
 
+    /**
+     * @brief Spawn the fifo-reader.js child process to consume classification labels.
+     *
+     * The child reads lines from the FIFO (blocking) and emits JSON objects on
+     * stdout.  Each @c {type:"classification"} message is broadcast to all
+     * connected WebSocket clients on @c /audio.  No-op if already running.
+     */
     function startFifoReader() {
         if (fifoReaderProcess) return;
 
@@ -218,6 +325,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
         });
     }
 
+    /** @brief Terminate the fifo-reader child process if running. */
     function stopFifoReader() {
         if (fifoReaderProcess) {
             fifoReaderProcess.kill('SIGTERM');
@@ -225,6 +333,12 @@ module.exports = function registerAudioClassification(app, wss, device) {
         }
     }
 
+    /**
+     * @brief Stop all active pipelines and timers, clean up processes.
+     *
+     * Handles both MOCK interval and real audio_utils / GStreamer processes.
+     * Called on REST @c /stop-audio-classification and on SIGTERM/SIGINT.
+     */
     function stopAll() {
         if (mockInterval) {
             clearInterval(mockInterval);

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Model Inspector - TI AM62D Demo Portal</title>
+    <script>(function(){var B=1280;function r(){var s=window.innerWidth/B;document.documentElement.style.zoom=s<1?s:'';}r();window.addEventListener('resize',r);})();</script>
+    <title>AI Model Inspector - TI Sitara AM62D Edge AI Portal</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -96,6 +97,15 @@
             color: #4da6ff; font-size: 11px; font-weight: 700;
             padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px;
         }
+
+        .fs-btn {
+            background: none; border: 1px solid #1e2a3a; color: #64748b;
+            cursor: pointer; padding: 4px 5px; border-radius: 4px;
+            line-height: 1; display: flex; align-items: center;
+            transition: color .15s, border-color .15s; flex-shrink: 0;
+        }
+        .fs-btn:hover { color: #e2e8f0; border-color: #4da6ff; }
+        .main:fullscreen { border-radius: 0; overflow-y: auto; background: #0a0e1a; }
 
         /* ── INSPECTOR GRID ── */
         .inspector-grid {
@@ -246,6 +256,80 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #1e2a3a; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #2d3f5a; }
+
+        /* ── RESPONSIVE ── */
+        .sidebar-toggle {
+            display: none;
+            background: none;
+            border: 1px solid #1e2a3a;
+            color: #94a3b8;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .sidebar-toggle:hover { color: #e2e8f0; background: rgba(255,255,255,0.05); }
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 149;
+        }
+
+        /* 900–1100 px: slightly narrower columns */
+        @media (max-width: 1100px) {
+            .inspector-grid { grid-template-columns: 260px 1fr; }
+            .sidebar { width: 200px; }
+        }
+
+        /* ≤900 px: collapsible sidebar, stacked inspector */
+        @media (max-width: 900px) {
+            .sidebar-toggle { display: flex; align-items: center; justify-content: center; }
+
+            .sidebar {
+                position: fixed;
+                left: -230px;
+                top: 0;
+                height: 100%;
+                z-index: 150;
+                transition: left 0.22s ease;
+                box-shadow: 4px 0 24px rgba(0,0,0,0.55);
+            }
+            .sidebar.open { left: 0; }
+            .sidebar-overlay.open { display: block; }
+
+            .inspector-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: 220px 1fr;
+            }
+
+            .ph-sub   { display: none; }
+            .ph-badge { display: none; }
+            .statusbar { display: none; }
+        }
+
+        /* ≤680 px: compact navbar, 2-col stat/arch grids */
+        @media (max-width: 680px) {
+            .navbar { padding: 0 12px; height: 54px; }
+            .brand-sub { display: none; }
+            .conn-block { display: none; }
+            .main { padding: 10px; gap: 10px; }
+            .ph-title { font-size: 17px; }
+            .inspector-grid { grid-template-rows: 180px 1fr; gap: 8px; }
+            .stat-row { grid-template-columns: repeat(2, 1fr); }
+            .arch-grid { grid-template-columns: 1fr 1fr; }
+            .stat-val  { font-size: 17px; }
+        }
+
+        /* ≤480 px: single-column stats */
+        @media (max-width: 480px) {
+            .stat-row { grid-template-columns: 1fr 1fr; }
+            .stat-val { font-size: 15px; }
+            .arch-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -253,10 +337,11 @@
 <!-- ── NAVBAR ── -->
 <nav class="navbar">
     <div class="navbar-left">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle navigation">&#9776;</button>
         <div class="ti-logo"><img src="ti-logo.png" alt="Texas Instruments"></div>
         <div>
-            <span class="brand-main">TI AM62D</span>
-            <span class="brand-sub">DEMO PORTAL</span>
+            <span class="brand-main">TI SITARA</span>
+            <span class="brand-sub">EDGE AI PORTAL</span>
         </div>
     </div>
     <div class="navbar-right">
@@ -267,6 +352,9 @@
         <button class="theme-btn" title="Toggle theme">&#9728;</button>
     </div>
 </nav>
+
+<!-- Sidebar overlay (tap to close on small screens) -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <!-- ── BODY LAYOUT ── -->
 <div class="layout">
@@ -318,7 +406,7 @@
     </aside>
 
     <!-- MAIN -->
-    <main class="main">
+    <main class="main" id="mi-main">
 
         <!-- Page Header -->
         <div class="page-hdr">
@@ -331,7 +419,10 @@
                     <div class="ph-sub">Browse and inspect AI models deployed on the AM62D platform via TIDL inference engine.</div>
                 </div>
             </div>
-            <span class="ph-badge">TIDL Runtime</span>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span class="ph-badge">TIDL Runtime</span>
+                <button class="fs-btn" onclick="toggleFullscreen(this,document.getElementById('mi-main'))" title="Fullscreen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg></button>
+            </div>
         </div>
 
         <!-- Inspector Grid -->
@@ -390,6 +481,39 @@
 </div>
 
 <script>
+/* ── FULLSCREEN ── */
+let _fsBtn = null;
+document.addEventListener('fullscreenchange', () => {
+    if (_fsBtn && !document.fullscreenElement) { _updateFsIcon(_fsBtn, false); _fsBtn = null; }
+});
+function toggleFullscreen(btn, elem) {
+    if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => console.warn('[fs]', err));
+        _fsBtn = btn; _updateFsIcon(btn, true);
+    } else { document.exitFullscreen(); }
+}
+function _updateFsIcon(btn, isFs) {
+    const svg = btn.querySelector('svg'); if (!svg) return;
+    svg.innerHTML = isFs
+        ? '<path d="M8 3v3a2 2 0 0 1-2 2H3m18-5h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3m8 0v-3a2 2 0 0 1 2-2h3"/>'
+        : '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/>';
+    btn.title = isFs ? 'Exit fullscreen (Esc)' : 'Fullscreen';
+}
+
+/* ── SIDEBAR TOGGLE (small screens) ── */
+function toggleSidebar() {
+    document.querySelector('.sidebar').classList.toggle('open');
+    document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+/* Close sidebar when a nav link is clicked on small screens */
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sidebar .nav-item').forEach(el => {
+        el.addEventListener('click', () => {
+            if (window.innerWidth <= 900) toggleSidebar();
+        });
+    });
+});
+
 /* ── MODEL DATA ── */
 const MODELS_STATIC = [
     {
@@ -526,6 +650,38 @@ async function loadModelList() {
 }
 
 /* ── SELECT MODEL ── */
+function injectIframeZoom(frame) {
+    try {
+        var d = frame.contentDocument;
+        if (!d || !d.head) return;
+        /* Force the visualization layout to always stay side-by-side (row),
+           overriding the @media <=992px rule that collapses canvas-wrapper. */
+        var st = d.createElement('style');
+        st.textContent = [
+            /* Keep graph/tree canvas + details panel side-by-side at all viewport widths */
+            '.visualization-container{flex-direction:row!important;height:calc(100vh - 200px)!important;}',
+            '.canvas-wrapper{flex:1!important;min-width:250px!important;height:100%!important;}',
+            '.details-panel{width:30%!important;min-width:280px!important;height:100%!important;}',
+            /* Fix header: replace absolute-centered model name with a proper flex item
+               so it never overlaps the "Edge AI Model Inspector" logo text */
+            '.logo{flex-shrink:0;}',
+            '.header-model-name-center{position:static!important;left:auto!important;transform:none!important;flex:1!important;text-align:center!important;overflow:hidden!important;min-width:0!important;}',
+            '.header-model-name-center .model-name{max-width:100%!important;}',
+            /* Keep navigation tab labels visible and header in row layout —
+               the iframe is narrower than 768px so the media query would
+               otherwise hide .tab span and stack the header vertically */
+            '.tab span{display:inline!important;}',
+            '.header-container{flex-direction:row!important;align-items:center!important;flex-wrap:wrap!important;}',
+            '.main-tabs{overflow-x:auto;}'
+        ].join('');
+        d.head.appendChild(st);
+        /* Proportional zoom so content scales on screens narrower than 1280px */
+        var s = d.createElement('script');
+        s.textContent = '(function(){var B=1280;function r(){var sc=window.top.innerWidth/B;document.documentElement.style.zoom=sc<1?sc:"";}r();window.addEventListener("resize",r);})();';
+        d.head.appendChild(s);
+    } catch(e) {}
+}
+
 function selectModel(idx) {
     document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
     const cards = document.querySelectorAll('.model-card');
@@ -533,6 +689,7 @@ function selectModel(idx) {
     document.getElementById('empty-state').style.display = 'none';
     const frame = document.getElementById('model-frame');
     frame.style.display = 'block';
+    frame.onload = function() { injectIframeZoom(frame); };
     frame.src = _models[idx].file;
 }
 

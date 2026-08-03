@@ -31,6 +31,35 @@
  *
  */
 
+/**
+ * @file audio_utils.c
+ * @brief Audio classification utility for the TI AM62D demo portal.
+ *
+ * Enumerates ALSA capture/playback devices and drives a GStreamer
+ * NNStreamer pipeline that classifies audio in real-time using the
+ * YAMNet TFLite model.  Classification labels are written to a named
+ * FIFO consumed by the Node.js webserver plugin and forwarded to the
+ * browser over WebSocket.
+ *
+ * Pipeline (live device source):
+ * @code
+ *   alsasrc → audioconvert → tensor_converter → tensor_aggregator
+ *   → tensor_transform (S16LE→F32, normalise) → tensor_filter (tflite/XNNPACK)
+ *   → tensor_decoder (image_labeling) → filesink → FIFO
+ * @endcode
+ *
+ * Output FIFO : /tmp/audio_classification_fifo
+ * PID file    : /tmp/audio_classification.pid
+ *
+ * @par Usage
+ * @code
+ *   audio_utils devices
+ *   audio_utils start_gst [device]   # e.g. plughw:1,0
+ *   audio_utils stop_gst
+ *   audio_utils status
+ * @endcode
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,7 +84,14 @@ char fifo_path[256] = "/tmp/audio_classification_fifo";
 char pid_file[256] = "/tmp/audio_classification.pid";
 volatile int running = 0;
 
-// Signal handler for graceful shutdown
+/**
+ * @brief Signal handler for graceful pipeline shutdown.
+ *
+ * Clears the global @p running flag so the GStreamer monitor loop exits
+ * cleanly on SIGTERM or SIGINT.
+ *
+ * @param signum  Signal number received.
+ */
 void signal_handler(int signum) {
     if (signum == SIGTERM || signum == SIGINT) {
         fprintf(stderr, "Received signal %d, stopping audio classification\n", signum);
@@ -63,21 +99,110 @@ void signal_handler(int signum) {
     }
 }
 
-// Get list of audio recording devices
+/**
+ * @brief Parse one line of @c arecord @c -l / @c aplay @c -l output.
+ *
+ * Expected format:
+ * @verbatim
+ * card N: SHORT [CARD_NAME], device D: LONG_NAME SHORT_NAME [...]
+ * @endverbatim
+ *
+ * On success, populates @c audio_devices[device_count] with the
+ * @c plughw:N,D ALSA identifier and a @c "CARD_NAME: DEV_SHORT"
+ * display name.  Devices matching HDMI, webcam, camera, or cape
+ * patterns are silently skipped.
+ *
+ * @param line  Null-terminated line from arecord/aplay output.
+ * @return 1 if a valid device entry was populated, 0 to skip.
+ */
+static int parse_alsa_line(const char *line) {
+    int card_num = -1, dev_num = -1;
+    char card_name[128] = {0};
+    char dev_short[128] = {0};
+
+    if (strncmp(line, "card", 4) != 0) return 0;
+
+    /* Line must contain ", device " to be a device entry */
+    const char *dev_str = strstr(line, ", device ");
+    if (!dev_str) return 0;
+
+    sscanf(line, "card %d:", &card_num);
+    if (card_num < 0) return 0;
+
+    /* Card display name is text inside the first [...] */
+    const char *ns = strchr(line, '[');
+    const char *ne = ns ? strchr(ns, ']') : NULL;
+    if (!ns || !ne || ne <= ns) return 0;
+    int nl = (int)(ne - ns - 1);
+    if (nl <= 0 || nl >= (int)sizeof(card_name)) return 0;
+    strncpy(card_name, ns + 1, nl);
+    card_name[nl] = '\0';
+
+    /* Skip webcam / camera / cape devices */
+    if (strstr(card_name, "HDMI")   || strstr(card_name, "hdmi")   ||
+        strstr(card_name, "cape")   ||
+        strstr(card_name, "Webcam") || strstr(card_name, "webcam") ||
+        strstr(card_name, "Camera") || strstr(card_name, "camera")) {
+        fprintf(stderr, "Skipping device: %s\n", card_name);
+        return 0;
+    }
+
+    sscanf(dev_str, ", device %d:", &dev_num);
+    if (dev_num < 0) return 0;
+
+    /* Device short name: skip past "device N: LONG_NAME " to reach SHORT_NAME */
+    const char *p = strchr(dev_str, ':');
+    if (!p) return 0;
+    p++;
+    while (*p == ' ') p++;          /* skip spaces after colon */
+    while (*p && *p != ' ') p++;    /* skip long device name */
+    while (*p == ' ') p++;          /* skip spaces */
+    int di = 0;
+    while (*p && *p != ' ' && *p != '[' && *p != '\n' && di < 127)
+        dev_short[di++] = *p++;
+    dev_short[di] = '\0';
+    if (di == 0) return 0;
+
+    /* Build display: "CARD_NAME: DEV_SHORT" */
+    char display[256];
+    snprintf(display, sizeof(display), "%s: %s", card_name, dev_short);
+
+    strncpy(audio_devices[device_count].display_name, display,
+            sizeof(audio_devices[device_count].display_name) - 1);
+    audio_devices[device_count].display_name[sizeof(audio_devices[device_count].display_name) - 1] = '\0';
+
+    snprintf(audio_devices[device_count].alsa_device,
+             sizeof(audio_devices[device_count].alsa_device),
+             "plughw:%d,%d", card_num, dev_num);
+
+    fprintf(stderr, "Found device: %s -> %s\n",
+            display, audio_devices[device_count].alsa_device);
+    return 1;
+}
+
+/**
+ * @brief Enumerate ALSA recording devices via @c arecord @c -l.
+ *
+ * Runs @c arecord @c -l, parses every card+device combination through
+ * parse_alsa_line(), and populates the global @c audio_devices[] array.
+ * Returns a heap-allocated, newline-separated list of display names
+ * (or an error message string).  The caller must @c free() the pointer.
+ *
+ * @return Heap-allocated device list string, or @c NULL on allocation failure.
+ */
 char* get_arecord_devices() {
     FILE *fp;
-    char path[1035];
+    char line[1035];
     char *device_list = malloc(4096);
 
     if (!device_list) return NULL;
     device_list[0] = '\0';
 
-    // Clear existing device count
     device_count = 0;
+    memset(audio_devices, 0, sizeof(audio_devices));
 
-    // First check if ALSA is available
     fp = popen("which arecord 2>/dev/null", "r");
-    if (fp == NULL || !fgets(path, sizeof(path), fp)) {
+    if (fp == NULL || !fgets(line, sizeof(line), fp)) {
         fprintf(stderr, "arecord not found on system\n");
         if (fp) pclose(fp);
         strcpy(device_list, "No audio devices found - arecord not available");
@@ -92,83 +217,54 @@ char* get_arecord_devices() {
         return device_list;
     }
 
-    char current_card_name[256] = {0};
-    int card_num = -1;
-
-    // Reset device array
-    memset(audio_devices, 0, sizeof(audio_devices));
-
-    // Process arecord output
-    while (fgets(path, sizeof(path), fp) != NULL) {
-        if (strncmp(path, "card", 4) == 0) {
-            char *card_str = strstr(path, "card ");
-            if (card_str) {
-                sscanf(card_str, "card %d:", &card_num);
-            }
-
-            char *name_start = strchr(path, '[');
-            char *name_end = strchr(path, ']');
-            if (name_start && name_end && name_end > name_start && device_count < MAX_DEVICES) {
-                int name_len = name_end - name_start - 1;
-                if (name_len > 0 && name_len < sizeof(current_card_name)) {
-                    strncpy(current_card_name, name_start + 1, name_len);
-                    current_card_name[name_len] = '\0';
-
-                    /* Skip HDMI, playback-only, and USB video capture (webcam) devices */
-                    if (strstr(current_card_name, "HDMI")    != NULL ||
-                        strstr(current_card_name, "hdmi")    != NULL ||
-                        strstr(current_card_name, "cape")    != NULL ||
-                        strstr(current_card_name, "Webcam")  != NULL ||
-                        strstr(current_card_name, "webcam")  != NULL ||
-                        strstr(current_card_name, "Camera")  != NULL ||
-                        strstr(current_card_name, "camera")  != NULL) {
-                        fprintf(stderr, "Skipping non-audio device: %s (card %d)\n",
-                                current_card_name, card_num);
-                        continue;
-                    }
-
-                    // Save device details
-                    strncpy(audio_devices[device_count].display_name,
-                            current_card_name,
-                            sizeof(audio_devices[device_count].display_name) - 1);
-                    audio_devices[device_count].display_name[sizeof(audio_devices[device_count].display_name) - 1] = '\0';
-
-                    snprintf(audio_devices[device_count].alsa_device,
-                             sizeof(audio_devices[device_count].alsa_device),
-                             "plughw:%d,0", card_num);
-
-                    // Add to return string with newline separation
-                    if (device_count > 0) {
-                        strcat(device_list, "\n");
-                    }
-                    strcat(device_list, current_card_name);
-
-                    fprintf(stderr, "Found capture device: %s -> %s\n",
-                           current_card_name, audio_devices[device_count].alsa_device);
-
-                    device_count++;
-                }
-            }
-        }
+    while (fgets(line, sizeof(line), fp) != NULL && device_count < MAX_DEVICES) {
+        if (parse_alsa_line(line))
+            device_count++;
     }
 
     pclose(fp);
 
-    // If no devices found, provide a clear message
     if (device_count == 0) {
         strcpy(device_list, "No audio input devices found");
+    } else {
+        for (int i = 0; i < device_count; i++) {
+            if (i > 0) strcat(device_list, "\n");
+            strcat(device_list, audio_devices[i].display_name);
+        }
     }
 
     return device_list;
 }
 
-// Placeholder for update_label_text - will be handled by WebSocket in JS
+/**
+ * @brief Log a classification result to stderr.
+ *
+ * Result delivery to the UI is handled by the GStreamer filesink element
+ * writing labels to the FIFO; the Node.js server reads that FIFO and
+ * forwards results over WebSocket.  This function is retained for
+ * diagnostic logging only.
+ *
+ * @param text  Null-terminated classification label string.
+ */
 void update_label_text(const char* text) {
     // In a real scenario, this would send data over a socket or write to a shared memory.
     // For this demo, the GStreamer pipeline will write to a FIFO, and the JS server will read from it.
     fprintf(stderr, "Classification: %s\n", text);
 }
 
+/**
+ * @brief Thread function that runs the GStreamer audio classification pipeline.
+ *
+ * Creates the output FIFO, assembles and launches a @c gst-launch-1.0
+ * command string, then monitors the FIFO via @c select() until the
+ * global @p running flag is cleared (e.g. by signal_handler()).
+ * Classification labels read from the FIFO are echoed to stderr for
+ * debugging; the Node.js FIFO reader is the primary consumer.
+ * Cleans up the FIFO and pipeline handle on exit.
+ *
+ * @param arg  Unused thread argument (required by pthread API).
+ * @return NULL.
+ */
 void* gst_launch_thread(void *arg) {
     char buffer[256];  // Increased buffer size
 
@@ -284,7 +380,20 @@ void* gst_launch_thread(void *arg) {
     return NULL;
 }
 
-// Main function for testing or direct execution
+/**
+ * @brief Entry point – dispatches to the requested sub-command.
+ *
+ * | argv[1]    | Behaviour |
+ * |------------|-----------|
+ * | devices    | Print all ALSA capture devices as @c "plughw:C,D|NAME\\n" |
+ * | start_gst  | Start the classification pipeline; optional argv[2] selects the device |
+ * | stop_gst   | Send SIGTERM to the running instance via the PID file |
+ * | status     | Print @c RUNNING or @c STOPPED |
+ *
+ * @param argc  Argument count.
+ * @param argv  Argument vector.
+ * @return 0 on success, 1 on error or unrecognised command.
+ */
 int main(int argc, char *argv[]) {
     if (argc > 1 && strcmp(argv[1], "devices") == 0) {
         char *devices = get_arecord_devices();

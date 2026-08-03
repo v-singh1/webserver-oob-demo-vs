@@ -9,7 +9,7 @@
     }
   ],
   "soc": "AM62Dx quad Cortex-A53 @ 1.4GHz + C7x DSP",
-  "demos": ["cpu-monitor", "tvm-inference"],
+  "demos": ["cpu-monitor", "tvm-inference", "audio-classification", "speech-enhancement"],
   "demoConfig": {
     "tvm-inference": {
       "artifactsPath": "/root/artifacts_mobilenet_v2_tv-onnx/",

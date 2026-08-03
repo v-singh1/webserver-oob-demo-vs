@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>(function(){var B=1280;function r(){var s=window.innerWidth/B;document.documentElement.style.zoom=s<1?s:'';}r();window.addEventListener('resize',r);})();</script>
     <title>Audio DSP With Analytics - TI AM62D Demo Portal</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -180,6 +181,17 @@
         /* ── DEMO DESCRIPTION ── */
         .desc-text { font-size: 13px; color: #94a3b8; line-height: 1.65; flex-shrink: 0; }
         .sub-ttl { font-size: 12.5px; font-weight: 700; color: #cbd5e1; flex-shrink: 0; }
+        .sf-toggle { cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; }
+        .sf-toggle:hover { color: #e2e8f0; }
+        .sf-chev { color: #64748b; transition: transform 0.2s; flex-shrink: 0; }
+        .fs-btn {
+            background: none; border: 1px solid #1e2a3a; color: #64748b;
+            cursor: pointer; padding: 4px 5px; border-radius: 4px;
+            line-height: 1; display: flex; align-items: center;
+            transition: color .15s, border-color .15s; flex-shrink: 0;
+        }
+        .fs-btn:hover { color: #e2e8f0; border-color: #4da6ff; }
+        .card:fullscreen { border-radius: 0; overflow-y: auto; }
         .feat-list { list-style: none; display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
         .feat-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #94a3b8; }
         .chk { color: #22c55e; flex-shrink: 0; }
@@ -257,8 +269,8 @@
     <div class="navbar-left">
         <div class="ti-logo"><img src="ti-logo.png" alt="Texas Instruments"></div>
         <div>
-            <span class="brand-main">TI AM62D</span>
-            <span class="brand-sub">DEMO PORTAL</span>
+            <span class="brand-main">TI SITARA</span>
+            <span class="brand-sub">EDGE AI PORTAL</span>
         </div>
     </div>
     <div class="navbar-right">
@@ -356,7 +368,9 @@
 
             <!-- COL 1: Demo Selection -->
             <div class="card">
-                <div class="card-ttl">Demo Selection</div>
+                <div class="card-ttl" style="display:flex;align-items:center;justify-content:space-between;">Demo Selection
+                    <button class="fs-btn" onclick="toggleFullscreen(this,this.closest('.card'))" title="Fullscreen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg></button>
+                </div>
 
                 <div class="dsi active" data-demo="0">
                     <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
@@ -395,7 +409,9 @@
 
             <!-- COL 2: Demo Description -->
             <div class="card">
-                <div class="card-ttl">Demo Description</div>
+                <div class="card-ttl" style="display:flex;align-items:center;justify-content:space-between;">Demo Description
+                    <button class="fs-btn" onclick="toggleFullscreen(this,this.closest('.card'))" title="Fullscreen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg></button>
+                </div>
 
                 <!-- Static description (hidden for Audio Classification demo) -->
                 <div id="static-demo-section" style="display:none;">
@@ -421,7 +437,8 @@
                     </div>
 
                     <hr class="card-divider">
-                    <div class="sub-ttl">Signal Flow</div>
+                    <div class="sub-ttl sf-toggle" onclick="toggleSigFlow(this)">Signal Flow <svg class="sf-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg></div>
+                    <div class="sf-body">
                     <div class="sig-flow">
                         <div class="sf-node">
                             <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
@@ -445,6 +462,7 @@
                             <div class="sf-lbl-main" style="color:#c084fc">Output</div>
                             <div class="sf-lbl-sub">(DAC)</div>
                         </div>
+                    </div>
                     </div>
                     <button class="btn-run-this" id="midRunBtn" onclick="triggerRun(this)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
@@ -471,7 +489,8 @@
                         <span id="tvm-demo-status" style="color:#64748b;">Ready</span>
                     </div>
                     <hr class="card-divider">
-                    <div class="sub-ttl">Signal Flow</div>
+                    <div class="sub-ttl sf-toggle" onclick="toggleSigFlow(this)">Signal Flow <svg class="sf-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg></div>
+                    <div class="sf-body">
                     <div class="sig-flow">
                         <div class="sf-node">
                             <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
@@ -495,6 +514,7 @@
                             <div class="sf-lbl-main" style="color:#c084fc">Output</div>
                             <div class="sf-lbl-sub">(DAC)</div>
                         </div>
+                    </div>
                     </div>
                     <div id="tvm-demo-results" style="display:none;">
                         <div class="sub-ttl">Results</div>
@@ -553,13 +573,26 @@
                     </div>
                     <!-- Live Mic panel -->
                     <div id="src-live-panel">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-                            <div class="sub-ttl" style="margin:0;">Input Device</div>
-                            <button onclick="loadAudioDevices()" title="Refresh device list" style="background:none;border:1px solid #1e2a3a;color:#64748b;font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;">&#8635; Refresh</button>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                    <div class="sub-ttl" style="margin:0;">Input Device</div>
+                                    <button onclick="loadAudioDevices()" title="Refresh" style="background:none;border:1px solid #1e2a3a;color:#64748b;font-size:11px;padding:2px 6px;border-radius:4px;cursor:pointer;">&#8635;</button>
+                                </div>
+                                <select id="audio-device-sel" style="background:#111827;border:1px solid #1e2a3a;color:#e2e8f0;font-size:12px;padding:6px 8px;border-radius:6px;width:100%;cursor:pointer;outline:none;">
+                                    <option value="default">Loading...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                    <div class="sub-ttl" style="margin:0;">Output Device</div>
+                                    <button onclick="loadAudioOutputDevices()" title="Refresh" style="background:none;border:1px solid #1e2a3a;color:#64748b;font-size:11px;padding:2px 6px;border-radius:4px;cursor:pointer;">&#8635;</button>
+                                </div>
+                                <select id="audio-output-device-sel" style="background:#111827;border:1px solid #1e2a3a;color:#e2e8f0;font-size:12px;padding:6px 8px;border-radius:6px;width:100%;cursor:pointer;outline:none;">
+                                    <option value="default">Loading...</option>
+                                </select>
+                            </div>
                         </div>
-                        <select id="audio-device-sel" style="background:#111827;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:6px 10px;border-radius:6px;width:100%;cursor:pointer;outline:none;">
-                            <option value="default">Loading devices...</option>
-                        </select>
                     </div>
                     <!-- Audio File panel -->
                     <div id="src-file-panel" style="display:none;">
@@ -582,30 +615,10 @@
                         <span id="audio-status-txt" style="color:#64748b;">Not running</span>
                     </div>
                     <hr class="card-divider">
-                    <div class="sub-ttl">Signal Flow</div>
-                    <div class="sig-flow">
-                        <div class="sf-node">
-                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
-                            </div>
-                            <div class="sf-lbl-main" style="color:#60a5fa">Input</div>
-                            <div class="sf-lbl-sub">(ADC)</div>
-                        </div>
-                        <span class="sf-arr">&#8594;</span>
-                        <div class="sf-node">
-                            <div class="sf-rect" style="background:#0a2d1e;border:2px solid #059669;color:#34d399">
-                                <div style="font-size:11px;font-weight:700;color:#34d399">C7x DSP</div>
-                                <div style="font-size:10px;color:#6ee7b7;margin-top:2px">Processing</div>
-                            </div>
-                        </div>
-                        <span class="sf-arr">&#8594;</span>
-                        <div class="sf-node">
-                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#3b1c68,#1e0d40);border:2px solid #7c3aed;color:#c084fc">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                            </div>
-                            <div class="sf-lbl-main" style="color:#c084fc">Output</div>
-                            <div class="sf-lbl-sub">(DAC)</div>
-                        </div>
+                    <div class="sub-ttl sf-toggle" onclick="toggleSigFlow(this)">Signal Flow <svg class="sf-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg></div>
+                    <div class="sf-body">
+                    <img src="images/audio-classification-flow.png" alt="Audio Classification Pipeline"
+                         style="width:100%;border-radius:8px;border:1px solid #1e2a3a;">
                     </div>
                     <div class="sub-ttl">Results</div>
                     <div id="audio-results" style="overflow-y:auto;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;min-height:80px;max-height:150px;font-size:12px;">
@@ -645,13 +658,26 @@
                     </div>
                     <!-- Live Mic panel -->
                     <div id="sp-src-live-panel">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-                            <div class="sub-ttl" style="margin:0;">Input Device</div>
-                            <button onclick="loadSpeechDevices()" title="Refresh device list" style="background:none;border:1px solid #1e2a3a;color:#64748b;font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;">&#8635; Refresh</button>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                    <div class="sub-ttl" style="margin:0;">Input Device</div>
+                                    <button onclick="loadSpeechDevices()" title="Refresh" style="background:none;border:1px solid #1e2a3a;color:#64748b;font-size:11px;padding:2px 6px;border-radius:4px;cursor:pointer;">&#8635;</button>
+                                </div>
+                                <select id="speech-device-sel" style="background:#111827;border:1px solid #1e2a3a;color:#e2e8f0;font-size:12px;padding:6px 8px;border-radius:6px;width:100%;cursor:pointer;outline:none;">
+                                    <option value="default">Loading...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                    <div class="sub-ttl" style="margin:0;">Output Device</div>
+                                    <button onclick="loadSpeechOutputDevices()" title="Refresh" style="background:none;border:1px solid #1e2a3a;color:#64748b;font-size:11px;padding:2px 6px;border-radius:4px;cursor:pointer;">&#8635;</button>
+                                </div>
+                                <select id="speech-output-device-sel" style="background:#111827;border:1px solid #1e2a3a;color:#e2e8f0;font-size:12px;padding:6px 8px;border-radius:6px;width:100%;cursor:pointer;outline:none;">
+                                    <option value="default">Loading...</option>
+                                </select>
+                            </div>
                         </div>
-                        <select id="speech-device-sel" style="background:#111827;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:6px 10px;border-radius:6px;width:100%;cursor:pointer;outline:none;">
-                            <option value="default">Loading devices...</option>
-                        </select>
                     </div>
                     <!-- Audio File panel -->
                     <div id="sp-src-file-panel" style="display:none;">
@@ -674,18 +700,31 @@
                         <span id="speech-status-txt" style="color:#64748b;">Not running</span>
                     </div>
                     <hr class="card-divider">
-                    <div class="sub-ttl">Signal Flow</div>
+                    <div class="sub-ttl sf-toggle" onclick="toggleSigFlow(this)">Signal Flow <svg class="sf-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg></div>
+                    <div class="sf-body">
                     <img src="images/speech-enhancement-flow.png" alt="Speech Enhancement Pipeline"
                          style="width:100%;border-radius:8px;border:1px solid #1e2a3a;">
+                    </div>
                     <div class="sub-ttl">Spectrogram</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                         <div style="display:flex;flex-direction:column;gap:4px;">
                             <div style="font-size:11px;color:#64748b;text-align:center;">Input (Noisy)</div>
-                            <canvas id="spec-in" width="220" height="88" style="border:1px solid #1e2a3a;"></canvas>
+                            <canvas id="spec-in" width="220" height="110" style="border:1px solid #1e2a3a;"></canvas>
                         </div>
                         <div style="display:flex;flex-direction:column;gap:4px;">
                             <div style="font-size:11px;color:#64748b;text-align:center;">Output (Enhanced)</div>
-                            <canvas id="spec-out" width="220" height="88" style="border:1px solid #1e2a3a;"></canvas>
+                            <canvas id="spec-out" width="220" height="110" style="border:1px solid #1e2a3a;"></canvas>
+                        </div>
+                    </div>
+                    <div class="sub-ttl">Waveform</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <div style="font-size:11px;color:#64748b;text-align:center;">Input (Noisy)</div>
+                            <canvas id="wave-in" width="220" height="70" style="border:1px solid #1e2a3a;"></canvas>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <div style="font-size:11px;color:#64748b;text-align:center;">Output (Enhanced)</div>
+                            <canvas id="wave-out" width="220" height="70" style="border:1px solid #1e2a3a;"></canvas>
                         </div>
                     </div>
                     <div class="sub-ttl">Playback</div>
@@ -727,9 +766,9 @@
                     <div id="speech-results" style="overflow-y:auto;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;min-height:80px;max-height:150px;font-size:12px;">
                         <div style="color:#475569;text-align:center;padding:16px 0;" id="speech-results-placeholder">Enhancement metrics will appear here when running</div>
                     </div>
-                    <button id="speech-run-btn" class="btn-run-this" disabled>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                        Not Supported Yet
+                    <button id="speech-run-btn" class="btn-run-this" onclick="toggleSpectrumDemo()">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
+                        Start Spectrum
                     </button>
                 </div>
             </div>
@@ -813,8 +852,8 @@ document.querySelectorAll('.dsi').forEach((el, i) => {
         document.getElementById('live-tvm-section').style.display    = isTvm    ? 'flex' : 'none';
         document.getElementById('live-speech-section').style.display = isSpeech ? 'flex' : 'none';
         _setRunBtnState(isTvm);
-        if (isAudio)       { loadAudioDevices(); }
-        else if (isSpeech) { loadSpeechDevices(); }
+        if (isAudio)       { loadAudioDevices(); loadAudioOutputDevices(); }
+        else if (isSpeech) { loadSpeechDevices(); loadSpeechOutputDevices(); }
         else if (!isTvm) {
             document.getElementById('desc-body').textContent = d.desc;
             document.getElementById('feat-list').innerHTML = d.features.map(f => `<li><span class="chk">&#10003;</span> ${f}</li>`).join('');
@@ -824,6 +863,34 @@ document.querySelectorAll('.dsi').forEach((el, i) => {
         if (!isSpeech && speechRunning) stopSpeechEnhancement();
     });
 });
+
+/* ── FULLSCREEN ── */
+let _fsBtn = null;
+document.addEventListener('fullscreenchange', () => {
+    if (_fsBtn && !document.fullscreenElement) { _updateFsIcon(_fsBtn, false); _fsBtn = null; }
+});
+function toggleFullscreen(btn, elem) {
+    if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => console.warn('[fs]', err));
+        _fsBtn = btn; _updateFsIcon(btn, true);
+    } else { document.exitFullscreen(); }
+}
+function _updateFsIcon(btn, isFs) {
+    const svg = btn.querySelector('svg'); if (!svg) return;
+    svg.innerHTML = isFs
+        ? '<path d="M8 3v3a2 2 0 0 1-2 2H3m18-5h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3m8 0v-3a2 2 0 0 1 2-2h3"/>'
+        : '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/>';
+    btn.title = isFs ? 'Exit fullscreen (Esc)' : 'Fullscreen';
+}
+
+/* ── SIGNAL FLOW COLLAPSE ── */
+function toggleSigFlow(hdr) {
+    const body = hdr.nextElementSibling;
+    const chev = hdr.querySelector('.sf-chev');
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : '';
+    chev.style.transform = isOpen ? 'rotate(-90deg)' : '';
+}
 
 /* ── RUN BUTTON (header) ── */
 function triggerRun(btn) {
@@ -983,7 +1050,7 @@ function updateAudioRunBtn(_running) { /* button disabled — not supported yet 
 function loadSpeechDevices() {
     const sel = document.getElementById('speech-device-sel');
     if (sel) sel.innerHTML = '<option value="default">Fetching devices...</option>';
-    fetch('/audio-devices')
+    fetch('/speech-devices')
         .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
         .then(text => {
             const lines = text.trim().split('\n').filter(Boolean);
@@ -996,6 +1063,44 @@ function loadSpeechDevices() {
         .catch(err => {
             if (sel) sel.innerHTML = '<option value="default">Default (unavailable)</option>';
             console.warn('[speech] loadSpeechDevices:', err.message);
+        });
+}
+
+function loadAudioOutputDevices() {
+    const sel = document.getElementById('audio-output-device-sel');
+    if (sel) sel.innerHTML = '<option value="default">Fetching devices...</option>';
+    fetch('/audio-output-devices')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const lines = text.trim().split('\n').filter(Boolean);
+            if (!lines.length) { sel.innerHTML = '<option value="default">No devices found</option>'; return; }
+            sel.innerHTML = lines.map(line => {
+                const [id, name] = line.split('|');
+                return `<option value="${id.trim()}">${(name || id).trim()}</option>`;
+            }).join('');
+        })
+        .catch(err => {
+            if (sel) sel.innerHTML = '<option value="default">Default (unavailable)</option>';
+            console.warn('[audio] loadAudioOutputDevices:', err.message);
+        });
+}
+
+function loadSpeechOutputDevices() {
+    const sel = document.getElementById('speech-output-device-sel');
+    if (sel) sel.innerHTML = '<option value="default">Fetching devices...</option>';
+    fetch('/speech-output-devices')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const lines = text.trim().split('\n').filter(Boolean);
+            if (!lines.length) { sel.innerHTML = '<option value="default">No devices found</option>'; return; }
+            sel.innerHTML = lines.map(line => {
+                const [id, name] = line.split('|');
+                return `<option value="${id.trim()}">${(name || id).trim()}</option>`;
+            }).join('');
+        })
+        .catch(err => {
+            if (sel) sel.innerHTML = '<option value="default">Default (unavailable)</option>';
+            console.warn('[speech] loadSpeechOutputDevices:', err.message);
         });
 }
 
@@ -1088,22 +1193,35 @@ function stopSpeechEnhancement() {
     if (speechWs) { speechWs.close(); speechWs = null; }
     speechRunning = false;
     stopSpeechSpectrogram();
-    _disableSpeechPlayers();
+    if (!_spectrumRunning) _disableSpeechPlayers();
     setSpeechStatus('Stopped', '#64748b', false);
-    updateSpeechRunBtn(false);
 }
 
 function connectSpeechWs() {
-    startSpeechSpectrogram();
+    if (speechWs && speechWs.readyState === 1) return;
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     speechWs = new WebSocket(proto + '//' + location.host + '/speech');
     speechWs.onmessage = e => {
         try {
             const data = JSON.parse(e.data);
             if (data.label) addSpeechResult(data.label, data.timestamp);
+            if (data.type === 'spectrum') {
+                const w = data.channel === 'output' ? 'out' : 'in';
+                drawSpectrumColumn(w, data.pcm);
+                drawWaveformColumn(w, data.pcm);
+            }
+            if (data.type === 'spectrum_done') {
+                _spectrumRunning = false;
+                updateSpeechRunBtn(false);
+                setSpeechStatus('Spectrum complete — audio ready for playback', '#22c55e', false);
+                _enableSpeechPlayer('in',  data.inputUrl);
+                _enableSpeechPlayer('out', data.outputUrl);
+            }
         } catch (_) {}
     };
-    speechWs.onclose = () => { if (speechRunning) setSpeechStatus('Connection lost - reload to retry', '#ef4444', false); };
+    speechWs.onclose = () => {
+        if (speechRunning) setSpeechStatus('Connection lost - reload to retry', '#ef4444', false);
+    };
 }
 
 function addSpeechResult(label, ts) {
@@ -1125,11 +1243,23 @@ function setSpeechStatus(msg, color, pulse) {
     if (dot) { dot.style.background = color; dot.style.animation = pulse ? 'pulse 2s infinite' : 'none'; }
 }
 
-function updateSpeechRunBtn(_running) { /* button disabled — not supported yet */ }
+function updateSpeechRunBtn(running) {
+    const btn = document.getElementById('speech-run-btn');
+    if (!btn) return;
+    if (running) {
+        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop Spectrum';
+        btn.style.background = '#dc2626';
+    } else {
+        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg> Start Spectrum';
+        btn.style.background = '';
+    }
+}
 
 /* ── SPEECH SPECTROGRAM ─────────────────────────────────────────────────── */
-let _specRunning  = false;
-let _specTimerId  = null;
+let _spectrumRunning = false;
+const _specLastDraw  = { in: 0, out: 0 };
+const _specFFTRe     = new Float32Array(512);
+const _specFFTIm     = new Float32Array(512);
 
 function _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -1148,10 +1278,10 @@ function drawSpeechSpecIdle(which) {
     });
     ctx.fillStyle = '#1e3350';
     ctx.font = '8px monospace';
-    ctx.fillText('8k', 3, 10);
-    ctx.fillText('4k', 3, Math.round(H * 0.25) + 4);
-    ctx.fillText('2k', 3, Math.round(H * 0.5) + 4);
-    ctx.fillText('0',  3, H - 3);
+    ctx.fillText('24k', 3, 10);
+    ctx.fillText('12k', 3, Math.round(H * 0.25) + 4);
+    ctx.fillText('6k',  3, Math.round(H * 0.5)  + 4);
+    ctx.fillText('0',   3, H - 3);
     ctx.fillStyle = '#2d3f55';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
@@ -1159,45 +1289,194 @@ function drawSpeechSpecIdle(which) {
     ctx.textAlign = 'left';
 }
 
-function startSpeechSpectrogram() {
-    if (_specRunning) return;
-    _specRunning = true;
-    _specTick();
-}
-
 function stopSpeechSpectrogram() {
-    _specRunning = false;
-    if (_specTimerId) { clearTimeout(_specTimerId); _specTimerId = null; }
     drawSpeechSpecIdle('in');
     drawSpeechSpecIdle('out');
+    drawWaveformIdle('in');
+    drawWaveformIdle('out');
 }
 
-function _specTick() {
-    if (!_specRunning) return;
-    const t = Date.now() / 1000;
-    _specScrollCol('in',  t, true);
-    _specScrollCol('out', t, false);
-    _specTimerId = setTimeout(_specTick, 80);
+/* ── WAVEFORM ────────────────────────────────────────────────────────────── */
+const WAVE_WIN = 2200;   /* ~45 ms at 48 kHz → ~20 cycles of 440 Hz across 220px */
+const _wBuf   = { in: new Float32Array(WAVE_WIN), out: new Float32Array(WAVE_WIN) };
+const _wHead  = { in: 0, out: 0 };
+const _wDrawT = { in: 0, out: 0 };
+
+function _appendWaveSamples(which, b64pcm) {
+    const raw = atob(b64pcm);
+    const buf = _wBuf[which];
+    let h = _wHead[which];
+    for (let i = 0; i < 512; i++) {
+        const lo = raw.charCodeAt(i * 2) & 0xff;
+        const hi = raw.charCodeAt(i * 2 + 1) & 0xff;
+        let s = (hi << 8) | lo;
+        if (s >= 32768) s -= 65536;
+        buf[h] = s / 32768;
+        h = (h + 1) % WAVE_WIN;
+    }
+    _wHead[which] = h;
 }
 
-function _specScrollCol(which, t, noisy) {
+function drawWaveformIdle(which) {
+    const canvas = document.getElementById('wave-' + which);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.fillStyle = '#05080f';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#1e2a3a';
+    ctx.fillRect(0, Math.round(H / 2), W, 1);
+    ctx.fillStyle = '#2d3f55';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No signal', W / 2, H / 2 + 4);
+    ctx.textAlign = 'left';
+    _wBuf[which].fill(0);
+    _wHead[which] = 0;
+}
+
+function drawWaveformColumn(which, b64pcm) {
+    _appendWaveSamples(which, b64pcm);
+    const now = performance.now();
+    if (now - (_wDrawT[which] || 0) < 33) return;
+    _wDrawT[which] = now;
+
+    const canvas = document.getElementById('wave-' + which);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const mid = H / 2;
+
+    ctx.fillStyle = '#05080f';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#1e2a3a';
+    ctx.fillRect(0, Math.round(mid), W, 1);
+
+    const buf = _wBuf[which], head = _wHead[which];
+    const spp = WAVE_WIN / W;
+    ctx.fillStyle = which === 'in' ? '#3b82f6' : '#22c55e';
+    for (let x = 0; x < W; x++) {
+        let mn = 1, mx = -1;
+        const s0 = Math.floor(x * spp);
+        const s1 = Math.ceil((x + 1) * spp);
+        for (let j = s0; j < s1; j++) {
+            const v = buf[(head + j) % WAVE_WIN];
+            if (v < mn) mn = v;
+            if (v > mx) mx = v;
+        }
+        const yTop = Math.round(mid - mx * (mid - 2));
+        const yBot = Math.round(mid - mn * (mid - 2));
+        ctx.fillRect(x, yTop, 1, Math.max(1, yBot - yTop));
+    }
+}
+
+/* ── FFT (radix-2 Cooley-Tukey DIT, in-place) ── */
+function _fft(re, im) {
+    const N = re.length;
+    for (let i = 1, j = 0; i < N; i++) {
+        let bit = N >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) {
+            let t = re[i]; re[i] = re[j]; re[j] = t;
+            t = im[i]; im[i] = im[j]; im[j] = t;
+        }
+    }
+    for (let len = 2; len <= N; len <<= 1) {
+        const ang = -2 * Math.PI / len;
+        const wRe = Math.cos(ang), wIm = Math.sin(ang);
+        for (let i = 0; i < N; i += len) {
+            let curRe = 1, curIm = 0;
+            const half = len >> 1;
+            for (let j = 0; j < half; j++) {
+                const uRe = re[i+j],       uIm = im[i+j];
+                const tRe = curRe*re[i+j+half] - curIm*im[i+j+half];
+                const tIm = curRe*im[i+j+half] + curIm*re[i+j+half];
+                re[i+j]      = uRe + tRe;  im[i+j]      = uIm + tIm;
+                re[i+j+half] = uRe - tRe;  im[i+j+half] = uIm - tIm;
+                const nr = curRe*wRe - curIm*wIm;
+                curIm = curRe*wIm + curIm*wRe;
+                curRe = nr;
+            }
+        }
+    }
+}
+
+/**
+ * Decode one base64 PCM chunk, compute a 512-point FFT, and paint a new
+ * column on the right edge of the spectrogram canvas.  Throttled to ~30 fps.
+ *
+ * @param {'in'|'out'} which  - Canvas suffix.
+ * @param {string}     b64pcm - Base64-encoded 1024-byte S16LE block (512 samples).
+ */
+function drawSpectrumColumn(which, b64pcm) {
+    const now = performance.now();
+    if (now - (_specLastDraw[which] || 0) < 33) return;
+    _specLastDraw[which] = now;
+
+    const raw = atob(b64pcm);
+    const N   = 512;
+    for (let i = 0; i < N; i++) {
+        const lo = raw.charCodeAt(i * 2) & 0xff;
+        const hi = raw.charCodeAt(i * 2 + 1) & 0xff;
+        let s = (hi << 8) | lo;
+        if (s >= 32768) s -= 65536;
+        _specFFTRe[i] = s / 32768;
+        _specFFTIm[i] = 0;
+    }
+    for (let i = 0; i < N; i++) {
+        const w = 0.42 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1))
+                       + 0.08 * Math.cos(4 * Math.PI * i / (N - 1));
+        _specFFTRe[i] *= w;
+    }
+
+    _fft(_specFFTRe, _specFFTIm);
+
     const canvas = document.getElementById('spec-' + which);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
     ctx.drawImage(canvas, -1, 0);
+
+    const bins = N >> 1;
     for (let y = 0; y < H; y++) {
-        const freq = 1 - y / H;
-        const inBand = freq > 0.05 && freq < 0.4;
-        const sig   = inBand ? 0.35 + 0.5 * Math.pow(Math.abs(Math.sin(t * 6 + freq * 30)), 2) : 0;
-        const noise = noisy ? Math.random() * 0.3 : Math.random() * 0.06;
-        const v = _clamp(sig + noise, 0, 1);
-        const r = Math.round(_clamp(v > 0.6  ? (v - 0.6) * 2.5 * 255 : 0, 0, 255));
-        const g = Math.round(_clamp(v > 0.35 ? (v - 0.35) * 1.8 * 255 : 0, 0, 255));
-        const b = Math.round(_clamp(v < 0.5  ? 80 + v * 2 * 120 : (1 - v) * 2 * 80, 0, 255));
+        const bin = Math.max(1, Math.round((H - 1 - y) / (H - 1) * (bins - 2) + 1));
+        const re  = _specFFTRe[bin], im = _specFFTIm[bin];
+        const db  = 20 * Math.log10(Math.sqrt(re*re + im*im) + 1e-6);
+        const v   = _clamp(db / 18, 0, 1);  /* 0–18 dB: noise floor→bright, silence→dark navy */
+        const r   = Math.round(v > 0.6  ? (v - 0.6)  * 2.5 * 255 : 0);
+        const g   = Math.round(v > 0.35 ? (v - 0.35) * 1.8 * 255 : 0);
+        const b   = Math.round(v < 0.5  ? 80 + v * 2 * 120 : (1 - v) * 2 * 80);
         ctx.fillStyle = `rgb(${r},${g},${b})`;
         ctx.fillRect(W - 1, y, 1, 1);
     }
+}
+
+/* ── SPECTRUM DEMO CONTROL ── */
+function toggleSpectrumDemo() {
+    if (_spectrumRunning) stopSpectrumDemo(); else startSpectrumDemo();
+}
+
+function startSpectrumDemo() {
+    setSpeechStatus('Generating test audio...', '#f59e0b', false);
+    _disableSpeechPlayers();
+    fetch('/start-spectrum')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(() => {
+            _spectrumRunning = true;
+            setSpeechStatus('Streaming spectrum...', '#22c55e', true);
+            updateSpeechRunBtn(true);
+            connectSpeechWs();
+        })
+        .catch(err => setSpeechStatus('Error: ' + err.message, '#ef4444', false));
+}
+
+function stopSpectrumDemo() {
+    fetch('/stop-spectrum').catch(() => {});
+    _spectrumRunning = false;
+    stopSpeechSpectrogram();
+    setSpeechStatus('Stopped', '#64748b', false);
+    updateSpeechRunBtn(false);
 }
 
 /* ── SPEECH PLAYBACK ─────────────────────────────────────────────────────── */
@@ -1383,6 +1662,8 @@ pollCpuStatus();
 _setRunBtnState(true); /* TVM is default active demo */
 drawSpeechSpecIdle('in');
 drawSpeechSpecIdle('out');
+drawWaveformIdle('in');
+drawWaveformIdle('out');
 _speechPlaybackInit();
 
 /* C7x DSP load monitoring not yet implemented — update these when ready */
