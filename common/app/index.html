@@ -48,7 +48,7 @@
         .navbar-right { display: flex; align-items: center; gap: 16px; }
         .status-badge {
             display: flex; align-items: center; gap: 8px;
-            font-size: 13px; color: #e2e8f0;
+            font-size: 13px; color: var(--txt);
             padding-right: 16px;
             border-right: 1px solid #1e2a3a;
             transition: color 0.3s;
@@ -113,12 +113,28 @@
         html[data-theme="light"] { --bg-page:#f0f4f8; --bg-panel:#ffffff; --bd:#d1d9e6; --txt:#0f172a; --txt2:#475569; --txt3:#64748b; }
         html[data-theme="light"] body          { background-color: var(--bg-page) !important; color: var(--txt) !important; }
         html[data-theme="light"] .navbar       { background: var(--bg-panel) !important; border-bottom-color: var(--bd) !important; }
+	html[data-theme="light"] .brand-main   { color: var(--txt) !important; }
+	html[data-theme="light"] .brand-sub    { color: #2563eb !important; }
         html[data-theme="light"] .status-badge { border-right-color: var(--bd) !important; }
         html[data-theme="light"] .hero         { background: linear-gradient(135deg,#e8f0fe 0%,#dce8ff 55%,#eef2ff 100%) !important; border-color:#bfd4f8 !important; }
         html[data-theme="light"] .hero-welcome { color:#1d4ed8 !important; }
         html[data-theme="light"] .hero-title .t-white { color:#0f172a !important; }
         html[data-theme="light"] .hero-desc    { color: var(--txt3) !important; }
-        html[data-theme="light"] .hero-chip    { background: linear-gradient(to right,transparent 0%,#eef2ff 18%) !important; }
+	html[data-theme="light"] .hero-chip     { background: transparent !important; }
+	html[data-theme="light"] #chip-dark    { display: none !important; }
+	html[data-theme="light"] #chip-light   { display: block !important; }
+	html[data-theme="light"] #chip-light   {
+	    -webkit-mask-image:
+	        linear-gradient(to right, transparent 0%, black 62%, black 92%, transparent 100%),
+ 	        linear-gradient(to left, transparent 0%, black 18%, black 82%, transparent 100%);
+            -webkit-mask-size: 100% 100%, 100% 100%;
+	    -webkit-mask-composite: source-in;
+	    mask-image:
+		linear-gradient(to right, transparent 0%, black 62%, black 92%, transparent 100%),
+		linear-gradient(to left, transparent 0%, black 18%, black 82%, transparent 100%);
+	    mask-composite: intersect;
+	}
+	#chip-light { display: none; }
         html[data-theme="light"] .card         { background: var(--bg-panel) !important; border-color: var(--bd) !important; }
         html[data-theme="light"] .card-heading { color: var(--txt) !important; }
         html[data-theme="light"] .demo-item    { border-color: var(--bd) !important; }
@@ -188,24 +204,55 @@
         .hero-chip {
             position: absolute;
             right: 0; top: 0; bottom: 0;
-            width: 72%;
+            width: 50%;
             z-index: 1;
             pointer-events: none;
-            background: linear-gradient(to right, transparent 0%, #040c18 18%);
+            background: transparent;
         }
-        .hero-chip img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            object-position: right center;
+        .hero-chip::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+                linear-gradient(to bottom, #040c18 0%, transparent 0%),
+                linear-gradient(to top,    #040c18 0%, transparent 0%),
+                linear-gradient(to right,  #040c18 0%, transparent 0%),
+                linear-gradient(to left,   #040c18 0%, transparent 0%);
+        }
+        html[data-theme="light"] .hero-chip::after {
+            background:
+                linear-gradient(to bottom, #e8f0fe 0%, transparent 0%),
+                linear-gradient(to top,    #eef2ff 0%, transparent 0%),
+                linear-gradient(to right,  #e8f0fe 0%, transparent 0%),
+                linear-gradient(to left,   #e8f0fe 0%, transparent 0%);
+        }
+        #chip-dark {
             -webkit-mask-image:
-                linear-gradient(to right, transparent 0%, black 22%, black 93%, transparent 100%),
-                linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+                linear-gradient(to right, transparent 0%, black 62%, black 92%, transparent 100%),
+                linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%);
             -webkit-mask-size: 100% 100%, 100% 100%;
             -webkit-mask-composite: source-in;
             mask-image:
-                linear-gradient(to right, transparent 0%, black 22%, black 93%, transparent 100%),
-                linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+                linear-gradient(to right, transparent 0%, black 62%, black 92%, transparent 100%),
+                linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%);
+            mask-composite: intersect;
+        }
+        .hero-chip img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center center;
+            -webkit-mask-image:
+                linear-gradient(to right, transparent 0%, black 48%, black 92%, transparent 100%),
+                linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%);
+            -webkit-mask-size: 100% 100%, 100% 100%;
+            -webkit-mask-composite: source-in;
+            mask-image:
+                linear-gradient(to right, transparent 0%, black 48%, black 92%, transparent 100%),
+                linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%);
             mask-composite: intersect;
         }
 
@@ -375,7 +422,8 @@
 
     <!-- Chip image -->
     <div class="hero-chip">
-        <img src="am62d-chip.png" alt="AM62D SoC">
+        <img id="chip-dark"  src="am62d-chip-dark.png"  alt="AM62D SoC">
+        <img id="chip-light" src="am62d-chip-light.png" alt="AM62D SoC">
     </div>
 </div>
 

@@ -18,6 +18,8 @@
             --txt:#0f172a; --txt2:#475569; --txt3:#64748b; --txt4:#94a3b8;
             --bar-track:#e2e8f0;
         }
+	html[data-theme="light"] .brand-main { color: var(--txt) !important; }
+	html[data-theme="light"] .brand-sub  { color: #2563eb !important; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -143,8 +145,8 @@
     <div class="navbar-left">
         <div class="ti-logo"><img src="ti-logo.png" alt="Texas Instruments"></div>
         <div>
-            <span class="brand-main">TI AM62D</span>
-            <span class="brand-sub">DEMO PORTAL</span>
+            <span class="brand-main">TI SITARA</span>
+            <span class="brand-sub">EDGE AI PORTAL</span>
         </div>
     </div>
     <div class="navbar-right">
@@ -342,15 +344,6 @@
                 </div>
 
                 <hr class="card-divider">
-
-                <!-- Signal Flow (collapsible) -->
-                <div class="sub-ttl sf-toggle" onclick="toggleSigFlow(this)">Signal Flow
-                    <svg class="sf-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
-                </div>
-                <div class="sf-body">
-                    <img src="images/audio-offload-flow.png" alt="Audio Offload Pipeline"
-                         style="width:100%;border-radius:8px;border:1px solid #1e2a3a;" onerror="this.style.display='none'">
-                </div>
 
                 <!-- Features -->
                 <div class="sub-ttl">Features</div>
@@ -691,6 +684,16 @@ document.querySelectorAll('.dsi').forEach((el, i) => {
     });
 });
 
+/* Check overlay for initially active demo on page load */
+document.addEventListener('DOMContentLoaded', () => {
+    const activeDemo = document.querySelector('.dsi.active');
+    if (activeDemo) {
+        const idx = Array.from(document.querySelectorAll('.dsi')).indexOf(activeDemo);
+        if (idx === 0 || idx === 1) checkConflictOverlay(idx);
+        else if (idx === 2) checkBiquadOverlay();
+    }
+});
+
 function triggerRun() {
     if (_activeDemo === 0) toggleAoDemo();
     else if (_activeDemo === 1) toggleFft2dDemo();
@@ -719,9 +722,13 @@ const _conflictActive = [false, false, false]; /* indexed by demo */
 function checkConflictOverlay(demoIdx) {
     const conflictId = demoIdx === 0 ? 'ao-overlay-conflict'   : 'fft2d-overlay-conflict';
     const runBtnId   = demoIdx === 0 ? 'ao-run-btn'            : 'fft2d-run-btn';
-    fetch('/sigchain-biquad/check-overlay')
-        .then(r => r.json())
+    fetch('/sigchain-biquad/check-overlay', { signal: AbortSignal.timeout(5000) })
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
         .then(d => {
+            if (!d) return;
             _conflictActive[demoIdx] = !!d.active;
             const conflict = document.getElementById(conflictId);
             const btn      = document.getElementById(runBtnId);
@@ -734,7 +741,9 @@ function checkConflictOverlay(demoIdx) {
             }
             _updateTopBtn();
         })
-        .catch(() => {});
+        .catch(err => {
+            console.debug('Overlay check unavailable:', err.message);
+        });
 }
 
 /* ── HEALTH CHECK — dedicated WebSocket for instant connect/disconnect detection ── */
@@ -777,7 +786,7 @@ const _HC = (() => {
                 } else {
                     _modal('Device Disconnected', 'Please check cable connection or device state.', 'Reconnecting…');
                 }
-            }, 8000);
+            }, 2000);
         }
         clearTimeout(_reconnectTimer);
         _reconnectTimer = setTimeout(_connect, 3000);
@@ -1262,9 +1271,13 @@ function checkBiquadOverlay() {
     const ok   = document.getElementById('biquad-overlay-ok');
     const btn  = document.getElementById('biquad-run-btn');
     setBiquadStatus('Checking overlay…', '#64748b', false);
-    fetch('/sigchain-biquad/check-overlay')
-        .then(r => r.json())
+    fetch('/sigchain-biquad/check-overlay', { signal: AbortSignal.timeout(5000) })
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
         .then(d => {
+            if (!d) return;
             _biquadOverlayActive = !!d.active;
             if (d.active) {
                 if (warn) warn.style.display = 'none';
@@ -1278,7 +1291,8 @@ function checkBiquadOverlay() {
                 setBiquadStatus('Overlay not set — demo disabled', '#d97706', false);
             }
         })
-        .catch(() => {
+        .catch(err => {
+            console.debug('Overlay check failed:', err.message);
             if (warn) warn.style.display = 'none';
             if (ok)   ok.style.display   = 'none';
             setBiquadStatus('Could not read uEnv.txt', '#ef4444', false);
@@ -1519,13 +1533,13 @@ function closePanel() {
     document.getElementById('panel-overlay').style.display='none';
     document.getElementById('side-panel').style.display='none';
 }
-function _panelRow(l,v){return`<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1e2a3a;"><span style="color:#64748b;font-size:13px;">${l}</span><span style="color:#e2e8f0;font-size:13px;font-weight:500;">${v}</span></div>`;}
+function _panelRow(l,v){return`<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--bd);"><span style="color:var(--txt3);font-size:13px;">${l}</span><span style="color:var(--txt);font-size:13px;font-weight:500;">${v}</span></div>`;}
 function loadDevicePanel() {
     document.getElementById('panel-title').textContent='Device Info';
-    document.getElementById('panel-body').innerHTML='<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    document.getElementById('panel-body').innerHTML='<div style="color:var(--txt3);font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
     fetch('/device-info').then(r=>r.json()).then(d=>{
         const board=(d.boards&&d.boards[0])||{};
-        let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:#05080f;border:1px solid #1e2a3a;border-radius:8px;"><div style="width:42px;height:42px;border-radius:8px;background:radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00);border:2px solid #d97706;display:flex;align-items:center;justify-content:center;color:#fbbf24;flex-shrink:0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div><div style="font-size:15px;font-weight:700;color:#e2e8f0;">${d.displayName||d.id}</div><div style="font-size:12px;color:#d97706;margin-top:2px;">${board.name||''}</div></div></div>`;
+        let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--bg-inner);border:1px solid var(--bd);border-radius:8px;"><div style="width:42px;height:42px;border-radius:8px;background:radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00);border:2px solid #d97706;display:flex;align-items:center;justify-content:center;color:#fbbf24;flex-shrink:0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div><div style="font-size:15px;font-weight:700;color:var(--txt);">${d.displayName||d.id}</div><div style="font-size:12px;color:#d97706;margin-top:2px;">${board.name||''}</div></div></div>`;
         html+=_panelRow('Board',board.name||'-');html+=_panelRow('SoC',d.soc||'-');
         html+=_panelRow('IP Address',window.location.hostname);html+=_panelRow('Port',window.location.port||'3000');
         document.getElementById('panel-body').innerHTML=html;
@@ -1586,10 +1600,10 @@ function saveDspSettings() {
 let _logInterval=null;
 function loadLogsPanel() {
     document.getElementById('panel-title').textContent='System Logs';
-    document.getElementById('panel-body').innerHTML='<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    document.getElementById('panel-body').innerHTML='<div style="color:var(--txt3);font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
     fetch('/logs').then(r=>r.json()).then(d=>{
         const lines=d.lines||[];
-        document.getElementById('panel-body').innerHTML=`<div style="font-family:monospace;font-size:11px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:10px;overflow-y:auto;max-height:calc(100vh - 200px);">${lines.length?lines.map(l=>`<div style="padding:2px 0;color:${l.match(/error/i)?'#ef4444':l.match(/warn/i)?'#f59e0b':'#94a3b8'};word-break:break-all;">${l.replace(/</g,'&lt;')}</div>`).join(''):'<div style="color:#475569;text-align:center;padding:20px 0;">No log entries</div>'}</div>`;
+        document.getElementById('panel-body').innerHTML=`<div style="font-family:monospace;font-size:11px;background:var(--bg-inner);border:1px solid var(--bd);border-radius:6px;padding:10px;overflow-y:auto;max-height:calc(100vh - 200px);">${lines.length?lines.map(l=>`<div style="padding:2px 0;color:${l.match(/error/i)?'#ef4444':l.match(/warn/i)?'#f59e0b':'var(--txt2)'};word-break:break-all;">${l.replace(/</g,'&lt;')}</div>`).join(''):'<div style="color:var(--txt3);text-align:center;padding:20px 0;">No log entries</div>'}</div>`;
     }).catch(()=>{document.getElementById('panel-body').innerHTML='<div style="color:#ef4444;font-size:13px;">Failed to load logs</div>';});
 }
 

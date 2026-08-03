@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>(function(){var B=1280;function r(){var s=window.innerWidth/B;document.documentElement.style.zoom=s<1?s:'';}r();window.addEventListener('resize',r);if(localStorage.getItem('theme')==='light')document.documentElement.dataset.theme='light';})();</script>
-    <title>Audio DSP With Analytics - TI AM62D Demo Portal</title>
+    <title>Audio DSP With Analytics - TI SITARA Edge AI Portal</title>
     <style>
         :root {
             --bg-page:#0a0e1a; --bg-panel:#0d1117; --bg-inner:#05080f; --bg-deep:#03060e;
@@ -18,6 +18,9 @@
             --txt:#0f172a; --txt2:#475569; --txt3:#64748b; --txt4:#94a3b8;
             --bar-track:#e2e8f0; --select-bg:#f8fafc;
         }
+	html[data-theme="light"] .brand-main { color: var(--txt) !important; }
+	html[data-theme="light"] .brand-sub  { color: #2563eb !important; }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -240,9 +243,6 @@
                 </div>
             </div>
             <div class="hdr-actions">
-                <button class="btn-inspect" onclick="window.location.href='model-inspector.html'">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    Model Inspector
                 </button>
                 <button class="btn-run" id="topRunBtn" onclick="triggerRun(this)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
@@ -1597,23 +1597,23 @@ function closePanel() {
 }
 
 function _panelRow(label, value) {
-    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #1e2a3a;">
-        <span style="color:#64748b;font-size:13px;min-width:100px;">${label}</span>
-        <span style="color:#e2e8f0;font-size:13px;font-weight:500;text-align:right;word-break:break-all;">${value}</span>
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--bd);">
+        <span style="color:var(--txt3);font-size:13px;min-width:100px;">${label}</span>
+        <span style="color:var(--txt);font-size:13px;font-weight:500;text-align:right;word-break:break-all;">${value}</span>
     </div>`;
 }
 
 function loadDevicePanel() {
     document.getElementById('panel-title').textContent = 'Device Info';
-    document.getElementById('panel-body').innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    document.getElementById('panel-body').innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
     fetch('/device-info').then(r => r.json()).then(d => {
         const board = (d.boards && d.boards[0]) || {};
         const ip = document.getElementById('nav-ip') ? document.getElementById('nav-ip').textContent : window.location.hostname;
-        let html = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:#05080f;border:1px solid #1e2a3a;border-radius:8px;">
+        let html = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--bg-inner);border:1px solid var(--bd);border-radius:8px;">
             <div style="width:42px;height:42px;border-radius:8px;background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;display:flex;align-items:center;justify-content:center;color:#60a5fa;flex-shrink:0;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             </div>
-            <div><div style="font-size:15px;font-weight:700;color:#e2e8f0;">${d.displayName || d.id}</div>
+            <div><div style="font-size:15px;font-weight:700;color:var(--txt);">${d.displayName || d.id}</div>
             <div style="font-size:12px;color:#4da6ff;margin-top:2px;">${board.name || ''}</div></div>
         </div>`;
         html += _panelRow('Board', board.name || '-');
@@ -1622,7 +1622,7 @@ function loadDevicePanel() {
         html += _panelRow('IP Address', window.location.hostname);
         html += _panelRow('Port', window.location.port || '3000');
         html += _panelRow('Active Demos', (d.activeDemos || []).join(', ') || '-');
-        if (board.description) html += `<div style="margin-top:16px;padding:12px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;font-size:12px;color:#94a3b8;line-height:1.6;">${board.description}</div>`;
+        if (board.description) html += `<div style="margin-top:16px;padding:12px;background:var(--bg-inner);border:1px solid var(--bd);border-radius:6px;font-size:12px;color:var(--txt2);line-height:1.6;">${board.description}</div>`;
         document.getElementById('panel-body').innerHTML = html;
     }).catch(() => {
         document.getElementById('panel-body').innerHTML = '<div style="color:#ef4444;font-size:13px;">Failed to load device info</div>';
@@ -1633,7 +1633,7 @@ let _logInterval = null;
 let _logLines = [];
 function loadLogsPanel() {
     document.getElementById('panel-title').textContent = 'System Logs';
-    document.getElementById('panel-body').innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    document.getElementById('panel-body').innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
     clearInterval(_logInterval);
     function fetchLogs() {
         fetch('/logs').then(r => r.json()).then(d => {
@@ -1641,13 +1641,13 @@ function loadLogsPanel() {
             const body = document.getElementById('panel-body');
             if (!body) return;
             body.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;">
-                <span style="font-size:12px;color:#64748b;">${_logLines.length} entries &middot; auto-refresh 10s</span>
-                <button onclick="saveLogsToFile()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#1e3a5f'">
+                <span style="font-size:12px;color:var(--txt3);">${_logLines.length} entries &middot; auto-refresh 10s</span>
+                <button onclick="saveLogsToFile()" style="background:var(--bg-inner);border:1px solid var(--bd);color:var(--txt2);font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;">
                     &#8595; Save to File
                 </button>
             </div>
-            <div style="font-family:monospace;font-size:11px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:10px;overflow-y:auto;max-height:calc(100vh - 200px);">
-                ${_logLines.length ? _logLines.map(l => `<div style="padding:2px 0;border-bottom:1px solid #0d1117;color:${l.match(/error/i) ? '#ef4444' : l.match(/warn/i) ? '#f59e0b' : '#94a3b8'};word-break:break-all;">${l.replace(/</g,'&lt;')}</div>`).join('') : '<div style="color:#475569;text-align:center;padding:20px 0;">No log entries</div>'}
+            <div style="font-family:monospace;font-size:11px;background:var(--bg-inner);border:1px solid var(--bd);border-radius:6px;padding:10px;overflow-y:auto;max-height:calc(100vh - 200px);">
+                ${_logLines.length ? _logLines.map(l => `<div style="padding:2px 0;border-bottom:1px solid var(--bd);color:${l.match(/error/i) ? '#ef4444' : l.match(/warn/i) ? '#f59e0b' : 'var(--txt2)'};word-break:break-all;">${l.replace(/</g,'&lt;')}</div>`).join('') : '<div style="color:var(--txt3);text-align:center;padding:20px 0;">No log entries</div>'}
             </div>`;
         }).catch(() => {
             const body = document.getElementById('panel-body');
@@ -1746,14 +1746,19 @@ function saveSettings() {
 
 /* ── DSP audio overlay conflict check ── */
 function _checkDspOverlayConflict() {
-    fetch('/sigchain-biquad/check-overlay')
-        .then(r => r.json())
+    fetch('/sigchain-biquad/check-overlay', { signal: AbortSignal.timeout(5000) })
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
         .then(d => {
-            if (d.active) {
+            if (d && d.active) {
                 document.getElementById('dsp-overlay-modal').style.display = 'flex';
             }
         })
-        .catch(() => {});
+        .catch(err => {
+            console.debug('Overlay check unavailable:', err.message);
+        });
 }
 
 /* ── HEALTH CHECK — dedicated WebSocket for instant connect/disconnect detection ── */
@@ -1796,7 +1801,7 @@ const _HC = (() => {
                 } else {
                     _modal('Device Disconnected', 'Please check cable connection or device state.', 'Reconnecting…');
                 }
-            }, 8000);
+            }, 2000);
         }
         clearTimeout(_reconnectTimer);
         _reconnectTimer = setTimeout(_connect, 3000);
@@ -1892,10 +1897,10 @@ document.addEventListener('DOMContentLoaded', () => { _checkDspOverlayConflict()
 
 <!-- ── SLIDE-IN PANEL ── -->
 <div id="panel-overlay" onclick="closePanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;"></div>
-<div id="side-panel" style="display:none;position:fixed;top:0;right:0;height:100%;width:360px;background:#0d1117;border-left:1px solid #1e2a3a;z-index:201;flex-direction:column;overflow:hidden;box-shadow:-4px 0 24px rgba(0,0,0,0.5);">
-    <div style="padding:16px 20px;border-bottom:1px solid #1e2a3a;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-        <div id="panel-title" style="font-size:15px;font-weight:700;color:#e2e8f0;"></div>
-        <button onclick="closePanel()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px;padding:2px 6px;border-radius:4px;line-height:1;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#64748b'">&#10005;</button>
+<div id="side-panel" style="display:none;position:fixed;top:0;right:0;height:100%;width:360px;background:var(--bg-panel);border-left:1px solid var(--bd);z-index:201;flex-direction:column;overflow:hidden;box-shadow:-4px 0 24px rgba(0,0,0,0.5);">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div id="panel-title" style="font-size:15px;font-weight:700;color:var(--txt);"></div>
+        <button onclick="closePanel()" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:20px;padding:2px 6px;border-radius:4px;line-height:1;">&#10005;</button>
     </div>
     <div id="panel-body" style="padding:20px;overflow-y:auto;flex:1;"></div>
 </div>
