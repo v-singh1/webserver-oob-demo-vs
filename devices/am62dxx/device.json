@@ -13,9 +13,10 @@
   "demoConfig": {
     "speech-enhancement": {
       "edgeAiBinary": "/usr/bin/rpmsg_inference_example",
-      "pipelinePath": "/usr/share/webserver-oob/demos/speech-enhancement/audio_pipeline_clean.json",
-      "artifactsPath": "/usr/share/edge-ai/artifacts",
-      "inputPath": "/usr/share/input.wav",
+      "tvmDir": "/usr/share/tvm_inference",
+      "jsonFile": "json/pipeline_stft_istft.json",
+      "artifactsPath": "artifacts",
+      "inputPath": "/usr/share/tvm_inference/input_audio/input_audio.wav",
       "streamSocket": "/tmp/edge-ai-speech.sock",
       "outputName": "processed_output.wav"
     },
