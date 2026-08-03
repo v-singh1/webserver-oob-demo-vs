@@ -44,6 +44,15 @@
         .conn-top { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--txt); }
         .conn-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite; }
         @keyframes pulse { 0%,100%{box-shadow:0 0 4px #22c55e} 50%{box-shadow:0 0 14px #22c55e} }
+        @keyframes bar-rise { 0%,100%{height:3px} 50%{height:14px} }
+        .bar-anim { display:none;align-items:flex-end;gap:2px;height:16px;flex-shrink:0; }
+        .bar-anim.active { display:inline-flex; }
+        .bar-anim span { display:inline-block;width:3px;border-radius:1px;height:3px;animation:bar-rise 0.7s ease-in-out infinite; }
+        .bar-anim span:nth-child(1){animation-delay:0s}
+        .bar-anim span:nth-child(2){animation-delay:0.1s}
+        .bar-anim span:nth-child(3){animation-delay:0.2s}
+        .bar-anim span:nth-child(4){animation-delay:0.3s}
+        .bar-anim span:nth-child(5){animation-delay:0.15s}
         .conn-ip { font-size: 11px; color: var(--txt3); text-align: right; margin-top: 2px; }
         .theme-btn { background: none; border: none; color: var(--txt2); cursor: pointer; font-size: 20px; padding: 6px; border-radius: 8px; line-height: 1; }
         .theme-btn:hover { color: var(--txt); }
@@ -375,30 +384,25 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
                         <span id="tvm-demo-dot" style="width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;"></span>
+                        <span class="bar-anim" id="tvm-demo-bars"><span></span><span></span><span></span><span></span><span></span></span>
                         <span id="tvm-demo-status" style="color:#64748b;">Ready</span>
                     </div>
                     <div id="tvm-demo-results" style="display:none;">
                         <div class="sub-ttl">Results</div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
                             <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;text-align:center;">
-                                <div style="font-size:16px;font-weight:700;color:#4da6ff;" id="tvm-d-avg">--</div>
-                                <div style="font-size:10px;color:#64748b;">Avg (ms)</div>
+                                <div style="font-size:16px;font-weight:700;color:#4da6ff;" id="tvm-d-time">--</div>
+                                <div style="font-size:10px;color:#64748b;">Inference (ms)</div>
                             </div>
                             <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;text-align:center;">
-                                <div style="font-size:16px;font-weight:700;color:#22c55e;" id="tvm-d-fps">--</div>
-                                <div style="font-size:10px;color:#64748b;">FPS</div>
+                                <div style="font-size:16px;font-weight:700;color:#22c55e;" id="tvm-d-output">--</div>
+                                <div style="font-size:10px;color:#64748b;">Output (floats)</div>
                             </div>
                             <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;text-align:center;">
-                                <div style="font-size:14px;font-weight:700;color:#a78bfa;" id="tvm-d-min">--</div>
-                                <div style="font-size:10px;color:#64748b;">Min (ms)</div>
-                            </div>
-                            <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;text-align:center;">
-                                <div style="font-size:14px;font-weight:700;color:#fb923c;" id="tvm-d-max">--</div>
-                                <div style="font-size:10px;color:#64748b;">Max (ms)</div>
+                                <div style="font-size:14px;font-weight:700;color:#a78bfa;" id="tvm-d-cycles">--</div>
+                                <div style="font-size:10px;color:#64748b;">C7x Cycles</div>
                             </div>
                         </div>
-                        <div class="sub-ttl">Top Predictions</div>
-                        <div id="tvm-d-preds" style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;font-size:12px;margin-top:4px;"></div>
                     </div>
                     <button id="tvm-demo-btn" onclick="toggleTvmDemo()" class="btn-run-this">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
@@ -561,6 +565,7 @@
                     <!-- Status -->
                     <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
                         <span id="speech-status-dot" style="width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;"></span>
+                        <span class="bar-anim" id="speech-status-bars"><span></span><span></span><span></span><span></span><span></span></span>
                         <span id="speech-status-txt" style="color:#64748b;">Not running</span>
                     </div>
                     <hr class="card-divider">
@@ -626,9 +631,9 @@
                             <audio id="audio-out" style="display:none;"></audio>
                         </div>
                     </div>
-                    <div class="sub-ttl">Results</div>
-                    <div id="speech-results" style="overflow-y:auto;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;min-height:80px;max-height:150px;font-size:12px;">
-                        <div style="color:#475569;text-align:center;padding:16px 0;" id="speech-results-placeholder">Enhancement metrics will appear here when running</div>
+                    <div class="sub-ttl">RMS Variance per Batch</div>
+                    <div id="speech-results" style="overflow-y:auto;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;min-height:80px;max-height:160px;font-size:11px;">
+                        <div style="color:#475569;text-align:center;padding:16px 0;" id="speech-results-placeholder">RMS values will appear per batch when running</div>
                     </div>
                     <button id="speech-run-btn" class="btn-run-this" onclick="toggleSpeechEnhancement()">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
@@ -1014,6 +1019,7 @@ function toggleSpeechEnhancement() {
 
 function startSpeechEnhancement() {
     setSpeechStatus('Starting...', '#f59e0b', false);
+    clearSpeechResults();
     // Subscribe before starting the short-buffer RPMsg job so its first input
     // frame is never emitted before the browser has joined /speech.
     connectSpeechWs();
@@ -1047,8 +1053,7 @@ function connectSpeechWs() {
     speechWs.onmessage = e => {
         try {
             const data = JSON.parse(e.data);
-            if (data.label) addSpeechResult(data.label, data.timestamp);
-            if (data.type === 'metric') addSpeechResult(data.label, data.timestamp);
+            if (data.type === 'rms') addRmsBatchResult(data);
             if (data.type === 'error') setSpeechStatus('Error: ' + data.message, '#ef4444', false);
             if (data.type === 'spectrum') {
                 const w = data.channel === 'output' ? 'out' : 'in';
@@ -1070,23 +1075,46 @@ function connectSpeechWs() {
     };
 }
 
-function addSpeechResult(label, ts) {
+const _COL = 'display:inline-block;overflow:hidden;white-space:nowrap;';
+const _HDR = `padding:4px 8px;background:#0a0f1a;border-bottom:1px solid #1e2a3a;position:sticky;top:0;display:grid;grid-template-columns:52px 52px 90px 60px 70px;gap:4px;font-size:10px;color:#475569;font-weight:600;letter-spacing:.04em;`;
+const _ROW = `padding:3px 8px;border-bottom:1px solid #0d1520;display:grid;grid-template-columns:52px 52px 90px 60px 70px;gap:4px;`;
+
+function addRmsBatchResult(d) {
     const results = document.getElementById('speech-results');
     const ph = document.getElementById('speech-results-placeholder');
-    if (ph) ph.remove();
-    const time = ts ? new Date(ts).toLocaleTimeString() : new Date().toLocaleTimeString();
+    if (ph) {
+        ph.remove();
+        const hdr = document.createElement('div');
+        hdr.style.cssText = _HDR;
+        hdr.innerHTML = '<span>Batch</span><span>Windows</span><span>Samples</span><span>Bytes</span><span style="color:#4da6ff;">RMS</span>';
+        results.appendChild(hdr);
+    }
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1e2a3a;';
-    row.innerHTML = `<span style="color:#e2e8f0;font-weight:600">${label.replace(/</g,'&lt;')}</span><span style="color:#64748b">${time}</span>`;
-    results.insertBefore(row, results.firstChild);
-    while (results.children.length > 20) results.removeChild(results.lastChild);
+    row.style.cssText = _ROW;
+    const sampleRange = (d.sampleStart != null && d.sampleEnd != null) ? `${d.sampleStart}-${d.sampleEnd}` : '--';
+    const batchLabel = d.total ? `${d.num}/${d.total}` : `${d.num}`;
+    row.innerHTML = `<span style="color:#94a3b8;">${batchLabel}</span><span style="color:#64748b;">${d.windows || '--'}</span><span style="color:#64748b;font-size:10px;">${sampleRange}</span><span style="color:#64748b;">${d.bytes || '--'}</span><span style="color:#4da6ff;font-weight:700;font-family:monospace;">${d.value.toFixed(4)}</span>`;
+    results.appendChild(row);
+    results.scrollTop = results.scrollHeight;
+}
+
+function clearSpeechResults() {
+    const results = document.getElementById('speech-results');
+    if (results) {
+        results.innerHTML = '<div style="color:#475569;text-align:center;padding:16px 0;" id="speech-results-placeholder">RMS values will appear per batch when running</div>';
+    }
 }
 
 function setSpeechStatus(msg, color, pulse) {
-    const txt = document.getElementById('speech-status-txt');
-    const dot = document.getElementById('speech-status-dot');
+    const txt  = document.getElementById('speech-status-txt');
+    const dot  = document.getElementById('speech-status-dot');
+    const bars = document.getElementById('speech-status-bars');
     if (txt) { txt.textContent = msg; txt.style.color = color; }
-    if (dot) { dot.style.background = color; dot.style.animation = pulse ? 'pulse 2s infinite' : 'none'; }
+    if (dot)  { dot.style.display = pulse ? 'none' : 'inline-block'; dot.style.background = color; }
+    if (bars) {
+        bars.classList.toggle('active', pulse);
+        bars.querySelectorAll('span').forEach(s => s.style.background = color);
+    }
 }
 
 function updateSpeechRunBtn(running) {
@@ -1422,7 +1450,7 @@ function startTvmDemo() {
         .then(r => r.json())
         .then(d => {
             if (d.error) { setTvmDemoStatus('Error: ' + d.error, '#ef4444', false); _tvmDemoRunning = false; updateTvmDemoBtn(false); return; }
-            setTvmDemoStatus('Running... (~30-45 seconds)', '#22c55e', true);
+            setTvmDemoStatus('Running...', '#22c55e', true);
             _tvmDemoPollTimer = setInterval(pollTvmDemoResults, 2000);
         })
         .catch(err => { setTvmDemoStatus('Error: ' + err.message, '#ef4444', false); _tvmDemoRunning = false; updateTvmDemoBtn(false); });
@@ -1453,27 +1481,22 @@ function pollTvmDemoResults() {
 function displayTvmDemoResults(r) {
     if (r.error) { setTvmDemoStatus('Error: ' + r.error, '#ef4444', false); return; }
     setTvmDemoStatus('Completed', '#22c55e', false);
-    document.getElementById('tvm-d-avg').textContent = r.averageTime || '--';
-    document.getElementById('tvm-d-fps').textContent = r.fps || '--';
-    document.getElementById('tvm-d-min').textContent = r.minTime || '--';
-    document.getElementById('tvm-d-max').textContent = r.maxTime || '--';
-    const predsEl = document.getElementById('tvm-d-preds');
-    if (r.predictions && r.predictions.length) {
-        predsEl.innerHTML = r.predictions.slice(0, 5).map(p =>
-            `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1e2a3a;">
-                <span style="color:#94a3b8;">Class ${p.class}</span>
-                <span style="color:#e2e8f0;font-weight:600;">${p.percentage}</span>
-            </div>`
-        ).join('');
-    }
+    document.getElementById('tvm-d-time').textContent = r.inferenceTimeMs != null ? r.inferenceTimeMs : '--';
+    document.getElementById('tvm-d-output').textContent = r.outputFloats != null ? r.outputFloats.toLocaleString() : '--';
+    document.getElementById('tvm-d-cycles').textContent = r.cycles != null ? Number(r.cycles).toLocaleString() : '--';
     document.getElementById('tvm-demo-results').style.display = 'block';
 }
 
 function setTvmDemoStatus(msg, color, pulse) {
-    const txt = document.getElementById('tvm-demo-status');
-    const dot = document.getElementById('tvm-demo-dot');
+    const txt  = document.getElementById('tvm-demo-status');
+    const dot  = document.getElementById('tvm-demo-dot');
+    const bars = document.getElementById('tvm-demo-bars');
     if (txt) { txt.textContent = msg; txt.style.color = color; }
-    if (dot)  { dot.style.background = color; dot.style.animation = pulse ? 'pulse 2s infinite' : 'none'; }
+    if (dot)  { dot.style.display = pulse ? 'none' : 'inline-block'; dot.style.background = color; }
+    if (bars) {
+        bars.classList.toggle('active', pulse);
+        bars.querySelectorAll('span').forEach(s => s.style.background = color);
+    }
 }
 
 function updateTvmDemoBtn(running) {

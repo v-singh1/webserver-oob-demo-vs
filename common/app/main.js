@@ -988,7 +988,7 @@ function initTvmInference() {
                     setTvmRunning(false);
                 } else {
                     console.log('[TVM DEBUG] Success response, starting polling');
-                    setTvmStatus('running', 'Running inference... Please wait (takes ~30-45 seconds)');
+                    setTvmStatus('running', 'Running inference...');
 
                     // Start polling for status updates
                     tvmPollingInterval = setInterval(pollTvmStatus, 2000);

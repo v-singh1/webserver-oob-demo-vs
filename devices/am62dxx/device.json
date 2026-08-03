@@ -21,8 +21,9 @@
       "outputName": "processed_output.wav"
     },
     "tvm-inference": {
-      "artifactsPath": "/root/artifacts_mobilenet_v2_tv-onnx/",
-      "modelName": "MobileNet v2",
+      "edgeAiBinary": "/usr/bin/rpmsg_inference_example",
+      "jsonFile": "/usr/share/tvm_inference/json_files/pipeline_tvm_inference.json",
+      "modelName": "GCRN",
       "description": "Hardware-accelerated inference using TVM+TIDL on C7x DSP"
     }
   },

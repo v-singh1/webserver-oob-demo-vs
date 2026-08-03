@@ -192,12 +192,28 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         job.process = child;
         console.log('[speech-enhancement] child process spawned, pid:', child.pid);
         connectDmaStream();
+        let lastBatch = { num: 0, total: 0, windows: 0, sampleStart: 0, sampleEnd: 0, bytes: 0 };
         const collect = data => {
             const text = data.toString();
             if (job) job.stdout += text;
             console.log('[speech-enhancement] child stdout:', text.trim());
             text.split('\n').filter(Boolean).forEach(line => {
-                if (/Processing chunk|STFT|ISTFT|TVM|RMS|success/i.test(line)) send({ type: 'metric', label: line.replace(/^\[App\]\s*/, '').slice(0, 180) });
+                const batchMatch = line.match(/Processing batch\s+(\d+)\/(\d+)\s+\((\d+)\s+windows,\s+samples\s+(\d+)-(\d+),\s+(\d+)\s+bytes\)/i);
+                if (batchMatch) {
+                    lastBatch = {
+                        num:         parseInt(batchMatch[1]),
+                        total:       parseInt(batchMatch[2]),
+                        windows:     parseInt(batchMatch[3]),
+                        sampleStart: parseInt(batchMatch[4]),
+                        sampleEnd:   parseInt(batchMatch[5]),
+                        bytes:       parseInt(batchMatch[6]),
+                    };
+                }
+                const rmsMatch = line.match(/Overall error RMS.*?:\s*([\d.]+)/i);
+                if (rmsMatch) {
+                    send({ type: 'rms', ...lastBatch, value: parseFloat(rmsMatch[1]) });
+                }
+                if (/Pipeline completed successfully/i.test(line)) { send({ type: 'metric', label: 'Pipeline completed successfully' }); }
             });
         };
         child.stdout.on('data', collect);
