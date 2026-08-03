@@ -9,13 +9,12 @@
     }
   ],
   "soc": "AM62Dx quad Cortex-A53 @ 1.4GHz + dual DSS",
-  "demos": ["cpu-monitor", "audio-classification"],
+  "demos": ["cpu-monitor", "tvm-inference"],
   "demoConfig": {
-    "audio-classification": {
-      "model":    "/usr/share/oob-demo-assets/models/yamnet_audio_classification.tflite",
-      "labels":   "/usr/share/oob-demo-assets/labels/yamnet_label_list.txt",
-      "delegate": "XNNPACK",
-      "threads":  4
+    "tvm-inference": {
+      "artifactsPath": "/root/artifacts_mobilenet_v2_tv-onnx/",
+      "modelName": "MobileNet v2",
+      "description": "Hardware-accelerated inference using TVM+TIDL on C7x DSP"
     }
   },
   "docs": {

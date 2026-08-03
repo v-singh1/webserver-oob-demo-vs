@@ -1,0 +1,8 @@
+{
+  "id": "tvm-inference",
+  "name": "TVM Inference",
+  "icon": "icons:build",
+  "description": "TVM+TIDL MobileNet inference on AM62D C7x DSP with performance benchmarking",
+  "devices": ["am62dxx"],
+  "routes": ["/tvm-inference/run", "/tvm-inference/status"]
+}

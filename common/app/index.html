@@ -3225,6 +3225,248 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             </div>
         </div>
     </ti-widget-vtab>
+    <ti-widget-vtab id="ti_widget_vtab_tvm_inference" data-demo-vtab name="TVM Inference" caption="TVM+TIDL ML Inference" icon="icons:build" icon-style="width:30px;height:30px;padding:5px;" visible="false" font-size="inherit" auto-scroll font-style="normal" font-weight="normal" text-align="left" text-decoration="none" autoscroll title>
+        <style>
+            .tvm-container {
+                padding: 20px;
+                max-width: 800px;
+                margin: 0 auto;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+
+            .tvm-header {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+
+            .tvm-title {
+                font-size: 28px;
+                font-weight: 600;
+                color: #148C9C;
+                margin-bottom: 10px;
+            }
+
+            .tvm-subtitle {
+                font-size: 16px;
+                color: #666;
+                line-height: 1.4;
+            }
+
+            .tvm-card {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                padding: 25px;
+                margin-bottom: 20px;
+            }
+
+            .tvm-controls {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+
+            .tvm-button {
+                background: #148C9C;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 12px 24px;
+                font-size: 16px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                margin: 0 10px;
+            }
+
+            .tvm-button:hover:not(:disabled) {
+                background: #0f7983;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(20, 140, 156, 0.3);
+            }
+
+            .tvm-button:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+                transform: none;
+                box-shadow: none;
+            }
+
+            .tvm-button.danger {
+                background: #dc3545;
+            }
+
+            .tvm-button.danger:hover:not(:disabled) {
+                background: #c82333;
+            }
+
+            .tvm-status {
+                text-align: center;
+                padding: 15px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+                font-weight: 500;
+            }
+
+            .tvm-status.running {
+                background: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+            }
+
+            .tvm-status.completed {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+
+            .tvm-status.error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+
+            .tvm-results {
+                display: none;
+            }
+
+            .tvm-results.show {
+                display: block;
+            }
+
+            .performance-metrics {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 15px;
+                margin-bottom: 25px;
+            }
+
+            .metric-box {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 6px;
+                text-align: center;
+                border: 1px solid #e9ecef;
+            }
+
+            .metric-value {
+                font-size: 24px;
+                font-weight: 700;
+                color: #148C9C;
+                margin-bottom: 5px;
+            }
+
+            .metric-label {
+                font-size: 14px;
+                color: #666;
+                font-weight: 500;
+            }
+
+            .predictions-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+
+            .predictions-table th,
+            .predictions-table td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid #ddd;
+            }
+
+            .predictions-table th {
+                background: #f8f9fa;
+                font-weight: 600;
+                color: #333;
+            }
+
+            .predictions-table tr:hover {
+                background: #f8f9fa;
+            }
+
+            .spinner {
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #148C9C;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+
+        <div class="tvm-container">
+            <div class="tvm-header">
+                <div class="tvm-title">TVM+TIDL Inference</div>
+                <div class="tvm-subtitle">
+                    Hardware-accelerated inference using TVM runtime with TIDL on AM62D C7x DSP cores
+                </div>
+            </div>
+
+            <div class="tvm-card">
+                <div class="tvm-controls">
+                    <button id="tvm_run_button" class="tvm-button">
+                        <span id="tvm_run_text">Run Inference</span>
+                        <span id="tvm_run_spinner" class="spinner" style="display: none; margin-left: 10px;"></span>
+                    </button>
+                    <button id="tvm_stop_button" class="tvm-button danger" style="display: none;" disabled>
+                        Stop Inference
+                    </button>
+                </div>
+
+                <div id="tvm_status" class="tvm-status" style="display: none;">
+                    Ready to run inference
+                </div>
+
+                <div id="tvm_results" class="tvm-results">
+                    <h3>Performance Results</h3>
+                    <div class="performance-metrics">
+                        <div class="metric-box">
+                            <div class="metric-value" id="tvm_avg_time">--</div>
+                            <div class="metric-label">Average Time (ms)</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-value" id="tvm_fps">--</div>
+                            <div class="metric-label">FPS</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-value" id="tvm_min_time">--</div>
+                            <div class="metric-label">Min Time (ms)</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-value" id="tvm_max_time">--</div>
+                            <div class="metric-label">Max Time (ms)</div>
+                        </div>
+                    </div>
+
+                    <h3>Top 5 Predictions</h3>
+                    <table class="predictions-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Class ID</th>
+                                <th>Score</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tvm_predictions_body">
+                            <!-- Predictions will be populated here -->
+                        </tbody>
+                    </table>
+
+                    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                        <strong>Output Shape:</strong> <span id="tvm_output_shape">--</span><br>
+                        <strong>Inference Completed:</strong> <span id="tvm_timestamp">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </ti-widget-vtab>
     <ti-widget-vtab id="ti_widget_vtab_collaterals" name="Documentation" icon="icons:description" icon-style="width:30px;height:30px;padding:5px;" visible no-child-tabs-in-menu font-size="inherit" auto-scroll font-style="normal" font-weight="normal" text-align="left" text-decoration="none" autoscroll title vertical layout>
         <style>
             /* Modern, clean documentation section */
