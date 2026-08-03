@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script>(function(){var B=1280;function r(){var s=window.innerWidth/B;document.documentElement.style.zoom=s<1?s:'';}r();window.addEventListener('resize',r);})();</script>
+    <script>(function(){var B=1280;function r(){var s=window.innerWidth/B;document.documentElement.style.zoom=s<1?s:'';}r();window.addEventListener('resize',r);if(localStorage.getItem('theme')==='light')document.documentElement.dataset.theme='light';})();</script>
     <title>TI SITARA EDGE AI Demo Portal</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -107,6 +107,39 @@
             line-height: 1;
         }
         .theme-btn:hover { color: #fff; }
+
+        /* ── THEME VARS ── */
+        :root { --bg-page:#0a0e1a; --bg-panel:#0d1117; --bd:#1e2a3a; --txt:#e2e8f0; --txt2:#94a3b8; --txt3:#64748b; }
+        html[data-theme="light"] { --bg-page:#f0f4f8; --bg-panel:#ffffff; --bd:#d1d9e6; --txt:#0f172a; --txt2:#475569; --txt3:#64748b; }
+        html[data-theme="light"] body          { background-color: var(--bg-page) !important; color: var(--txt) !important; }
+        html[data-theme="light"] .navbar       { background: var(--bg-panel) !important; border-bottom-color: var(--bd) !important; }
+        html[data-theme="light"] .status-badge { border-right-color: var(--bd) !important; }
+        html[data-theme="light"] .hero         { background: linear-gradient(135deg,#e8f0fe 0%,#dce8ff 55%,#eef2ff 100%) !important; border-color:#bfd4f8 !important; }
+        html[data-theme="light"] .hero-welcome { color:#1d4ed8 !important; }
+        html[data-theme="light"] .hero-title .t-white { color:#0f172a !important; }
+        html[data-theme="light"] .hero-desc    { color: var(--txt3) !important; }
+        html[data-theme="light"] .hero-chip    { background: linear-gradient(to right,transparent 0%,#eef2ff 18%) !important; }
+        html[data-theme="light"] .card         { background: var(--bg-panel) !important; border-color: var(--bd) !important; }
+        html[data-theme="light"] .card-heading { color: var(--txt) !important; }
+        html[data-theme="light"] .demo-item    { border-color: var(--bd) !important; }
+        html[data-theme="light"] .demo-body h3 { color: var(--txt) !important; }
+        html[data-theme="light"] .demo-body p  { color: var(--txt3) !important; }
+        html[data-theme="light"] .info-label   { color: var(--txt2) !important; }
+        html[data-theme="light"] .info-version { color: var(--txt) !important; }
+        html[data-theme="light"] .info-item    { border-color: var(--bd) !important; }
+        html[data-theme="light"] .about-box    { background:#f1f5f9 !important; border-color: var(--bd) !important; }
+        html[data-theme="light"] .about-body   { color: var(--txt3) !important; }
+        html[data-theme="light"] .section-heading { color: var(--txt) !important; }
+        html[data-theme="light"] .device-row   { border-bottom-color: var(--bd) !important; }
+        html[data-theme="light"] .dl           { color: var(--txt3) !important; }
+        html[data-theme="light"] .dv           { color: var(--txt) !important; }
+        html[data-theme="light"] .metric-label { color: var(--txt2) !important; }
+        html[data-theme="light"] .metric-value { color: var(--txt) !important; }
+        html[data-theme="light"] .bar-track    { background:#e2e8f0 !important; }
+        html[data-theme="light"] .footer       { background: var(--bg-panel) !important; border-top-color: var(--bd) !important; }
+        html[data-theme="light"] .footer-title { color: var(--txt) !important; }
+        html[data-theme="light"] .footer-copy  { color: var(--txt2) !important; }
+        html[data-theme="light"] .theme-btn    { color: var(--txt2) !important; }
 
         /* ── HERO ── */
         .hero {
@@ -322,7 +355,7 @@
             <div class="status-dot" id="conn-dot"></div>
             <span id="conn-text">Connected</span>
         </div>
-        <button class="theme-btn" title="Toggle theme">&#9728;</button>
+        <button class="theme-btn" id="theme-btn" title="Toggle theme" onclick="toggleTheme()">&#9728;</button>
     </div>
 </nav>
 
@@ -376,7 +409,7 @@
             </div>
             <div class="demo-body">
                 <h3>DSP Compute Demos</h3>
-                <p>8-channel real-time audio offloaded to C7x DSP via RPMsg-DMA with FFT filtering and live spectrum.</p>
+                <p>Real-time audio compute workloads offloaded to C7x DSP via RPMsg-DMA on AM62D</p>
             </div>
             <span class="demo-arrow">›</span>
         </div>
@@ -673,6 +706,19 @@
     }
     setInterval(pollConnection, 3000);
     pollConnection();
+
+    function toggleTheme() {
+        const html = document.documentElement;
+        const btn  = document.getElementById('theme-btn');
+        if (html.dataset.theme === 'light') {
+            delete html.dataset.theme; localStorage.setItem('theme','dark');
+            if (btn) btn.innerHTML = '&#9728;';
+        } else {
+            html.dataset.theme = 'light'; localStorage.setItem('theme','light');
+            if (btn) btn.innerHTML = '&#9790;';
+        }
+    }
+    (function(){ if(document.documentElement.dataset.theme==='light'){ const b=document.getElementById('theme-btn'); if(b) b.innerHTML='&#9790;'; } })();
 </script>
 
 <!-- Connection toast -->

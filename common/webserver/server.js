@@ -79,6 +79,12 @@ const server = http.createServer(app);
 const port   = process.env.PORT || 3000;
 const wss    = new WebSocket.Server({ server });
 
+/* Dedicated health-check socket — frontend connects here for instant disconnect detection */
+wss.on('connection', (ws, req) => {
+    if (req.url !== '/health') return;
+    ws.on('error', () => {});
+});
+
 app.use(express.json({ limit: '512kb' }));
 
 /* Serve device-specific static files first (images, overrides), then common app */
@@ -88,6 +94,9 @@ if (fs.existsSync(deviceAppDir)) {
     console.log(`[Server] Device app overlay: ${deviceAppDir}`);
 }
 app.use(express.static(appDir));
+
+/* Health check — used by frontend to detect disconnects and post-reboot reconnect */
+app.get('/ping', (req, res) => res.json({ ok: true }));
 
 /* Device info endpoint — frontend calls this on load */
 app.get('/device-info', (req, res) => {
