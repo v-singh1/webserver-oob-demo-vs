@@ -67,7 +67,6 @@ function readPcmWav(filename) {
     const bitsPerSample = fmt.readUInt16LE(14);
     if (audioFmt !== 1)       throw new Error('WAV must be uncompressed PCM (got compressed format)');
     if (channels !== 1)       throw new Error(`WAV must be mono (got ${channels} channels)`);
-    if (sampleRate !== 16000) throw new Error(`WAV must be 16 kHz (got ${sampleRate} Hz)`);
     if (bitsPerSample !== 16) throw new Error(`WAV must be 16-bit (got ${bitsPerSample}-bit)`);
     return { pcm: data, sampleRate };
 }
