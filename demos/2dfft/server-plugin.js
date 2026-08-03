@@ -72,7 +72,12 @@ module.exports = function register2dFft(app, wss, device) {
 
     app.get('/2dfft/stop', (req, res) => {
         if (MOCK) { _stopMock(); return res.send('2dfft stopped (MOCK)'); }
-        if (proc) { try { proc.kill('SIGTERM'); } catch (_) {} proc = null; }
+        if (proc) {
+            try { process.kill(-proc.pid, 'SIGINT'); } catch (_) {
+                try { proc.kill('SIGINT'); } catch (_) {}
+            }
+            proc = null;
+        }
         broadcast({ type: 'status', state: 'stopped', message: 'Stopped' });
         res.send('2dfft stopped');
     });
@@ -132,7 +137,12 @@ module.exports = function register2dFft(app, wss, device) {
 
     function _cleanup() {
         if (MOCK) _stopMock();
-        if (proc) { try { proc.kill('SIGTERM'); } catch (_) {} proc = null; }
+        if (proc) {
+            try { process.kill(-proc.pid, 'SIGINT'); } catch (_) {
+                try { proc.kill('SIGINT'); } catch (_) {}
+            }
+            proc = null;
+        }
     }
     process.on('SIGTERM', _cleanup);
     process.on('SIGINT',  _cleanup);

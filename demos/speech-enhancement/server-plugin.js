@@ -259,7 +259,11 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         stopStreams();
         if (job) {
             job.cancelled = true;
-            if (job.process) job.process.kill('SIGTERM');
+            if (job.process) {
+                try { process.kill(-job.process.pid, 'SIGINT'); } catch (_) {
+                    try { job.process.kill('SIGINT'); } catch (_) {}
+                }
+            }
             job = null;
         }
         if (dmaSocket) { dmaSocket.destroy(); dmaSocket = null; }

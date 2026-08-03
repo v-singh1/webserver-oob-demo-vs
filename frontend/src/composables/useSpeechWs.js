@@ -1,0 +1,113 @@
+import { ref, shallowRef, onUnmounted } from 'vue'
+
+export function useSpeechWs() {
+  const connected   = ref(false)
+  const running     = ref(false)
+  const statusMsg   = ref('Idle')
+  const statusColor = ref('secondary')
+  const error       = ref(null)
+  const rmsBatches  = ref([])         // [{ num, total, windows, sampleStart, sampleEnd, bytes, value }]
+  const inputPcm    = shallowRef(null)  // { pcm: Int16Array, sampleRate }
+  const outputPcm   = shallowRef(null)
+  const downloadUrls = ref(null)       // { inputUrl, outputUrl } after done
+  const metrics     = ref([])          // string[]
+
+  let ws = null
+
+  function connect() {
+    if (ws) return
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+    ws = new WebSocket(`${proto}://${location.host}/speech`)
+    ws.onopen = () => { connected.value = true }
+    ws.onclose = () => { connected.value = false; ws = null }
+    ws.onerror = () => { connected.value = false }
+    ws.onmessage = (ev) => {
+      let msg
+      try { msg = JSON.parse(ev.data) } catch { return }
+      dispatch(msg)
+    }
+  }
+
+  function dispatch(msg) {
+    switch (msg.type) {
+      case 'spectrum':
+        handleSpectrum(msg)
+        break
+      case 'rms':
+        rmsBatches.value = [...rmsBatches.value, {
+          num: msg.num, total: msg.total, windows: msg.windows,
+          sampleStart: msg.sampleStart, sampleEnd: msg.sampleEnd,
+          bytes: msg.bytes, value: msg.value,
+        }]
+        break
+      case 'metric':
+        metrics.value = [...metrics.value, msg.label]
+        statusMsg.value = msg.label
+        statusColor.value = 'primary'
+        break
+      case 'error':
+        error.value = msg.message
+        statusMsg.value = msg.message
+        statusColor.value = 'error'
+        running.value = false
+        break
+      case 'spectrum_done':
+        running.value = false
+        statusMsg.value = 'Complete'
+        statusColor.value = 'success'
+        downloadUrls.value = { inputUrl: msg.inputUrl, outputUrl: msg.outputUrl }
+        break
+      default:
+        if (msg.status === 'connected') {
+          statusMsg.value = 'Ready'
+          statusColor.value = 'secondary'
+        }
+    }
+  }
+
+  function handleSpectrum(msg) {
+    const binary = atob(msg.pcm)
+    const bytes  = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    const int16  = new Int16Array(bytes.buffer)
+    if (msg.channel === 'input')  inputPcm.value  = { pcm: int16, sampleRate: msg.sampleRate }
+    if (msg.channel === 'output') outputPcm.value = { pcm: int16, sampleRate: msg.sampleRate }
+  }
+
+  function reset() {
+    rmsBatches.value  = []
+    metrics.value     = []
+    error.value       = null
+    downloadUrls.value = null
+    inputPcm.value    = null
+    outputPcm.value   = null
+    statusMsg.value   = 'Starting…'
+    statusColor.value = 'primary'
+    running.value     = true
+  }
+
+  async function start(filePath) {
+    reset()
+    const url = filePath ? `/start-speech-enhancement?file=${encodeURIComponent(filePath)}` : '/start-speech-enhancement'
+    const r = await fetch(url)
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}))
+      error.value = d.error || `HTTP ${r.status}`
+      running.value = false
+      statusMsg.value = error.value
+      statusColor.value = 'error'
+    }
+  }
+
+  async function stop() {
+    await fetch('/stop-speech-enhancement')
+    running.value = false
+    statusMsg.value = 'Stopped'
+    statusColor.value = 'secondary'
+  }
+
+  onUnmounted(() => { if (ws) ws.close() })
+  connect()
+
+  return { connected, running, statusMsg, statusColor, error, rmsBatches, inputPcm, outputPcm, downloadUrls, metrics, start, stop }
+}

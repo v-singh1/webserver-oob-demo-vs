@@ -87,8 +87,23 @@ wss.on('connection', (ws, req) => {
 
 app.use(express.json({ limit: '512kb' }));
 
-/* Serve device-specific static files first (images, overrides), then common app */
+/* Determine device app directory and Vue entry point before registering any middleware.
+ * app.get('/') must be registered before express.static() so it wins over the automatic
+ * index.html serving that express.static does for GET / — otherwise the legacy
+ * common/app/index.html would be returned instead of vue-dist/index.html. */
 const deviceAppDir = path.join(path.dirname(deviceConfigPath), 'app');
+
+const vueIndex = [
+    path.join(deviceAppDir, 'vue-dist', 'index.html'),
+    path.join(appDir,       'vue-dist', 'index.html'),
+].find(p => fs.existsSync(p));
+
+if (vueIndex) {
+    app.get('/', (req, res) => res.sendFile(vueIndex));
+    console.log('[Server] Vue app root: ' + vueIndex);
+}
+
+/* Serve device-specific static files first (images, overrides), then common app */
 if (fs.existsSync(deviceAppDir)) {
     app.use(express.static(deviceAppDir));
     console.log(`[Server] Device app overlay: ${deviceAppDir}`);
@@ -201,6 +216,16 @@ for (const demoId of device.demos) {
     } catch (err) {
         console.error(`[Server] Failed to load demo plugin ${demoId}:`, err);
     }
+}
+
+/* ------------------------------------------------------------------ */
+/* SPA fallback — serve Vue app for any unmatched GET                  */
+/* ------------------------------------------------------------------ */
+
+/* Must come after all API routes and plugin registrations so API paths
+ * are never caught here. Only fires when vue-dist/index.html exists. */
+if (fs.existsSync(vueIndex)) {
+    app.get('*', (req, res) => res.sendFile(vueIndex));
 }
 
 /* ------------------------------------------------------------------ */

@@ -88,6 +88,9 @@ module.exports = function registerAudioOffload(app, wss, device) {
     let mockInterval  = null;
     let mockMetricInt = null;
     let offloadProc   = null;
+    let retryTimer    = null;
+    let retryCount    = 0;
+    const MAX_RETRIES = 10;
 
     const BIN_PATH  = (device && device.demoConfig &&
                        device.demoConfig['audio-offload'] &&
@@ -205,21 +208,46 @@ module.exports = function registerAudioOffload(app, wss, device) {
         return sock;
     }
 
-    function connectTcp(host) {
+    function connectTcp(host, isRetry = false) {
         if (tcpConnected) {
             broadcast({ type: 'status', state: 'connected', message: 'Already connected' });
             return;
         }
 
-        console.log(`[audio-offload] Connecting to rpmsg_audio_offload_example at ${host}`);
+        if (!isRetry) {
+            retryCount = 0;
+            if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+        }
+
+        console.log(`[audio-offload] Connecting to rpmsg_audio_offload_example at ${host}${isRetry ? ` (attempt ${retryCount + 1}/${MAX_RETRIES})` : ''}`);
         broadcast({ type: 'status', state: 'connecting', message: `Connecting to ${host}…` });
 
         let ready = 0;
+        let connectFailed = false;
+
         function onReady() {
             ready++;
             if (ready === 4) {   /* all four sockets up */
                 tcpConnected = true;
+                retryCount = 0;
+                if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
                 broadcast({ type: 'status', state: 'connected', message: `Connected to ${host}` });
+            }
+        }
+
+        function scheduleRetry() {
+            if (connectFailed || tcpConnected) return;
+            connectFailed = true;
+
+            /* Clean up failed sockets */
+            [logSock, cmdSock, inSock, outSock].forEach(s => { if (s) { try { s.destroy(); } catch (_) {} } });
+            logSock = cmdSock = inSock = outSock = null;
+
+            if (retryCount < MAX_RETRIES && offloadProc) {
+                retryCount++;
+                retryTimer = setTimeout(() => connectTcp(host, true), RETRY_MS);
+            } else {
+                broadcast({ type: 'status', state: 'error', message: 'Failed to connect after multiple attempts' });
             }
         }
 
@@ -228,8 +256,11 @@ module.exports = function registerAudioOffload(app, wss, device) {
         inSock  = openSocket(host, INDATA_PORT,  handleInData,  onReady);
         outSock = openSocket(host, OUTDATA_PORT, handleOutData, onReady);
 
-        /* Mark disconnected if any socket errors out */
+        /* Trigger retry if any socket fails to connect */
         [logSock, cmdSock, inSock, outSock].forEach(s => {
+            s.once('error', () => {
+                setTimeout(scheduleRetry, 100);  /* small delay so all 4 error events can fire */
+            });
             s.on('close', () => {
                 if (tcpConnected) {
                     tcpConnected = false;
@@ -241,6 +272,8 @@ module.exports = function registerAudioOffload(app, wss, device) {
 
     function disconnectTcp() {
         tcpConnected = false;
+        retryCount = 0;
+        if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
         [logSock, cmdSock, inSock, outSock].forEach(s => { if (s) { try { s.destroy(); } catch (_) {} } });
         logSock = cmdSock = inSock = outSock = null;
         inBuf = outBuf = Buffer.alloc(0);
@@ -357,6 +390,8 @@ module.exports = function registerAudioOffload(app, wss, device) {
         offloadProc.on('exit', code => {
             console.log(`[audio-offload] rpmsg_audio_offload_example exited (code=${code})`);
             offloadProc = null;
+            retryCount = 0;
+            if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
             if (tcpConnected) disconnectTcp();
         });
         /* Wait for binary to open TCP ports before connecting */
