@@ -67,7 +67,7 @@ function readPcmWav(filename) {
     const bitsPerSample = fmt.readUInt16LE(14);
     if (audioFmt !== 1)       throw new Error('WAV must be uncompressed PCM (got compressed format)');
     if (channels !== 1)       throw new Error(`WAV must be mono (got ${channels} channels)`);
-    if (sampleRate !== 48000) throw new Error(`WAV must be 48 kHz (got ${sampleRate} Hz)`);
+    if (sampleRate !== 16000) throw new Error(`WAV must be 16 kHz (got ${sampleRate} Hz)`);
     if (bitsPerSample !== 16) throw new Error(`WAV must be 16-bit (got ${bitsPerSample}-bit)`);
     return { pcm: data, sampleRate };
 }
@@ -90,7 +90,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     const config = (device.demoConfig || {})['speech-enhancement'] || {};
     const binary = config.edgeAiBinary || '/usr/bin/rpmsg_inference_example /usr/bin/rpmsg_inference_example';
     const tvmDir = config.tvmDir || '/usr/share/tvm_inference';
-    const inputPath = config.inputPath || '/usr/share/tvm_inference/input_audio/input_audio.wav';
+    const inputPath = config.inputPath || '/usr/share/tvm_inference/input/input_audio.wav';
     const jsonFile = config.jsonFile || 'pipeline_stft_istft.json';
     const outputName = config.outputName || 'processed_output.wav';
     const streamSocket = config.streamSocket || '/tmp/edge-ai-speech.sock';

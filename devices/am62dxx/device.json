@@ -16,13 +16,13 @@
       "tvmDir": "/usr/share/tvm_inference",
       "jsonFile": "json/pipeline_stft_istft.json",
       "artifactsPath": "artifacts",
-      "inputPath": "/usr/share/tvm_inference/input_audio/input_audio.wav",
+      "inputPath": "/usr/share/tvm_inference/input/input_audio.wav",
       "streamSocket": "/tmp/edge-ai-speech.sock",
       "outputName": "processed_output.wav"
     },
     "tvm-inference": {
       "edgeAiBinary": "/usr/bin/rpmsg_inference_example",
-      "jsonFile": "/usr/share/tvm_inference/json_files/pipeline_tvm_inference.json",
+      "jsonFile": "/usr/share/tvm_inference/json/pipeline_tvm_inference.json",
       "modelName": "GCRN",
       "description": "Hardware-accelerated inference using TVM+TIDL on C7x DSP"
     }

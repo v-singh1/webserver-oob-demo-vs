@@ -297,7 +297,7 @@
                     </div>
                     <div class="dsi-txt">
                         <div class="dsi-name">TVM Inference</div>
-                        <div class="dsi-sub">MobileNet v2 on C7x DSP via TIDL</div>
+                        <div class="dsi-sub">GCRN on C7x DSP via TIDL</div>
                     </div>
                     <span class="dsi-arr">›</span>
                 </div>
@@ -366,7 +366,7 @@
 
                 <!-- Live TVM Inference panel (shown when TVM demo is selected) -->
                 <div id="live-tvm-section" style="display:none;flex-direction:column;gap:10px;flex:1;">
-                    <p class="desc-text">Hardware-accelerated ML inference using TVM+TIDL on AM62D C7x DSP. Benchmarks MobileNet v2 INT8 quantized model for edge AI performance measurement.</p>
+                    <p class="desc-text">Hardware-accelerated speech enhancement inference using TVM+TIDL on AM62D C7x DSP. Runs the GCRN model for noise reduction and speech quality improvement.</p>
                     <hr class="card-divider">
                     <div class="sub-ttl">Model</div>
                     <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;">
@@ -374,8 +374,8 @@
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
                         </div>
                         <div>
-                            <div style="font-size:13px;font-weight:600;color:#e2e8f0;">MobileNet v2</div>
-                            <div style="font-size:11px;color:#64748b;">INT8 · Image Classification · C7x DSP</div>
+                            <div style="font-size:13px;font-weight:600;color:#e2e8f0;">GCRN</div>
+                            <div style="font-size:11px;color:#64748b;">FP32 · Speech Enhancement · C7x DSP</div>
                         </div>
                     </div>
                     <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
@@ -681,8 +681,8 @@ const DEMOS = [
         preset: "treble"
     },
     {
-        desc: "Hardware-accelerated ML inference using TVM+TIDL runtime on AM62D C7x DSP. Benchmarks MobileNet v2 quantized to INT8 for edge AI performance.",
-        features: ["TVM+TIDL runtime on C7x DSP","MobileNet v2 INT8 quantized","Avg / Min / Max latency metrics","FPS throughput measurement","Top-5 predictions output"],
+        desc: "Hardware-accelerated speech enhancement inference using TVM+TIDL runtime on AM62D C7x DSP. Runs GCRN FP32 model for noise reduction and speech quality improvement.",
+        features: ["TVM+TIDL runtime on C7x DSP","GCRN FP32 speech enhancement model","Inference time and C7x DSP cycle count","Output tensor float count","Hardware-accelerated on C7x DSP"],
         tags: ["AI / ML","TVM Inference"],
         preset: "flat"
     }
