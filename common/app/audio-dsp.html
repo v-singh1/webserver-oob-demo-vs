@@ -304,6 +304,11 @@
                 Audio DSP with Analytics
             </a>
 
+            <a href="dsp-compute.html" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="4"/><line x1="8" y1="20" x2="8" y2="12"/><line x1="12" y1="20" x2="12" y2="2"/><line x1="16" y1="20" x2="16" y2="10"/><line x1="20" y1="20" x2="20" y2="6"/></svg>
+                DSP Compute Demos
+            </a>
+
             <div class="nav-lbl">Tools</div>
 
             <a href="model-inspector.html" class="nav-item">
@@ -404,6 +409,7 @@
                     </div>
                     <span class="dsi-arr">›</span>
                 </div>
+
 
             </div>
 
@@ -771,6 +777,7 @@
                         Start Spectrum
                     </button>
                 </div>
+
             </div>
 
         </div>
@@ -896,7 +903,6 @@ function toggleSigFlow(hdr) {
 function triggerRun(btn) {
     const activeIdx = Array.from(document.querySelectorAll('.dsi')).findIndex(d => d.classList.contains('active'));
     if (activeIdx === TVM_DEMO_IDX) { toggleTvmDemo(); return; }
-    /* Audio Classification and Speech Enhancement not yet supported — do nothing */
 }
 
 function _setRunBtnState(isTvm) {
@@ -1854,7 +1860,54 @@ function saveSettings() {
         status.style.color = '#ef4444';
     });
 }
+
+/* ── DSP audio overlay conflict check ── */
+function _checkDspOverlayConflict() {
+    fetch('/sigchain-biquad/check-overlay')
+        .then(r => r.json())
+        .then(d => {
+            if (d.active) {
+                document.getElementById('dsp-overlay-modal').style.display = 'flex';
+            }
+        })
+        .catch(() => {});
+}
+
+function _removeDspOverlayAndReboot() {
+    const btn = document.getElementById('dsp-overlay-remove-btn');
+    btn.disabled = true;
+    btn.textContent = 'Removing & Rebooting…';
+    fetch('/sigchain-biquad/disable-overlay', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) {
+                btn.disabled = false;
+                btn.textContent = 'Remove Overlay & Reboot';
+                alert('Failed: ' + (d.error || 'unknown error'));
+            }
+        })
+        .catch(() => {});
+}
+
+document.addEventListener('DOMContentLoaded', _checkDspOverlayConflict);
 </script>
+
+<!-- ── DSP audio overlay conflict modal ── -->
+<div id="dsp-overlay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:500;align-items:center;justify-content:center;">
+    <div style="background:#0d1117;border:1px solid #ef4444;border-radius:12px;padding:28px 32px;max-width:440px;width:90%;display:flex;flex-direction:column;gap:16px;box-shadow:0 8px 40px rgba(0,0,0,0.7);">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span style="font-size:15px;font-weight:700;color:#fca5a5;">Overlay Conflict Detected</span>
+        </div>
+        <p style="font-size:13px;color:#94a3b8;line-height:1.7;">The DSP-controlled audio overlay is currently active:</p>
+        <div style="font-family:monospace;font-size:11px;background:#03060e;border:1px solid #1e2a3a;border-radius:6px;padding:10px 12px;color:#fca5a5;word-break:break-all;">k3-am62d2-evm-dsp-controlled-audio.dtbo</div>
+        <p style="font-size:13px;color:#94a3b8;line-height:1.7;">This overlay is incompatible with the Audio DSP with Analytics demos. Remove it and reboot before continuing.</p>
+        <button id="dsp-overlay-remove-btn" onclick="_removeDspOverlayAndReboot()" style="padding:10px 16px;background:#dc2626;border:none;color:#fff;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;justify-content:center;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Remove Overlay &amp; Reboot
+        </button>
+    </div>
+</div>
 
 <!-- ── SLIDE-IN PANEL ── -->
 <div id="panel-overlay" onclick="closePanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;"></div>

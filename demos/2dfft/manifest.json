@@ -1,0 +1,9 @@
+{
+  "id": "2dfft",
+  "name": "2D FFT Offload",
+  "icon": "image:grid_on",
+  "description": "Offloads 128×128×2 test data for 2D FFT processing to C7x DSP via RPMsg-DMA, then compares output against reference data to verify correctness.",
+  "devices": ["am62dxx"],
+  "routes": ["/2dfft/run", "/2dfft/stop"],
+  "websocket": "/2dfft"
+}

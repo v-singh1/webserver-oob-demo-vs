@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>(function(){var B=1280;function r(){var s=window.innerWidth/B;document.documentElement.style.zoom=s<1?s:'';}r();window.addEventListener('resize',r);})();</script>
+    <title>DSP Compute Demos - TI AM62D Demo Portal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e1a; color: #e2e8f0;
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        }
+        /* ── NAVBAR ── */
+        .navbar {
+            background: #0d1117; border-bottom: 1px solid #1e2a3a;
+            height: 62px; padding: 0 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0; z-index: 10;
+        }
+        .navbar-left { display: flex; align-items: center; gap: 12px; }
+        .ti-logo { width: 38px; height: 38px; border-radius: 8px; background: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 3px; }
+        .ti-logo img { width: 100%; height: 100%; object-fit: contain; }
+        .brand-main { display: block; font-size: 15px; font-weight: 700; color: #fff; }
+        .brand-sub  { display: block; font-size: 10px; font-weight: 700; color: #4da6ff; letter-spacing: 2.5px; margin-top: 1px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .conn-block { padding-right: 16px; border-right: 1px solid #1e2a3a; }
+        .conn-top { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #e2e8f0; }
+        .conn-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 4px #22c55e} 50%{box-shadow:0 0 14px #22c55e} }
+        .conn-ip { font-size: 11px; color: #64748b; text-align: right; margin-top: 2px; }
+        .theme-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 20px; padding: 6px; border-radius: 8px; line-height: 1; }
+        .theme-btn:hover { color: #fff; }
+        /* ── LAYOUT ── */
+        .layout { display: flex; flex: 1; overflow: hidden; }
+        /* ── SIDEBAR ── */
+        .sidebar { width: 222px; background: #0d1117; border-right: 1px solid #1e2a3a; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+        .sidebar-nav { flex: 1; padding: 10px 0; }
+        .nav-lbl { font-size: 10px; font-weight: 700; color: #475569; letter-spacing: 1.8px; text-transform: uppercase; padding: 14px 16px 5px; }
+        .nav-item { display: flex; align-items: center; gap: 11px; padding: 10px 16px; font-size: 13.5px; color: #94a3b8; cursor: pointer; text-decoration: none; border-left: 3px solid transparent; transition: background 0.15s, color 0.15s; }
+        .nav-item:hover { background: rgba(255,255,255,0.04); color: #e2e8f0; }
+        .nav-item.active { background: rgba(251,191,36,0.1); color: #fbbf24; border-left-color: #d97706; }
+        .nav-item svg { flex-shrink: 0; }
+        /* ── MAIN ── */
+        .main { flex: 1; overflow-y: auto; padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 14px; }
+        /* ── PAGE HEADER ── */
+        .page-hdr { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-shrink: 0; }
+        .ph-left { display: flex; align-items: center; gap: 14px; }
+        .ph-icon { width: 50px; height: 50px; border-radius: 50%; flex-shrink: 0; background: radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00); border: 2px solid #d97706; color: #fbbf24; display: flex; align-items: center; justify-content: center; }
+        .ph-title { font-size: 21px; font-weight: 800; color: #fff; margin-bottom: 3px; }
+        .ph-sub   { font-size: 13px; color: #64748b; }
+        .btn-run { background: #d97706; color: #fff; border: none; padding: 11px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; white-space: nowrap; transition: background 0.2s; flex-shrink: 0; }
+        .btn-run:hover { background: #b45309; }
+        .btn-run:disabled { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
+        .hdr-actions { display: flex; align-items: center; gap: 10px; }
+        /* ── 3-COLUMN GRID ── */
+        .grid3 { display: grid; grid-template-columns: 230px 290px 1fr; gap: 14px; flex: 1; min-height: 0; }
+        /* ── CARD ── */
+        .card { background: #0d1117; border: 1px solid #1e2a3a; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+        .card-ttl { font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .card-divider { border: none; border-top: 1px solid #1e2a3a; margin: 2px 0; flex-shrink: 0; }
+        /* ── DEMO SELECT LIST ── */
+        .dsi { display: flex; align-items: center; gap: 11px; padding: 11px 12px; border: 1px solid #1e2a3a; border-radius: 9px; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
+        .dsi:hover { border-color: #d97706; background: rgba(217,119,6,0.05); }
+        .dsi.active { border-color: #d97706; background: rgba(217,119,6,0.09); }
+        .dsi-ic { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .dsi-txt { flex: 1; min-width: 0; }
+        .dsi-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+        .dsi-sub  { font-size: 11px; color: #64748b; margin-top: 2px; }
+        .dsi-arr  { color: #d97706; font-size: 16px; flex-shrink: 0; }
+        /* ── MISC ── */
+        .desc-text { font-size: 13px; color: #94a3b8; line-height: 1.65; flex-shrink: 0; }
+        .sub-ttl { font-size: 12.5px; font-weight: 700; color: #cbd5e1; flex-shrink: 0; }
+        .sf-toggle { cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; }
+        .sf-toggle:hover { color: #e2e8f0; }
+        .sf-chev { color: #64748b; transition: transform 0.2s; flex-shrink: 0; }
+        .fs-btn { background: none; border: 1px solid #1e2a3a; color: #64748b; cursor: pointer; padding: 4px 5px; border-radius: 4px; line-height: 1; display: flex; align-items: center; transition: color .15s, border-color .15s; flex-shrink: 0; }
+        .fs-btn:hover { color: #e2e8f0; border-color: #d97706; }
+        .card:fullscreen { border-radius: 0; overflow-y: auto; }
+        .btn-run-this { background: #d97706; color: #fff; border: none; padding: 11px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; flex-shrink: 0; margin-top: auto; }
+        .btn-run-this:hover { background: #b45309; }
+        canvas { display: block; border-radius: 4px; flex-shrink: 0; }
+        /* ── STATUS BAR ── */
+        .statusbar { background: #0d1117; border-top: 1px solid #1e2a3a; height: 42px; padding: 0 20px; display: flex; align-items: center; gap: 20px; flex-shrink: 0; font-size: 12px; }
+        .sb-item { display: flex; align-items: center; gap: 7px; color: #94a3b8; white-space: nowrap; }
+        .bar-t { width: 58px; height: 5px; background: #1a2438; border-radius: 3px; overflow: hidden; }
+        .bar-f { height: 100%; border-radius: 3px; transition: width 1s ease; }
+        .bar-f.g { background: linear-gradient(90deg,#16a34a,#4ade80); }
+        .bar-f.c { background: linear-gradient(90deg,#0891b2,#22d3ee); }
+        .sb-ram { color: #c084fc; font-weight: 600; }
+        .sb-spacer { flex: 1; }
+        .sb-copy { color: #475569; font-size: 12px; }
+        .sb-doc { color: #4da6ff; text-decoration: none; display: flex; align-items: center; gap: 4px; font-size: 12px; }
+        .sb-doc:hover { color: #93c5fd; }
+        /* ── SIDE PANEL ── */
+        #panel-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:100; }
+        #side-panel { display:none; position:fixed; top:0; right:0; bottom:0; width:360px; background:#0d1117; border-left:1px solid #1e2a3a; flex-direction:column; z-index:101; }
+        .panel-hdr { display:flex; align-items:center; justify-content:space-between; padding:18px 20px 14px; border-bottom:1px solid #1e2a3a; flex-shrink:0; }
+        .panel-title { font-size:16px; font-weight:700; color:#fff; }
+        .panel-close { background:none; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1; }
+        .panel-close:hover { color:#fff; }
+        #panel-body { flex:1; overflow-y:auto; padding:18px 20px; }
+    </style>
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+<nav class="navbar">
+    <div class="navbar-left">
+        <div class="ti-logo"><img src="ti-logo.png" alt="Texas Instruments"></div>
+        <div>
+            <span class="brand-main">TI AM62D</span>
+            <span class="brand-sub">DEMO PORTAL</span>
+        </div>
+    </div>
+    <div class="navbar-right">
+        <div class="conn-block">
+            <div class="conn-top"><div class="conn-dot"></div><span>Connected to AM62D EVM</span></div>
+            <div class="conn-ip" id="nav-ip">-</div>
+        </div>
+        <button class="theme-btn" title="Toggle theme">&#9728;</button>
+    </div>
+</nav>
+
+<!-- ── BODY LAYOUT ── -->
+<div class="layout">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+        <nav class="sidebar-nav">
+
+            <a href="index.html" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+                Home
+            </a>
+
+            <div class="nav-lbl">Demos</div>
+
+            <a href="audio-dsp.html" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
+                Audio DSP with Analytics
+            </a>
+
+            <a href="dsp-compute.html" class="nav-item active">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="4"/><line x1="8" y1="20" x2="8" y2="12"/><line x1="12" y1="20" x2="12" y2="2"/><line x1="16" y1="20" x2="16" y2="10"/><line x1="20" y1="20" x2="20" y2="6"/></svg>
+                DSP Compute Demos
+            </a>
+
+            <div class="nav-lbl">Tools</div>
+
+            <a href="model-inspector.html" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                AI Model Inspector
+            </a>
+
+            <div class="nav-lbl">System</div>
+
+            <a href="#" class="nav-item" onclick="openPanel('device');return false;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Device Info
+            </a>
+
+            <a href="#" class="nav-item" onclick="openPanel('logs');return false;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+                Logs
+            </a>
+
+            <a href="https://e2e.ti.com/support/processors/" target="_blank" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+                Help
+            </a>
+
+        </nav>
+    </aside>
+
+    <!-- ── MAIN ── -->
+    <main class="main">
+
+        <!-- Page Header -->
+        <div class="page-hdr">
+            <div class="ph-left">
+                <div class="ph-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="4"/><line x1="8" y1="20" x2="8" y2="12"/><line x1="12" y1="20" x2="12" y2="2"/><line x1="16" y1="20" x2="16" y2="10"/><line x1="20" y1="20" x2="20" y2="6"/></svg>
+                </div>
+                <div>
+                    <div class="ph-title">DSP Compute Demos</div>
+                    <div class="ph-sub">Real-time audio compute workloads offloaded to C7x DSP via RPMsg-DMA on AM62D.</div>
+                </div>
+            </div>
+            <div class="hdr-actions">
+                <button class="btn-run" id="topRunBtn" onclick="triggerRun()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                    Run Demo
+                </button>
+            </div>
+        </div>
+
+        <!-- 3-Column Grid -->
+        <div class="grid3">
+
+            <!-- COL 1: Demo Selection -->
+            <div class="card">
+                <div class="card-ttl" style="display:flex;align-items:center;justify-content:space-between;">
+                    Demo Selection
+                    <button class="fs-btn" onclick="toggleFullscreen(this,this.closest('.card'))" title="Fullscreen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg></button>
+                </div>
+
+                <div class="dsi active" data-demo="0">
+                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00);border:2px solid #d97706;color:#fbbf24;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="4"/><line x1="8" y1="20" x2="8" y2="12"/><line x1="12" y1="20" x2="12" y2="2"/><line x1="16" y1="20" x2="16" y2="10"/><line x1="20" y1="20" x2="20" y2="6"/></svg>
+                    </div>
+                    <div class="dsi-txt">
+                        <div class="dsi-name">Audio DSP Offload</div>
+                        <div class="dsi-sub">8-ch RPMsg-DMA on C7x DSP</div>
+                    </div>
+                    <span class="dsi-arr">›</span>
+                </div>
+
+                <div class="dsi" data-demo="1">
+                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#04201e,#021210);border:2px solid #0891b2;color:#22d3ee;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                    </div>
+                    <div class="dsi-txt">
+                        <div class="dsi-name">2D FFT Offload</div>
+                        <div class="dsi-sub">128×128 on C7x via RPMsg-DMA</div>
+                    </div>
+                    <span class="dsi-arr">›</span>
+                </div>
+
+                <div class="dsi" data-demo="2">
+                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#1e0d40,#0d0620);border:2px solid #7c3aed;color:#c084fc;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    </div>
+                    <div class="dsi-txt">
+                        <div class="dsi-name">Sigchain Biquad EQ</div>
+                        <div class="dsi-sub">3-stage parametric EQ on C7x DSP</div>
+                    </div>
+                    <span class="dsi-arr">›</span>
+                </div>
+
+            </div>
+
+            <!-- COL 2: Demo Controls -->
+            <div class="card">
+                <div class="card-ttl" style="display:flex;align-items:center;justify-content:space-between;">
+                    Demo Description
+                    <button class="fs-btn" onclick="toggleFullscreen(this,this.closest('.card'))" title="Fullscreen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg></button>
+                </div>
+
+                <div id="ao-ctrl-panel" style="display:flex;flex-direction:column;gap:10px;flex:1;">
+                <p class="desc-text">Real-time 8-channel audio processing offloaded to C7x DSP via RPMsg-DMA. FFT bandpass filtering with input/output spectrum visualization and live CPU/DSP performance metrics.</p>
+                <hr class="card-divider">
+
+                <!-- Status -->
+                <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
+                    <span id="ao-status-dot" style="width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;animation:none;"></span>
+                    <span id="ao-status-txt" style="color:#64748b;">Not running</span>
+                </div>
+
+                <!-- Controls -->
+                <div class="sub-ttl">Controls</div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <span style="font-size:11px;color:#94a3b8;flex-shrink:0;">Filter</span>
+                    <button id="ao-filter-on"  onclick="setAoFilter(true)"  style="flex:1;padding:5px 8px;background:#d97706;border:1px solid #b45309;color:#fff;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;">ON</button>
+                    <button id="ao-filter-off" onclick="setAoFilter(false)" style="flex:1;padding:5px 8px;background:#0f172a;border:1px solid #1e2a3a;color:#64748b;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;">OFF</button>
+                    <span style="font-size:11px;color:#94a3b8;flex-shrink:0;margin-left:4px;">Mode</span>
+                    <button id="ao-mode-dsp" onclick="setAoMode('DSP')" style="flex:1;padding:5px 8px;background:#d97706;border:1px solid #b45309;color:#fff;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;">DSP</button>
+                    <button id="ao-mode-arm" onclick="setAoMode('ARM')" style="flex:1;padding:5px 8px;background:#0f172a;border:1px solid #1e2a3a;color:#64748b;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;">ARM</button>
+                </div>
+
+                <!-- Metrics tiles -->
+                <div class="sub-ttl">Live Metrics</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                    <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                        <div style="font-size:10px;color:#64748b;margin-bottom:3px;">Frame</div>
+                        <div id="ao-m-frame" style="font-size:16px;font-weight:700;color:#e2e8f0;">--</div>
+                    </div>
+                    <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                        <div style="font-size:10px;color:#64748b;margin-bottom:3px;">Latency</div>
+                        <div id="ao-m-latency" style="font-size:16px;font-weight:700;color:#e2e8f0;">-- ms</div>
+                    </div>
+                    <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                        <div style="font-size:10px;color:#64748b;margin-bottom:3px;">CPU Load</div>
+                        <div id="ao-m-cpu" style="font-size:16px;font-weight:700;color:#60a5fa;">--%</div>
+                    </div>
+                    <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                        <div style="font-size:10px;color:#64748b;margin-bottom:3px;">DSP Load</div>
+                        <div id="ao-m-dsp" style="font-size:16px;font-weight:700;color:#fbbf24;">--%</div>
+                    </div>
+                </div>
+
+                <hr class="card-divider">
+
+                <!-- Signal Flow (collapsible) -->
+                <div class="sub-ttl sf-toggle" onclick="toggleSigFlow(this)">Signal Flow
+                    <svg class="sf-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                </div>
+                <div class="sf-body">
+                    <img src="images/audio-offload-flow.png" alt="Audio Offload Pipeline"
+                         style="width:100%;border-radius:8px;border:1px solid #1e2a3a;" onerror="this.style.display='none'">
+                </div>
+
+                <!-- Features -->
+                <div class="sub-ttl">Features</div>
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;">
+                    <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#fbbf24;flex-shrink:0;">&#10003;</span> 8-channel audio via RPMsg-DMA</li>
+                    <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#fbbf24;flex-shrink:0;">&#10003;</span> FFT bandpass filtering on C7x DSP</li>
+                    <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#fbbf24;flex-shrink:0;">&#10003;</span> Real-time input/output spectrum</li>
+                    <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#fbbf24;flex-shrink:0;">&#10003;</span> Live CPU and DSP load metrics</li>
+                    <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#fbbf24;flex-shrink:0;">&#10003;</span> ARM vs DSP mode comparison</li>
+                </ul>
+
+                <!-- Biquad overlay conflict warning -->
+                <div id="ao-overlay-conflict" style="display:none;flex-direction:column;gap:8px;padding:12px;background:#120800;border:1px solid #ef4444;border-radius:8px;flex-shrink:0;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <span style="font-size:12px;font-weight:700;color:#fca5a5;">Biquad Overlay Conflict</span>
+                    </div>
+                    <p style="font-size:11px;color:#94a3b8;line-height:1.6;">The DSP audio overlay (<span style="color:#fca5a5;font-family:monospace;">k3-am62d2-evm-dsp-controlled-audio.dtbo</span>) is currently active. Remove it to run this demo.</p>
+                    <button id="ao-remove-btn" onclick="removeAndReboot(this)" style="padding:8px 12px;background:#dc2626;border:none;color:#fff;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Remove Overlay &amp; Reboot
+                    </button>
+                </div>
+
+                <button id="ao-run-btn" class="btn-run-this" onclick="toggleAoDemo()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                    Run Demo
+                </button>
+                </div><!-- /ao-ctrl-panel -->
+
+                <!-- ── 2D FFT panel ── -->
+                <div id="fft2d-ctrl-panel" style="display:none;flex-direction:column;gap:10px;flex:1;">
+                    <p class="desc-text">Offloads 128×128×2 test data for 2D FFT processing to C7x DSP via RPMsg-DMA, then compares output against reference data to verify correctness.</p>
+                    <hr class="card-divider">
+                    <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
+                        <span id="fft2d-status-dot" style="width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;"></span>
+                        <span id="fft2d-status-txt" style="color:#64748b;">Not running</span>
+                    </div>
+                    <div class="sub-ttl">Execution Info</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">Result</div>
+                            <div id="fft2d-m-status" style="font-size:15px;font-weight:700;color:#e2e8f0;">--</div>
+                        </div>
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">Elapsed</div>
+                            <div id="fft2d-m-elapsed" style="font-size:15px;font-weight:700;color:#22d3ee;">-- ms</div>
+                        </div>
+                    </div>
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Features</div>
+                    <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;">
+                        <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#22d3ee;flex-shrink:0;">&#10003;</span> 128×128×2 offload on C7x DSP</li>
+                        <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#22d3ee;flex-shrink:0;">&#10003;</span> RPMsg-DMA zero-copy data transfer</li>
+                        <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#22d3ee;flex-shrink:0;">&#10003;</span> Pass/fail vs. reference output</li>
+                        <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#22d3ee;flex-shrink:0;">&#10003;</span> 2D FFT magnitude heatmap</li>
+                    </ul>
+                    <!-- Biquad overlay conflict warning -->
+                    <div id="fft2d-overlay-conflict" style="display:none;flex-direction:column;gap:8px;padding:12px;background:#120800;border:1px solid #ef4444;border-radius:8px;flex-shrink:0;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span style="font-size:12px;font-weight:700;color:#fca5a5;">Biquad Overlay Conflict</span>
+                        </div>
+                        <p style="font-size:11px;color:#94a3b8;line-height:1.6;">The DSP audio overlay (<span style="color:#fca5a5;font-family:monospace;">k3-am62d2-evm-dsp-controlled-audio.dtbo</span>) is currently active. Remove it to run this demo.</p>
+                        <button id="fft2d-remove-btn" onclick="removeAndReboot(this)" style="padding:8px 12px;background:#dc2626;border:none;color:#fff;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            Remove Overlay &amp; Reboot
+                        </button>
+                    </div>
+
+                    <button id="fft2d-run-btn" class="btn-run-this" onclick="toggleFft2dDemo()" style="background:#0891b2;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                        Run Demo
+                    </button>
+                </div><!-- /fft2d-ctrl-panel -->
+
+                <!-- ── Sigchain Biquad panel ── -->
+                <div id="biquad-ctrl-panel" style="display:none;flex-direction:column;gap:10px;flex:1;">
+                    <p class="desc-text">Real-time 3-stage parametric equalizer (biquad cascade) on C7x DSP with live C7x load, cycles and throughput monitoring via multi-port TCP server.</p>
+                    <hr class="card-divider">
+                    <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
+                        <span id="biquad-status-dot" style="width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;"></span>
+                        <span id="biquad-status-txt" style="color:#64748b;">Not running</span>
+                    </div>
+
+                    <!-- Overlay requirement banner -->
+                    <div id="biquad-overlay-warn" style="display:none;flex-direction:column;gap:8px;padding:12px;background:#120800;border:1px solid #d97706;border-radius:8px;flex-shrink:0;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span style="font-size:12px;font-weight:700;color:#fbbf24;">DSP Audio Overlay Required</span>
+                        </div>
+                        <p style="font-size:11px;color:#94a3b8;line-height:1.6;">This demo requires the DSP-controlled audio overlay in <span style="color:#fbbf24;font-family:monospace;">uEnv.txt</span>. The following line must be present:</p>
+                        <div style="font-family:monospace;font-size:10.5px;background:#03060e;border:1px solid #1e2a3a;border-radius:5px;padding:8px 10px;color:#22d3ee;word-break:break-all;line-height:1.5;">name_overlays=ti/k3-am62d2-evm-dsp-controlled-audio.dtbo</div>
+                        <p style="font-size:11px;color:#64748b;line-height:1.5;">File: <span style="color:#94a3b8;font-family:monospace;">/run/media/boot-mmcblk1p1/uEnv.txt</span></p>
+                        <button id="biquad-apply-btn" onclick="applyBiquadOverlay()" style="padding:8px 12px;background:#d97706;border:none;color:#fff;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+                            Apply Overlay &amp; Reboot
+                        </button>
+                    </div>
+                    <div id="biquad-overlay-ok" style="display:none;align-items:center;gap:8px;padding:8px 10px;background:#031a0e;border:1px solid #166534;border-radius:6px;flex-shrink:0;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+                        <span style="font-size:11px;color:#22c55e;">DSP audio overlay active</span>
+                    </div>
+
+                    <div class="sub-ttl">Live Metrics</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">C7x Load</div>
+                            <div id="biquad-m-load" style="font-size:15px;font-weight:700;color:#3b82f6;">--%</div>
+                        </div>
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">Cycles</div>
+                            <div id="biquad-m-cycles" style="font-size:15px;font-weight:700;color:#e2e8f0;">--</div>
+                        </div>
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">Throughput</div>
+                            <div id="biquad-m-tput" style="font-size:15px;font-weight:700;color:#22c55e;">-- MB/s</div>
+                        </div>
+                    </div>
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Features</div>
+                    <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;">
+                        <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#c084fc;flex-shrink:0;">&#10003;</span> 3-stage cascade biquad EQ on C7x DSP</li>
+                        <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#c084fc;flex-shrink:0;">&#10003;</span> TAD5212 DAC + PCM6240 ADC support</li>
+                        <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#c084fc;flex-shrink:0;">&#10003;</span> Live C7x load, cycles, throughput</li>
+                        <li style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;"><span style="color:#c084fc;flex-shrink:0;">&#10003;</span> Multi-port TCP (logs, cmds, stats)</li>
+                    </ul>
+                    <button id="biquad-run-btn" class="btn-run-this" onclick="toggleBiquadDemo()" style="background:#7c3aed;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                        Run Demo
+                    </button>
+                </div><!-- /biquad-ctrl-panel -->
+
+            </div>
+
+            <!-- COL 3: Live Visualization -->
+            <div class="card" id="viz-card">
+                <div class="card-ttl" style="display:flex;align-items:center;justify-content:space-between;">
+                    Live Visualization
+                    <button class="fs-btn" onclick="toggleFullscreen(this,this.closest('.card'))" title="Fullscreen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg></button>
+                </div>
+
+                <div id="ao-viz-panel" style="display:flex;flex-direction:column;gap:10px;">
+                <!-- Input spectrum -->
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                    <div style="font-size:11px;color:#34d399;font-weight:600;">Input Audio Spectrum</div>
+                    <canvas id="ao-spec-in"  width="600" height="150" style="border:1px solid #1e2a3a;width:100%;"></canvas>
+                </div>
+
+                <!-- Output spectrum -->
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                    <div style="font-size:11px;color:#60a5fa;font-weight:600;">Output Audio Spectrum</div>
+                    <canvas id="ao-spec-out" width="600" height="150" style="border:1px solid #1e2a3a;width:100%;"></canvas>
+                </div>
+
+                <hr class="card-divider">
+
+                <!-- Trend charts -->
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                    <div style="font-size:11px;color:#64748b;">Average Amplitude</div>
+                    <canvas id="ao-ts-amp"  width="600" height="100" style="border:1px solid #1e2a3a;width:100%;"></canvas>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                    <div style="font-size:11px;color:#64748b;">Frame Latency (ms)</div>
+                    <canvas id="ao-ts-lat"  width="600" height="100" style="border:1px solid #1e2a3a;width:100%;"></canvas>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                    <div style="font-size:11px;color:#64748b;">System Load</div>
+                    <canvas id="ao-ts-load" width="600" height="100" style="border:1px solid #1e2a3a;width:100%;"></canvas>
+                </div>
+                </div><!-- /ao-viz-panel -->
+
+                <!-- ── 2D FFT visualization panel ── -->
+                <div id="fft2d-viz-panel" style="display:none;flex-direction:column;gap:10px;">
+                    <div style="padding:10px 14px;background:#05080f;border:1px solid #1e2a3a;border-radius:8px;">
+                        <div style="font-size:10.5px;color:#475569;font-family:monospace;margin-bottom:6px;">RPMsg based 2D FFT Offload Example</div>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <span id="fft2d-result-badge" style="font-size:14px;font-weight:700;color:#64748b;">Idle</span>
+                            <span style="flex:1;"></span>
+                            <span style="font-size:11px;color:#475569;">Elapsed:</span>
+                            <span id="fft2d-elapsed" style="font-size:13px;font-weight:700;color:#22d3ee;">--</span>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">C7x Load</div>
+                            <div id="fft2d-m-load" style="font-size:15px;font-weight:700;color:#3b82f6;">--%</div>
+                        </div>
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">Cycle Count</div>
+                            <div id="fft2d-m-cycles" style="font-size:15px;font-weight:700;color:#e2e8f0;">--</div>
+                        </div>
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">DDR Throughput</div>
+                            <div id="fft2d-m-ddr" style="font-size:15px;font-weight:700;color:#22d3ee;">-- MB/s</div>
+                        </div>
+                    </div>
+                    <hr class="card-divider">
+                    <div style="display:flex;flex-direction:column;gap:3px;">
+                        <div style="font-size:11px;color:#64748b;">Console Output</div>
+                        <div id="fft2d-log" style="font-family:monospace;font-size:11px;background:#03060e;border:1px solid #1e2a3a;border-radius:6px;padding:10px;overflow-y:auto;height:300px;color:#94a3b8;word-break:break-all;line-height:1.5;"></div>
+                    </div>
+                </div><!-- /fft2d-viz-panel -->
+
+                <!-- ── Sigchain Biquad visualization panel ── -->
+                <div id="biquad-viz-panel" style="display:none;flex-direction:column;gap:10px;">
+                    <div style="display:flex;flex-direction:column;gap:3px;">
+                        <div id="biquad-load-lbl" style="font-size:11px;color:#3b82f6;font-weight:600;">C7x DSP Load (%)</div>
+                        <canvas id="biquad-ts-load" width="600" height="80" style="border:1px solid #1e2a3a;width:100%;"></canvas>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:3px;">
+                        <div id="biquad-cycles-lbl" style="font-size:11px;color:#ef4444;font-weight:600;">DSP Processing Cycles</div>
+                        <canvas id="biquad-ts-cycles" width="600" height="80" style="border:1px solid #1e2a3a;width:100%;"></canvas>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:3px;">
+                        <div id="biquad-tput-lbl" style="font-size:11px;color:#22c55e;font-weight:600;">Demo Throughput (MB/s)</div>
+                        <canvas id="biquad-ts-tput" width="600" height="80" style="border:1px solid #1e2a3a;width:100%;"></canvas>
+                    </div>
+                    <hr class="card-divider">
+                    <div style="display:flex;flex-direction:column;gap:3px;">
+                        <div style="font-size:11px;color:#64748b;">Board Logs (Port 8888)</div>
+                        <div id="biquad-log" style="font-family:monospace;font-size:11px;background:#03060e;border:1px solid #1e2a3a;border-radius:6px;padding:10px;overflow-y:auto;height:160px;color:#94a3b8;word-break:break-all;line-height:1.5;"></div>
+                    </div>
+                </div><!-- /biquad-viz-panel -->
+
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<!-- ── STATUS BAR ── -->
+<div class="statusbar">
+    <div class="sb-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+        Uptime: <span id="sb-uptime">--</span>
+    </div>
+    <div class="sb-item">
+        CPU Load: <span id="sb-cpu-v">--%</span>
+        <div class="bar-t"><div class="bar-f g" id="sb-cpu-b" style="width:0%"></div></div>
+    </div>
+    <div class="sb-item">
+        RAM (Used/Free): <span class="sb-ram" id="sb-ram-v">-- / --</span>
+    </div>
+    <div class="sb-spacer"></div>
+    <span class="sb-copy">&#169; 2026 Texas Instruments Incorporated</span>
+    <a href="https://software-dl.ti.com/processor-sdk-linux/esd/AM62DX/latest/exports/docs/devices/AM62DX/index.html" target="_blank" class="sb-doc">
+        Documentation
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    </a>
+</div>
+
+<!-- ── SIDE PANEL ── -->
+<div id="panel-overlay" onclick="closePanel()"></div>
+<div id="side-panel">
+    <div class="panel-hdr">
+        <span class="panel-title" id="panel-title">Info</span>
+        <button class="panel-close" onclick="closePanel()">&#x2715;</button>
+    </div>
+    <div id="panel-body"></div>
+</div>
+
+<script>
+/* ── FULLSCREEN ── */
+let _fsBtn = null;
+document.addEventListener('fullscreenchange', () => {
+    if (_fsBtn && !document.fullscreenElement) { _updateFsIcon(_fsBtn, false); _fsBtn = null; }
+});
+function toggleFullscreen(btn, elem) {
+    if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => console.warn('[fs]', err));
+        _fsBtn = btn; _updateFsIcon(btn, true);
+    } else { document.exitFullscreen(); }
+}
+function _updateFsIcon(btn, isFs) {
+    const svg = btn.querySelector('svg'); if (!svg) return;
+    svg.innerHTML = isFs
+        ? '<path d="M8 3v3a2 2 0 0 1-2 2H3m18-5h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3m8 0v-3a2 2 0 0 1 2-2h3"/>'
+        : '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/>';
+    btn.title = isFs ? 'Exit fullscreen (Esc)' : 'Fullscreen';
+}
+
+/* ── SIGNAL FLOW COLLAPSE ── */
+function toggleSigFlow(hdr) {
+    const body = hdr.nextElementSibling;
+    const chev = hdr.querySelector('.sf-chev');
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : '';
+    chev.style.transform = isOpen ? 'rotate(-90deg)' : '';
+}
+
+/* ── DEMO SELECTION ── */
+let _activeDemo = 0;
+const _demoPanels = [
+    { ctrl: 'ao-ctrl-panel',    viz: 'ao-viz-panel' },
+    { ctrl: 'fft2d-ctrl-panel', viz: 'fft2d-viz-panel' },
+    { ctrl: 'biquad-ctrl-panel', viz: 'biquad-viz-panel' }
+];
+
+document.querySelectorAll('.dsi').forEach((el, i) => {
+    el.addEventListener('click', () => {
+        document.querySelectorAll('.dsi').forEach(d => d.classList.remove('active'));
+        el.classList.add('active');
+        _demoPanels.forEach(p => {
+            document.getElementById(p.ctrl).style.display = 'none';
+            document.getElementById(p.viz).style.display  = 'none';
+        });
+        document.getElementById(_demoPanels[i].ctrl).style.display = 'flex';
+        document.getElementById(_demoPanels[i].viz).style.display  = 'flex';
+        _activeDemo = i;
+        if (i !== 0 && _aoRunning)     stopAoDemo();
+        if (i !== 1 && _fft2dRunning)  stopFft2dDemo();
+        if (i !== 2 && _biquadRunning) stopBiquadDemo();
+        if (i === 0 || i === 1) checkConflictOverlay(i);
+        if (i === 2) checkBiquadOverlay();
+        _updateTopBtn();
+    });
+});
+
+function triggerRun() {
+    if (_activeDemo === 0) toggleAoDemo();
+    else if (_activeDemo === 1) toggleFft2dDemo();
+    else if (_activeDemo === 2) toggleBiquadDemo();
+}
+
+function _updateTopBtn() {
+    const running  = _activeDemo === 0 ? _aoRunning
+                   : _activeDemo === 1 ? _fft2dRunning
+                   : _biquadRunning;
+    const conflict = _conflictActive[_activeDemo];
+    const btn = document.getElementById('topRunBtn');
+    if (!btn) return;
+    btn.innerHTML = running
+        ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop Demo'
+        : '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Run Demo';
+    btn.style.background = running ? '#dc2626' : '';
+    btn.disabled = conflict && !running;
+    btn.style.opacity = (conflict && !running) ? '0.38' : '';
+    btn.style.cursor  = (conflict && !running) ? 'not-allowed' : '';
+}
+
+/* ── OVERLAY CONFLICT HANDLING (for Audio Offload & 2D FFT) ── */
+const _conflictActive = [false, false, false]; /* indexed by demo */
+
+function checkConflictOverlay(demoIdx) {
+    const conflictId = demoIdx === 0 ? 'ao-overlay-conflict'   : 'fft2d-overlay-conflict';
+    const runBtnId   = demoIdx === 0 ? 'ao-run-btn'            : 'fft2d-run-btn';
+    fetch('/sigchain-biquad/check-overlay')
+        .then(r => r.json())
+        .then(d => {
+            _conflictActive[demoIdx] = !!d.active;
+            const conflict = document.getElementById(conflictId);
+            const btn      = document.getElementById(runBtnId);
+            if (d.active) {
+                if (conflict) conflict.style.display = 'flex';
+                if (btn) { btn.disabled = true; btn.style.opacity = '0.35'; btn.style.cursor = 'not-allowed'; }
+            } else {
+                if (conflict) conflict.style.display = 'none';
+                if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+            }
+            _updateTopBtn();
+        })
+        .catch(() => {});
+}
+
+function removeAndReboot(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Removing…'; }
+    fetch('/sigchain-biquad/disable-overlay', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                if (btn) btn.textContent = 'Rebooting…';
+            } else {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Remove Overlay &amp; Reboot'; }
+            }
+        })
+        .catch(() => {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Remove Overlay &amp; Reboot'; }
+        });
+}
+
+/* ── AUDIO OFFLOAD BACKEND ── */
+let _aoRunning = false;
+let _aoWs      = null;
+
+function setAoStatus(msg, color, pulse) {
+    const txt = document.getElementById('ao-status-txt');
+    const dot = document.getElementById('ao-status-dot');
+    if (txt) { txt.textContent = msg; txt.style.color = color; }
+    if (dot) { dot.style.background = color; dot.style.animation = pulse ? 'pulse 2s infinite' : 'none'; }
+}
+
+function _syncRunBtns(running) {
+    const label = running
+        ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop Demo'
+        : '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Run Demo';
+    const bg = running ? '#dc2626' : '';
+    const btn = document.getElementById('ao-run-btn');
+    if (btn) { btn.innerHTML = label; btn.style.background = bg; }
+    _updateTopBtn();
+}
+
+function toggleAoDemo() { if (_aoRunning) stopAoDemo(); else startAoDemo(); }
+
+function startAoDemo() {
+    if (_conflictActive[0]) { checkConflictOverlay(0); return; }
+    _aoRunning = true;
+    _syncRunBtns(true);
+    setAoStatus('Starting rpmsg_audio_offload_example…', '#f59e0b', true);
+    fetch('/audio-offload/run')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(() => { setAoStatus('Connecting…', '#f59e0b', true); connectAoWs(); })
+        .catch(err => { setAoStatus('Error: ' + err.message, '#ef4444', false); _aoRunning = false; _syncRunBtns(false); });
+}
+
+function stopAoDemo() {
+    fetch('/audio-offload/stop').catch(() => {});
+    _aoRunning = false;
+    if (_aoWs) { try { _aoWs.close(); } catch (_) {} _aoWs = null; }
+    setAoStatus('Stopped', '#64748b', false);
+    _syncRunBtns(false);
+    _aoTsAmp.fill(0); _aoTsLat.fill(0); _aoTsCpu.fill(0); _aoTsDsp.fill(0);
+    _aoTsIdx = 0; _aoTsCount = 0;
+    ['ao-spec-in','ao-spec-out','ao-ts-amp','ao-ts-lat','ao-ts-load'].forEach(id => {
+        const c = document.getElementById(id);
+        if (c) { const ctx = c.getContext('2d'); ctx.fillStyle = '#05080f'; ctx.fillRect(0, 0, c.width, c.height); }
+    });
+}
+
+function connectAoWs() {
+    if (_aoWs && (_aoWs.readyState === 0 || _aoWs.readyState === 1)) return;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    _aoWs = new WebSocket(`${proto}//${location.host}/audio-offload`);
+    _aoWs.onmessage = e => {
+        try {
+            const d = JSON.parse(e.data);
+            if (d.type === 'status') {
+                const c = d.state === 'connected' ? '#22c55e' : d.state === 'connecting' ? '#f59e0b' : '#64748b';
+                setAoStatus(d.message, c, d.state === 'connecting');
+            } else if (d.type === 'audio') {
+                _drawAoSpectrumLine(d.channel === 'input' ? 'in' : 'out', d.pcm);
+            } else if (d.type === 'metrics') {
+                const amp = d.avgAmp  != null ? d.avgAmp  : 0;
+                const lat = d.latency != null ? d.latency : 0;
+                const cpu = d.cpuLoad != null ? d.cpuLoad : 0;
+                const dsp = d.dspLoad != null ? d.dspLoad : 0;
+                const el = id => document.getElementById(id);
+                el('ao-m-frame').textContent   = d.frame  != null ? d.frame           : '--';
+                el('ao-m-latency').textContent = lat ? lat.toFixed(2) + ' ms'         : '-- ms';
+                el('ao-m-cpu').textContent     = cpu ? cpu.toFixed(1) + '%'           : '--%';
+                el('ao-m-dsp').textContent     = dsp ? dsp.toFixed(1) + '%'           : '--%';
+                _aoTsPush(amp, lat, cpu, dsp);
+                _drawAoTrendLine('ao-ts-amp',  _aoTsAmp, '#22d3ee', '');
+                _drawAoTrendLine('ao-ts-lat',  _aoTsLat, '#22c55e', 'ms');
+                _drawAoLoadChart();
+            }
+        } catch (err) { console.warn('[ao-ws]', err); }
+    };
+    _aoWs.onclose = () => { if (_aoRunning) setAoStatus('Connection lost', '#ef4444', false); };
+    _aoWs.onerror = err => console.warn('[ao-ws] error:', err);
+}
+
+function setAoFilter(enable) {
+    const AS = 'flex:1;padding:5px 8px;background:#d97706;border:1px solid #b45309;color:#fff;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;';
+    const IS = 'flex:1;padding:5px 8px;background:#0f172a;border:1px solid #1e2a3a;color:#64748b;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;';
+    const on = document.getElementById('ao-filter-on'), off = document.getElementById('ao-filter-off');
+    if (on) on.style.cssText   = enable  ? AS : IS;
+    if (off) off.style.cssText = !enable ? AS : IS;
+    if (_aoWs && _aoWs.readyState === 1) _aoWs.send(JSON.stringify({ type: 'set_filter', value: enable ? 1 : 0 }));
+}
+
+function setAoMode(mode) {
+    const AS = 'flex:1;padding:5px 8px;background:#d97706;border:1px solid #b45309;color:#fff;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;';
+    const IS = 'flex:1;padding:5px 8px;background:#0f172a;border:1px solid #1e2a3a;color:#64748b;font-size:11px;font-weight:600;border-radius:5px;cursor:pointer;';
+    const dsp = document.getElementById('ao-mode-dsp'), arm = document.getElementById('ao-mode-arm');
+    if (dsp) dsp.style.cssText = (mode === 'DSP') ? AS : IS;
+    if (arm) arm.style.cssText = (mode === 'ARM') ? AS : IS;
+    if (_aoWs && _aoWs.readyState === 1) _aoWs.send(JSON.stringify({ type: 'set_mode', value: mode }));
+}
+
+/* ── VISUALIZATION ── */
+const _aoSpecLastDraw = {};
+const _aoSpecFFTRe    = new Float64Array(512);
+const _aoSpecFFTIm    = new Float64Array(512);
+const AO_TS_LEN       = 600;
+const _aoTsAmp  = new Float32Array(AO_TS_LEN);
+const _aoTsLat  = new Float32Array(AO_TS_LEN);
+const _aoTsCpu  = new Float32Array(AO_TS_LEN);
+const _aoTsDsp  = new Float32Array(AO_TS_LEN);
+let _aoTsIdx = 0, _aoTsCount = 0;
+
+function _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function _aoTsPush(amp, lat, cpu, dsp) {
+    _aoTsAmp[_aoTsIdx] = amp; _aoTsLat[_aoTsIdx] = lat;
+    _aoTsCpu[_aoTsIdx] = cpu; _aoTsDsp[_aoTsIdx] = dsp;
+    _aoTsIdx = (_aoTsIdx + 1) % AO_TS_LEN;
+    if (_aoTsCount < AO_TS_LEN) _aoTsCount++;
+}
+
+/* Radix-2 Cooley-Tukey FFT */
+function _fft(re, im) {
+    const N = re.length;
+    for (let i = 1, j = 0; i < N; i++) {
+        let bit = N >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) { let t=re[i];re[i]=re[j];re[j]=t; t=im[i];im[i]=im[j];im[j]=t; }
+    }
+    for (let len = 2; len <= N; len <<= 1) {
+        const ang = -2 * Math.PI / len, wRe = Math.cos(ang), wIm = Math.sin(ang);
+        for (let i = 0; i < N; i += len) {
+            let cRe = 1, cIm = 0;
+            const half = len >> 1;
+            for (let j = 0; j < half; j++) {
+                const uRe=re[i+j], uIm=im[i+j];
+                const tRe=cRe*re[i+j+half]-cIm*im[i+j+half], tIm=cRe*im[i+j+half]+cIm*re[i+j+half];
+                re[i+j]=uRe+tRe; im[i+j]=uIm+tIm;
+                re[i+j+half]=uRe-tRe; im[i+j+half]=uIm-tIm;
+                const nr=cRe*wRe-cIm*wIm; cIm=cRe*wIm+cIm*wRe; cRe=nr;
+            }
+        }
+    }
+}
+
+function _drawAoSpectrumLine(which, b64pcm) {
+    const now = performance.now();
+    if (now - (_aoSpecLastDraw[which] || 0) < 40) return;
+    _aoSpecLastDraw[which] = now;
+    const raw = atob(b64pcm);
+    const N = 512, n = Math.min(N, raw.length >> 1);
+    for (let i = 0; i < N; i++) {
+        if (i < n) {
+            const lo = raw.charCodeAt(i*2)&0xff, hi = raw.charCodeAt(i*2+1)&0xff;
+            let s = (hi<<8)|lo; if (s>=32768) s-=65536;
+            _aoSpecFFTRe[i] = s/32768;
+        } else _aoSpecFFTRe[i] = 0;
+        _aoSpecFFTIm[i] = 0;
+    }
+    for (let i = 0; i < N; i++) {
+        const w = 0.42 - 0.5*Math.cos(2*Math.PI*i/(N-1)) + 0.08*Math.cos(4*Math.PI*i/(N-1));
+        _aoSpecFFTRe[i] *= w;
+    }
+    _fft(_aoSpecFFTRe, _aoSpecFFTIm);
+
+    const canvas = document.getElementById('ao-spec-' + which);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const PL=44, PR=8, PT=12, PB=24, PW=W-PL-PR, PH=H-PT-PB;
+    const DB_MIN=-100, DB_MAX=0, SR=48000, MAX_HZ=16000;
+    const MAX_BIN = Math.round(MAX_HZ/(SR/N));
+
+    ctx.fillStyle = '#05080f'; ctx.fillRect(0, 0, W, H);
+
+    /* Y grid + labels */
+    ctx.font = '10px monospace'; ctx.textAlign = 'right';
+    [-100,-75,-50,-25,0].forEach(db => {
+        const y = PT + (db-DB_MAX)/(DB_MIN-DB_MAX)*PH;
+        ctx.strokeStyle='#1a2f4a'; ctx.lineWidth=0.5;
+        ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(W-PR,y); ctx.stroke();
+        ctx.fillStyle='#3d5068'; ctx.fillText(db, PL-3, y+3);
+    });
+
+    /* X grid + labels */
+    ctx.textAlign = 'center';
+    [0,1000,2000,4000,8000,12000,16000].forEach(hz => {
+        const x = PL + (Math.round(hz/(SR/N))/MAX_BIN)*PW;
+        if (x<PL || x>W-PR) return;
+        ctx.strokeStyle='#1a2f4a'; ctx.lineWidth=0.5;
+        ctx.beginPath(); ctx.moveTo(x,PT); ctx.lineTo(x,H-PB); ctx.stroke();
+        ctx.fillStyle='#3d5068';
+        ctx.fillText(hz===0?'0':(hz>=1000?(hz/1000)+'k':hz), x, H-7);
+    });
+
+    /* Y axis label */
+    ctx.save(); ctx.translate(11, PT+PH/2); ctx.rotate(-Math.PI/2);
+    ctx.font='9px sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#475569';
+    ctx.fillText('Amplitude (dBFS)', 0, 0);
+    ctx.restore();
+
+    /* Axes */
+    ctx.strokeStyle='#334155'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(PL,PT); ctx.lineTo(PL,H-PB); ctx.lineTo(W-PR,H-PB); ctx.stroke();
+
+    /* Spectrum line */
+    ctx.strokeStyle = which==='in' ? '#22c55e' : '#3b82f6';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let b=1; b<=MAX_BIN; b++) {
+        const re=_aoSpecFFTRe[b], im=_aoSpecFFTIm[b];
+        const db=20*Math.log10(Math.sqrt(re*re+im*im)+1e-9);
+        const x=PL+(b/MAX_BIN)*PW;
+        const y=PT+(_clamp(db,DB_MIN,DB_MAX)-DB_MAX)/(DB_MIN-DB_MAX)*PH;
+        if (b===1) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+}
+
+function _drawAoTrendLine(canvasId, buf, color, unit) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || _aoTsCount < 2) return;
+    const ctx = canvas.getContext('2d');
+    const W=canvas.width, H=canvas.height, PL=42, PR=6, PT=6, PB=14;
+    const PW=W-PL-PR, PH=H-PT-PB;
+    const n=Math.min(_aoTsCount,AO_TS_LEN), si=_aoTsCount<AO_TS_LEN?0:_aoTsIdx;
+    let vMin=Infinity, vMax=-Infinity;
+    for (let i=0;i<n;i++){const v=buf[(si+i)%AO_TS_LEN];if(v<vMin)vMin=v;if(v>vMax)vMax=v;}
+    if (vMin===vMax){vMin-=1;vMax+=1;}
+    const mg=(vMax-vMin)*0.15||0.5; vMin-=mg; vMax+=mg;
+    ctx.fillStyle='#05080f'; ctx.fillRect(0,0,W,H);
+    ctx.font='9px monospace'; ctx.textAlign='right';
+    [vMin,(vMin+vMax)/2,vMax].forEach(v=>{
+        const y=PT+(1-(v-vMin)/(vMax-vMin))*PH;
+        ctx.strokeStyle='#1a2f4a'; ctx.lineWidth=0.5;
+        ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(W-PR,y); ctx.stroke();
+        ctx.fillStyle='#3d5068';
+        ctx.fillText(v.toFixed(v<10?2:0)+(unit||''), PL-3, y+3);
+    });
+    ctx.strokeStyle='#334155'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(PL,PT); ctx.lineTo(PL,H-PB); ctx.lineTo(W-PR,H-PB); ctx.stroke();
+    ctx.strokeStyle=color; ctx.lineWidth=1.5;
+    ctx.beginPath();
+    for (let i=0;i<n;i++){
+        const v=buf[(si+i)%AO_TS_LEN];
+        const x=PL+(i/(n-1))*PW;
+        const y=PT+(1-_clamp((v-vMin)/(vMax-vMin),0,1))*PH;
+        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+}
+
+function _drawAoLoadChart() {
+    const canvas=document.getElementById('ao-ts-load');
+    if (!canvas||_aoTsCount<2) return;
+    const ctx=canvas.getContext('2d');
+    const W=canvas.width,H=canvas.height,PL=42,PR=6,PT=6,PB=14;
+    const PW=W-PL-PR,PH=H-PT-PB;
+    const n=Math.min(_aoTsCount,AO_TS_LEN),si=_aoTsCount<AO_TS_LEN?0:_aoTsIdx;
+    ctx.fillStyle='#05080f'; ctx.fillRect(0,0,W,H);
+    ctx.font='9px monospace'; ctx.textAlign='right';
+    [0,50,100].forEach(v=>{
+        const y=PT+(1-v/100)*PH;
+        ctx.strokeStyle='#1a2f4a'; ctx.lineWidth=0.5;
+        ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(W-PR,y); ctx.stroke();
+        ctx.fillStyle='#3d5068'; ctx.fillText(v+'%', PL-3, y+3);
+    });
+    ctx.strokeStyle='#334155'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(PL,PT); ctx.lineTo(PL,H-PB); ctx.lineTo(W-PR,H-PB); ctx.stroke();
+    [[_aoTsCpu,'#3b82f6'],[_aoTsDsp,'#f59e0b']].forEach(([buf,col])=>{
+        ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.beginPath();
+        for(let i=0;i<n;i++){
+            const v=buf[(si+i)%AO_TS_LEN];
+            const x=PL+(i/(n-1))*PW, y=PT+(1-_clamp(v/100,0,1))*PH;
+            if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+    });
+    ctx.textAlign='left'; ctx.font='9px sans-serif';
+    ctx.fillStyle='#3b82f6'; ctx.fillRect(W-76,9,12,2); ctx.fillStyle='#94a3b8'; ctx.fillText('CPU',W-61,13);
+    ctx.fillStyle='#f59e0b'; ctx.fillRect(W-36,9,12,2); ctx.fillStyle='#94a3b8'; ctx.fillText('DSP',W-21,13);
+}
+
+/* ── 2D FFT BACKEND ── */
+let _fft2dRunning = false;
+let _fft2dWs      = null;
+
+function setFft2dStatus(msg, color, pulse) {
+    const txt = document.getElementById('fft2d-status-txt');
+    const dot = document.getElementById('fft2d-status-dot');
+    if (txt) { txt.textContent = msg; txt.style.color = color; }
+    if (dot) { dot.style.background = color; dot.style.animation = pulse ? 'pulse 2s infinite' : 'none'; }
+}
+
+function _syncFft2dBtn(running) {
+    const label = running
+        ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop Demo'
+        : '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Run Demo';
+    const btn = document.getElementById('fft2d-run-btn');
+    if (btn) { btn.innerHTML = label; btn.style.background = running ? '#dc2626' : '#0891b2'; }
+    _updateTopBtn();
+}
+
+function toggleFft2dDemo() { if (_fft2dRunning) stopFft2dDemo(); else startFft2dDemo(); }
+
+function startFft2dDemo() {
+    if (_conflictActive[1]) { checkConflictOverlay(1); return; }
+    _fft2dRunning = true;
+    _syncFft2dBtn(true);
+    setFft2dStatus('Starting rpmsg_2dfft_example…', '#f59e0b', true);
+    document.getElementById('fft2d-m-status').textContent  = '--';
+    document.getElementById('fft2d-m-elapsed').textContent = '-- ms';
+    document.getElementById('fft2d-result-badge').textContent = 'Running…';
+    document.getElementById('fft2d-result-badge').style.color = '#f59e0b';
+    document.getElementById('fft2d-elapsed').textContent = '--';
+    document.getElementById('fft2d-m-load').textContent   = '--%';
+    document.getElementById('fft2d-m-cycles').textContent = '--';
+    document.getElementById('fft2d-m-ddr').textContent    = '-- MB/s';
+    document.getElementById('fft2d-log').innerHTML = '';
+    fetch('/2dfft/run')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(() => connectFft2dWs())
+        .catch(err => {
+            setFft2dStatus('Error: ' + err.message, '#ef4444', false);
+            _fft2dRunning = false;
+            _syncFft2dBtn(false);
+        });
+}
+
+function stopFft2dDemo() {
+    fetch('/2dfft/stop').catch(() => {});
+    _fft2dRunning = false;
+    if (_fft2dWs) { try { _fft2dWs.close(); } catch (_) {} _fft2dWs = null; }
+    setFft2dStatus('Stopped', '#64748b', false);
+    _syncFft2dBtn(false);
+}
+
+function connectFft2dWs() {
+    if (_fft2dWs && (_fft2dWs.readyState === 0 || _fft2dWs.readyState === 1)) return;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    _fft2dWs = new WebSocket(`${proto}//${location.host}/2dfft`);
+    _fft2dWs.onmessage = e => {
+        try {
+            const d = JSON.parse(e.data);
+            if (d.type === 'status') {
+                const c = d.state === 'running' ? '#f59e0b'
+                        : d.state === 'stopped' ? '#22c55e' : '#64748b';
+                setFft2dStatus(d.message, c, d.state === 'running');
+            } else if (d.type === 'log') {
+                _appendFft2dLog(d.text);
+                _parseFft2dMetrics(d.text);
+            } else if (d.type === 'result') {
+                const pass = d.status === 'PASSED';
+                document.getElementById('fft2d-m-status').textContent  = d.status;
+                document.getElementById('fft2d-m-status').style.color  = pass ? '#22c55e' : '#ef4444';
+                document.getElementById('fft2d-result-badge').textContent = d.status;
+                document.getElementById('fft2d-result-badge').style.color  = pass ? '#22c55e' : '#ef4444';
+            } else if (d.type === 'done') {
+                const pass = d.status === 'PASSED';
+                const ms = d.elapsed != null ? d.elapsed + ' ms' : '--';
+                document.getElementById('fft2d-m-elapsed').textContent = ms;
+                document.getElementById('fft2d-m-elapsed').style.color = '#22d3ee';
+                document.getElementById('fft2d-elapsed').textContent   = ms;
+                setFft2dStatus(pass ? 'Completed: PASSED' : 'Completed: FAILED',
+                               pass ? '#22c55e' : '#ef4444', false);
+                _fft2dRunning = false;
+                _syncFft2dBtn(false);
+            }
+        } catch (err) { console.warn('[fft2d-ws]', err); }
+    };
+    _fft2dWs.onclose = () => { if (_fft2dRunning) setFft2dStatus('Connection lost', '#ef4444', false); };
+    _fft2dWs.onerror = err => console.warn('[fft2d-ws] error:', err);
+}
+
+function _appendFft2dLog(text) {
+    const box = document.getElementById('fft2d-log');
+    if (!box) return;
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:1px 0;word-break:break-all;';
+    div.style.color = /error|fail/i.test(text) ? '#ef4444'
+                    : /passed/i.test(text)      ? '#22c55e'
+                    : /^\*+$/.test(text.trim()) ? '#1e3a5a'
+                    : '#94a3b8';
+    div.textContent = text.replace(/\n$/, '');
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
+
+function _parseFft2dMetrics(text) {
+    let m;
+    if ((m = text.match(/C7x Load:\s*(\d+)%/i))) {
+        const el = document.getElementById('fft2d-m-load');
+        if (el) el.textContent = m[1] + '%';
+    }
+    if ((m = text.match(/C7x Cycle Count:\s*([\d,]+)/i))) {
+        const el = document.getElementById('fft2d-m-cycles');
+        if (el) el.textContent = parseInt(m[1].replace(/,/g, '')).toLocaleString();
+    }
+    if ((m = text.match(/C7x DDR Throughput:\s*([\d.]+)\s*MB\/s/i))) {
+        const el = document.getElementById('fft2d-m-ddr');
+        if (el) el.textContent = parseFloat(m[1]).toFixed(6) + ' MB/s';
+    }
+}
+
+/* ── SIGCHAIN BIQUAD OVERLAY CHECK ── */
+let _biquadOverlayActive = false;
+
+function checkBiquadOverlay() {
+    const warn = document.getElementById('biquad-overlay-warn');
+    const ok   = document.getElementById('biquad-overlay-ok');
+    const btn  = document.getElementById('biquad-run-btn');
+    setBiquadStatus('Checking overlay…', '#64748b', false);
+    fetch('/sigchain-biquad/check-overlay')
+        .then(r => r.json())
+        .then(d => {
+            _biquadOverlayActive = !!d.active;
+            if (d.active) {
+                if (warn) warn.style.display = 'none';
+                if (ok)   ok.style.display   = 'flex';
+                if (btn)  { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+                setBiquadStatus('Ready', '#22c55e', false);
+            } else {
+                if (warn) warn.style.display = 'flex';
+                if (ok)   ok.style.display   = 'none';
+                if (btn)  { btn.disabled = true; btn.style.opacity = '0.35'; btn.style.cursor = 'not-allowed'; }
+                setBiquadStatus('Overlay not set — demo disabled', '#d97706', false);
+            }
+        })
+        .catch(() => {
+            if (warn) warn.style.display = 'none';
+            if (ok)   ok.style.display   = 'none';
+            setBiquadStatus('Could not read uEnv.txt', '#ef4444', false);
+        });
+}
+
+function applyBiquadOverlay() {
+    const btn = document.getElementById('biquad-apply-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Applying…'; }
+    setBiquadStatus('Writing overlay and rebooting…', '#f59e0b', true);
+    fetch('/sigchain-biquad/enable-overlay', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                setBiquadStatus('Overlay applied — rebooting board…', '#22c55e', true);
+                if (btn) { btn.textContent = 'Rebooting…'; }
+            } else {
+                setBiquadStatus('Failed: ' + (d.error || 'unknown error'), '#ef4444', false);
+                if (btn) { btn.disabled = false; btn.textContent = 'Apply Overlay & Reboot'; }
+            }
+        })
+        .catch(err => {
+            setBiquadStatus('Error: ' + err.message, '#ef4444', false);
+            if (btn) { btn.disabled = false; btn.textContent = 'Apply Overlay & Reboot'; }
+        });
+}
+
+/* ── SIGCHAIN BIQUAD BACKEND ── */
+let _biquadRunning = false;
+let _biquadWs      = null;
+
+const BIQUAD_TS_LEN     = 600;
+const _biquadTsLoad     = new Float32Array(BIQUAD_TS_LEN);
+const _biquadTsCycles   = new Float32Array(BIQUAD_TS_LEN);
+const _biquadTsTput     = new Float32Array(BIQUAD_TS_LEN);
+let _biquadTsIdx = 0, _biquadTsCount = 0;
+
+function setBiquadStatus(msg, color, pulse) {
+    const txt = document.getElementById('biquad-status-txt');
+    const dot = document.getElementById('biquad-status-dot');
+    if (txt) { txt.textContent = msg; txt.style.color = color; }
+    if (dot) { dot.style.background = color; dot.style.animation = pulse ? 'pulse 2s infinite' : 'none'; }
+}
+
+function _syncBiquadBtn(running) {
+    const label = running
+        ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop Demo'
+        : '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Run Demo';
+    const btn = document.getElementById('biquad-run-btn');
+    if (btn) { btn.innerHTML = label; btn.style.background = running ? '#dc2626' : '#7c3aed'; }
+    _updateTopBtn();
+}
+
+function toggleBiquadDemo() { if (_biquadRunning) stopBiquadDemo(); else startBiquadDemo(); }
+
+function startBiquadDemo() {
+    if (!_biquadOverlayActive) { checkBiquadOverlay(); return; }
+    _biquadRunning = true;
+    _syncBiquadBtn(true);
+    setBiquadStatus('Starting rpmsg_sigchain_biquad_example…', '#f59e0b', true);
+    _biquadTsLoad.fill(0); _biquadTsCycles.fill(0); _biquadTsTput.fill(0);
+    _biquadTsIdx = 0; _biquadTsCount = 0;
+    document.getElementById('biquad-log').innerHTML = '';
+    ['biquad-m-load','biquad-m-cycles','biquad-m-tput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '--';
+    });
+    fetch('/sigchain-biquad/run')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(() => connectBiquadWs())
+        .catch(err => {
+            setBiquadStatus('Error: ' + err.message, '#ef4444', false);
+            _biquadRunning = false;
+            _syncBiquadBtn(false);
+        });
+}
+
+function stopBiquadDemo() {
+    fetch('/sigchain-biquad/stop').catch(() => {});
+    _biquadRunning = false;
+    if (_biquadWs) { try { _biquadWs.close(); } catch (_) {} _biquadWs = null; }
+    setBiquadStatus('Stopped', '#64748b', false);
+    _syncBiquadBtn(false);
+}
+
+function connectBiquadWs() {
+    if (_biquadWs && (_biquadWs.readyState === 0 || _biquadWs.readyState === 1)) return;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    _biquadWs = new WebSocket(`${proto}//${location.host}/sigchain-biquad`);
+    _biquadWs.onmessage = e => {
+        try {
+            const d = JSON.parse(e.data);
+            if (d.type === 'status') {
+                const c = d.state === 'connected'   ? '#22c55e'
+                        : d.state === 'connecting'  ? '#f59e0b'
+                        : d.state === 'stopped'     ? '#64748b' : '#ef4444';
+                setBiquadStatus(d.message, c, d.state === 'connecting');
+                if (d.state === 'stopped') {
+                    _biquadRunning = false;
+                    _syncBiquadBtn(false);
+                }
+            } else if (d.type === 'log') {
+                _appendBiquadLog(d.text);
+            } else if (d.type === 'stats') {
+                const el = id => document.getElementById(id);
+                if (d.c7xLoad    != null) { el('biquad-m-load').textContent   = d.c7xLoad.toFixed(1)    + '%'; }
+                if (d.cycles     != null) { el('biquad-m-cycles').textContent = d.cycles.toLocaleString(); }
+                if (d.throughput != null) { el('biquad-m-tput').textContent   = d.throughput.toFixed(2) + ' MB/s'; }
+
+                _biquadTsLoad[_biquadTsIdx]   = d.c7xLoad    != null ? d.c7xLoad    : 0;
+                _biquadTsCycles[_biquadTsIdx] = d.cycles     != null ? d.cycles     : 0;
+                _biquadTsTput[_biquadTsIdx]   = d.throughput != null ? d.throughput : 0;
+                _biquadTsIdx = (_biquadTsIdx + 1) % BIQUAD_TS_LEN;
+                if (_biquadTsCount < BIQUAD_TS_LEN) _biquadTsCount++;
+                /* update chart labels with live stats */
+                const ll = el('biquad-load-lbl');
+                const cl = el('biquad-cycles-lbl');
+                const tl = el('biquad-tput-lbl');
+                if (ll) ll.textContent = `C7x DSP Load (${_biquadTsCount} samples)`;
+                if (cl && d.cycles  != null) cl.textContent = `DSP Processing Cycles (Latest: ${d.cycles.toLocaleString()})`;
+                if (tl && d.throughput != null) tl.textContent = `Demo Throughput (Avg: ${(_biquadTsTput.slice(0, _biquadTsCount).reduce((a,b)=>a+b,0)/_biquadTsCount).toFixed(2)} MB/s)`;
+                _drawBiquadTsLine('biquad-ts-load',   _biquadTsLoad,   '#3b82f6', '%');
+                _drawBiquadTsLine('biquad-ts-cycles', _biquadTsCycles, '#ef4444', '');
+                _drawBiquadTsLine('biquad-ts-tput',   _biquadTsTput,   '#22c55e', ' MB/s');
+            }
+        } catch (err) { console.warn('[biquad-ws]', err); }
+    };
+    _biquadWs.onclose = () => { if (_biquadRunning) setBiquadStatus('Connection lost', '#ef4444', false); };
+    _biquadWs.onerror = err => console.warn('[biquad-ws] error:', err);
+}
+
+function _appendBiquadLog(text) {
+    const box = document.getElementById('biquad-log');
+    if (!box) return;
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:1px 0;word-break:break-all;';
+    div.style.color = /error/i.test(text) ? '#ef4444'
+                    : /loaded|success|running/i.test(text) ? '#22c55e'
+                    : /warn/i.test(text) ? '#f59e0b' : '#94a3b8';
+    div.textContent = text.replace(/\n$/, '');
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
+
+function _drawBiquadTsLine(canvasId, buf, color, unit) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || _biquadTsCount < 2) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height, PL = 42, PR = 6, PT = 6, PB = 14;
+    const PW = W - PL - PR, PH = H - PT - PB;
+    const n  = Math.min(_biquadTsCount, BIQUAD_TS_LEN);
+    const si = _biquadTsCount < BIQUAD_TS_LEN ? 0 : _biquadTsIdx;
+    let vMin = Infinity, vMax = -Infinity;
+    for (let i = 0; i < n; i++) { const v = buf[(si + i) % BIQUAD_TS_LEN]; if (v < vMin) vMin = v; if (v > vMax) vMax = v; }
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    const mg = (vMax - vMin) * 0.15 || 0.5; vMin -= mg; vMax += mg;
+    ctx.fillStyle = '#05080f'; ctx.fillRect(0, 0, W, H);
+    ctx.font = '9px monospace'; ctx.textAlign = 'right';
+    [vMin, (vMin + vMax) / 2, vMax].forEach(v => {
+        const y = PT + (1 - (v - vMin) / (vMax - vMin)) * PH;
+        ctx.strokeStyle = '#1a2f4a'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(W - PR, y); ctx.stroke();
+        ctx.fillStyle = '#3d5068';
+        ctx.fillText(v.toFixed(v < 10 ? 2 : 0) + (unit || ''), PL - 3, y + 3);
+    });
+    ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PL, PT); ctx.lineTo(PL, H - PB); ctx.lineTo(W - PR, H - PB); ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const v = buf[(si + i) % BIQUAD_TS_LEN];
+        const x = PL + (i / (n - 1)) * PW;
+        const y = PT + (1 - _clamp((v - vMin) / (vMax - vMin), 0, 1)) * PH;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+}
+
+/* ── STATUS BAR POLLING ── */
+document.getElementById('nav-ip').textContent = window.location.hostname || '-';
+
+function pollCpu() {
+    fetch('/cpu-load').then(r=>r.json()).then(d=>{
+        const cpu=d.current_cpu_usage??d.cpu_percent??null;
+        if(cpu!=null){document.getElementById('sb-cpu-v').textContent=Math.round(cpu)+'%';document.getElementById('sb-cpu-b').style.width=cpu+'%';}
+    }).catch(()=>{});
+}
+setInterval(pollCpu, 1000); pollCpu();
+
+function fmtUptime(s){const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return d+'d '+h+'h '+m+'m';}
+function pollSidebar() {
+    fetch('/mem-info').then(r=>r.json()).then(d=>{
+        if(!d.total_kb)return;
+        const u=Math.round((d.total_kb-d.available_kb)/1024),t=Math.round(d.total_kb/1024);
+        const fmt=mb=>mb>=1024?(mb/1024).toFixed(1)+'GB':mb+'MB';
+        document.getElementById('sb-ram-v').textContent=fmt(u)+' / '+fmt(t);
+    }).catch(()=>{});
+    fetch('/sys-uptime').then(r=>r.json()).then(d=>{
+        if(d.uptime_seconds!=null)document.getElementById('sb-uptime').textContent=fmtUptime(d.uptime_seconds);
+    }).catch(()=>{});
+}
+setInterval(pollSidebar, 10000); pollSidebar();
+
+/* ── PANEL SYSTEM ── */
+function openPanel(type) {
+    document.getElementById('panel-overlay').style.display='block';
+    document.getElementById('side-panel').style.display='flex';
+    if(type==='device') loadDevicePanel();
+    else if(type==='logs') loadLogsPanel();
+}
+function closePanel() {
+    document.getElementById('panel-overlay').style.display='none';
+    document.getElementById('side-panel').style.display='none';
+}
+function _panelRow(l,v){return`<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1e2a3a;"><span style="color:#64748b;font-size:13px;">${l}</span><span style="color:#e2e8f0;font-size:13px;font-weight:500;">${v}</span></div>`;}
+function loadDevicePanel() {
+    document.getElementById('panel-title').textContent='Device Info';
+    document.getElementById('panel-body').innerHTML='<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    fetch('/device-info').then(r=>r.json()).then(d=>{
+        const board=(d.boards&&d.boards[0])||{};
+        let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:#05080f;border:1px solid #1e2a3a;border-radius:8px;"><div style="width:42px;height:42px;border-radius:8px;background:radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00);border:2px solid #d97706;display:flex;align-items:center;justify-content:center;color:#fbbf24;flex-shrink:0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div><div style="font-size:15px;font-weight:700;color:#e2e8f0;">${d.displayName||d.id}</div><div style="font-size:12px;color:#d97706;margin-top:2px;">${board.name||''}</div></div></div>`;
+        html+=_panelRow('Board',board.name||'-');html+=_panelRow('SoC',d.soc||'-');
+        html+=_panelRow('IP Address',window.location.hostname);html+=_panelRow('Port',window.location.port||'3000');
+        document.getElementById('panel-body').innerHTML=html;
+    }).catch(()=>{document.getElementById('panel-body').innerHTML='<div style="color:#ef4444;font-size:13px;">Failed to load device info</div>';});
+}
+let _logInterval=null;
+function loadLogsPanel() {
+    document.getElementById('panel-title').textContent='System Logs';
+    document.getElementById('panel-body').innerHTML='<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    fetch('/logs').then(r=>r.json()).then(d=>{
+        const lines=d.lines||[];
+        document.getElementById('panel-body').innerHTML=`<div style="font-family:monospace;font-size:11px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:10px;overflow-y:auto;max-height:calc(100vh - 200px);">${lines.length?lines.map(l=>`<div style="padding:2px 0;color:${l.match(/error/i)?'#ef4444':l.match(/warn/i)?'#f59e0b':'#94a3b8'};word-break:break-all;">${l.replace(/</g,'&lt;')}</div>`).join(''):'<div style="color:#475569;text-align:center;padding:20px 0;">No log entries</div>'}</div>`;
+    }).catch(()=>{document.getElementById('panel-body').innerHTML='<div style="color:#ef4444;font-size:13px;">Failed to load logs</div>';});
+}
+</script>
+</body>
+</html>

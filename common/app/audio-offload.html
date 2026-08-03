@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>(function(){var B=1280;function r(){var s=window.innerWidth/B;document.documentElement.style.zoom=s<1?s:'';}r();window.addEventListener('resize',r);})();</script>
+    <title>Audio DSP Offload - TI AM62D Demo Portal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e1a; color: #e2e8f0;
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* ── NAVBAR ── */
+        .navbar {
+            background: #0d1117; border-bottom: 1px solid #1e2a3a;
+            height: 62px; padding: 0 24px;
+            display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        .navbar-left  { display: flex; align-items: center; gap: 12px; }
+        .ti-logo { width: 38px; height: 38px; border-radius: 8px; background: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 3px; }
+        .ti-logo img  { width: 100%; height: 100%; object-fit: contain; }
+        .brand-main   { display: block; font-size: 15px; font-weight: 700; color: #fff; }
+        .brand-sub    { display: block; font-size: 10px; font-weight: 700; color: #4da6ff; letter-spacing: 2.5px; margin-top: 1px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .conn-dot { width: 8px; height: 8px; background: #475569; border-radius: 50%; transition: background .3s; }
+        .conn-dot.live { background: #22c55e; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 4px #22c55e}50%{box-shadow:0 0 14px #22c55e} }
+        .conn-ip  { font-size: 11px; color: #64748b; }
+        .btn-back {
+            background: transparent; border: 1.5px solid #1e2a3a; color: #94a3b8;
+            padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all .15s;
+        }
+        .btn-back:hover { border-color: #4da6ff; color: #4da6ff; }
+
+        /* ── LAYOUT ── */
+        .layout { display: flex; flex: 1; overflow: hidden; }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width: 240px; background: #0d1117; border-right: 1px solid #1e2a3a;
+            display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; padding: 14px 12px;
+        }
+        .s-ttl { font-size: 10px; font-weight: 700; color: #475569; letter-spacing: 1.8px; text-transform: uppercase; padding: 10px 4px 6px; }
+
+        /* Connection card */
+        .conn-card { background: #111827; border: 1px solid #1e2a3a; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+        .conn-row  { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .conn-state { font-size: 12px; font-weight: 600; }
+        .host-input {
+            width: 100%; background: #05080f; border: 1px solid #1e2a3a; color: #e2e8f0;
+            font-size: 12px; padding: 6px 8px; border-radius: 6px; outline: none;
+        }
+        .host-input:focus { border-color: #4da6ff; }
+        .btn-connect {
+            width: 100%; margin-top: 8px; padding: 8px; border-radius: 6px; border: none;
+            background: #1d4ed8; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s;
+        }
+        .btn-connect:hover  { background: #2563eb; }
+        .btn-connect.active { background: #dc2626; }
+        .btn-connect.active:hover { background: #b91c1c; }
+
+        /* Control buttons */
+        .ctrl-card { background: #111827; border: 1px solid #1e2a3a; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+        .ctrl-row  { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .ctrl-lbl  { font-size: 12px; color: #94a3b8; }
+        .toggle-btn {
+            padding: 5px 14px; border-radius: 20px; border: none; font-size: 12px; font-weight: 700;
+            cursor: pointer; transition: all .15s;
+        }
+        .toggle-btn.on  { background: #166534; color: #4ade80; border: 1.5px solid #16a34a; }
+        .toggle-btn.off { background: #1e1e2e; color: #64748b; border: 1.5px solid #374151; }
+        .mode-row  { display: flex; gap: 6px; }
+        .mode-btn  {
+            flex: 1; padding: 5px 0; border-radius: 6px; border: 1.5px solid #1e2a3a;
+            background: #05080f; color: #64748b; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
+        }
+        .mode-btn.active { background: rgba(29,78,216,0.2); border-color: #1d4ed8; color: #60a5fa; }
+
+        /* Metrics card */
+        .metrics-card { background: #111827; border: 1px solid #1e2a3a; border-radius: 10px; padding: 12px; flex: 1; }
+        .metric-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+        .metric-box   { background: #05080f; border: 1px solid #1e2a3a; border-radius: 6px; padding: 7px 8px; }
+        .m-val  { font-size: 15px; font-weight: 700; color: #4da6ff; }
+        .m-lbl  { font-size: 10px; color: #475569; margin-top: 1px; }
+        .metric-full  { background: #05080f; border: 1px solid #1e2a3a; border-radius: 6px; padding: 7px 8px; margin-bottom: 6px; }
+        .mf-row { display: flex; justify-content: space-between; align-items: baseline; }
+        .mf-ttl { font-size: 11px; color: #64748b; }
+        .mf-stats { font-size: 10px; color: #475569; display: flex; gap: 8px; }
+        .mf-stat span { color: #94a3b8; font-weight: 600; }
+
+        /* ── MAIN ── */
+        .main {
+            flex: 1; overflow: hidden; padding: 16px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .page-hdr { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .ph-left  { display: flex; align-items: center; gap: 14px; }
+        .ph-icon  {
+            width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+            background: radial-gradient(circle at 40% 40%, #0d3a2e, #062018);
+            border: 2px solid #059669; color: #34d399;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .ph-title { font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 2px; }
+        .ph-sub   { font-size: 13px; color: #64748b; }
+        .ph-badge { background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: #34d399; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
+
+        /* ── VIZ GRID ── */
+        .viz-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 12px; flex: 1; min-height: 0;
+        }
+        .viz-panel {
+            background: #0d1117; border: 1px solid #1e2a3a; border-radius: 10px;
+            padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 0;
+        }
+        .vp-hdr { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .vp-ttl { font-size: 13px; font-weight: 700; color: #cbd5e1; }
+        .vp-sub { font-size: 11px; color: #475569; }
+        .vp-badge {
+            font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.5px;
+        }
+        .vp-badge.input  { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+        .vp-badge.output { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3);  }
+        .canvas-wrap { flex: 1; min-height: 0; position: relative; }
+        .canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+
+        .fs-btn {
+            background: none; border: 1px solid #1e2a3a; color: #64748b;
+            cursor: pointer; padding: 4px 5px; border-radius: 4px;
+            line-height: 1; display: flex; align-items: center;
+            transition: color .15s, border-color .15s;
+        }
+        .fs-btn:hover { color: #e2e8f0; border-color: #4da6ff; }
+        .viz-panel:fullscreen { border-radius: 0; background: #0d1117; overflow: hidden; display: flex; flex-direction: column; }
+        .viz-panel:fullscreen .canvas-wrap canvas { height: 100%; }
+
+        /* Status bar */
+        .status-bar {
+            height: 28px; background: #0d1117; border-top: 1px solid #1e2a3a;
+            display: flex; align-items: center; gap: 16px; padding: 0 16px; flex-shrink: 0;
+            font-size: 11px; color: #475569;
+        }
+        .sb-dot { width: 6px; height: 6px; border-radius: 50%; background: #475569; flex-shrink: 0; }
+        .sb-dot.live { background: #22c55e; }
+    </style>
+</head>
+<body>
+
+    <!-- ── NAVBAR ── -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <div class="ti-logo">
+                <img src="images/ti-logo.png" alt="TI" onerror="this.style.display='none';this.parentElement.textContent='TI'">
+            </div>
+            <div>
+                <span class="brand-main">TI AM62D Demo Portal</span>
+                <span class="brand-sub">AUDIO DSP OFFLOAD</span>
+            </div>
+        </div>
+        <div class="navbar-right">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <div class="conn-dot" id="nb-dot"></div>
+                <span class="conn-ip" id="nb-status">Not connected</span>
+            </div>
+            <button class="btn-back" onclick="window.location.href='audio-dsp.html'">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>
+                Back to Demos
+            </button>
+        </div>
+    </nav>
+
+    <!-- ── LAYOUT ── -->
+    <div class="layout">
+
+        <!-- ── SIDEBAR ── -->
+        <aside class="sidebar">
+
+            <div class="s-ttl">Connection</div>
+            <div class="conn-card">
+                <div class="conn-row">
+                    <div class="conn-dot" id="side-dot"></div>
+                    <span class="conn-state" id="side-state">Disconnected</span>
+                </div>
+                <label style="font-size:11px;color:#64748b;display:block;margin-bottom:4px;">Device IP</label>
+                <input class="host-input" id="host-input" type="text" value="127.0.0.1" placeholder="127.0.0.1">
+                <button class="btn-connect" id="conn-btn" onclick="toggleConnection()">Connect</button>
+            </div>
+
+            <div class="s-ttl">Controls</div>
+            <div class="ctrl-card">
+                <div class="ctrl-row">
+                    <span class="ctrl-lbl">FFT Filter (2k–8kHz)</span>
+                    <button class="toggle-btn on" id="filter-btn" onclick="toggleFilter()">ON</button>
+                </div>
+                <div class="ctrl-row" style="margin-bottom:0;">
+                    <span class="ctrl-lbl">Processing Mode</span>
+                </div>
+                <div class="mode-row" style="margin-top:6px;">
+                    <button class="mode-btn active" id="mode-dsp" onclick="setMode('DSP')">DSP</button>
+                    <button class="mode-btn" id="mode-arm" onclick="setMode('ARM')">ARM</button>
+                </div>
+            </div>
+
+            <div class="s-ttl">Metrics</div>
+            <div class="metrics-card">
+                <div class="metric-row">
+                    <div class="metric-box">
+                        <div class="m-val" id="m-frames">--</div>
+                        <div class="m-lbl">Frames</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="m-val" id="m-amp" style="color:#c084fc;">--</div>
+                        <div class="m-lbl">Avg Amp</div>
+                    </div>
+                </div>
+                <div class="metric-full">
+                    <div class="mf-row">
+                        <span class="mf-ttl">Latency (ms)</span>
+                        <div class="mf-stats">
+                            <div>Min <span id="m-lat-min">--</span></div>
+                            <div>Max <span id="m-lat-max">--</span></div>
+                            <div>Avg <span id="m-lat-avg">--</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric-full">
+                    <div class="mf-row">
+                        <span class="mf-ttl">CPU Load (%)</span>
+                        <div class="mf-stats">
+                            <div>Min <span id="m-cpu-min">--</span></div>
+                            <div>Max <span id="m-cpu-max">--</span></div>
+                            <div>Avg <span id="m-cpu-avg">--</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric-full" style="margin-bottom:0;">
+                    <div class="mf-row">
+                        <span class="mf-ttl">DSP Load (%)</span>
+                        <div class="mf-stats">
+                            <div>Min <span id="m-dsp-min">--</span></div>
+                            <div>Max <span id="m-dsp-max">--</span></div>
+                            <div>Avg <span id="m-dsp-avg">--</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- ── MAIN ── -->
+        <main class="main" id="ao-main">
+
+            <div class="page-hdr">
+                <div class="ph-left">
+                    <div class="ph-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+                    </div>
+                    <div>
+                        <div class="ph-title">Audio DSP Offload</div>
+                        <div class="ph-sub">8-channel audio processed on C7x DSP via RPMsg-DMA · FFT bandpass filter · Real-time spectrum</div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="ph-badge">C7x DSP</span>
+                    <button class="fs-btn" onclick="toggleFullscreen(this,document.getElementById('ao-main'))" title="Fullscreen">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4-panel visualization grid -->
+            <div class="viz-grid">
+
+                <!-- Input Spectrogram -->
+                <div class="viz-panel" id="vp-spec-in">
+                    <div class="vp-hdr">
+                        <div>
+                            <span class="vp-ttl">Input Spectrum</span>
+                            <div class="vp-sub" style="margin-top:2px;">Noisy / pre-filter · Ch0</div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span class="vp-badge input">INPUT</span>
+                            <button class="fs-btn" onclick="toggleFullscreen(this,document.getElementById('vp-spec-in'))" title="Fullscreen">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="canvas-wrap">
+                        <canvas id="spec-in"></canvas>
+                    </div>
+                </div>
+
+                <!-- Output Spectrogram -->
+                <div class="viz-panel" id="vp-spec-out">
+                    <div class="vp-hdr">
+                        <div>
+                            <span class="vp-ttl">Output Spectrum</span>
+                            <div class="vp-sub" style="margin-top:2px;">Filtered / post-DSP · Ch0</div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span class="vp-badge output">OUTPUT</span>
+                            <button class="fs-btn" onclick="toggleFullscreen(this,document.getElementById('vp-spec-out'))" title="Fullscreen">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="canvas-wrap">
+                        <canvas id="spec-out"></canvas>
+                    </div>
+                </div>
+
+                <!-- Input Waveform -->
+                <div class="viz-panel" id="vp-wave-in">
+                    <div class="vp-hdr">
+                        <div>
+                            <span class="vp-ttl">Input Waveform</span>
+                            <div class="vp-sub" style="margin-top:2px;">Time domain · Ch0</div>
+                        </div>
+                        <span class="vp-badge input">INPUT</span>
+                    </div>
+                    <div class="canvas-wrap">
+                        <canvas id="wave-in"></canvas>
+                    </div>
+                </div>
+
+                <!-- Output Waveform -->
+                <div class="viz-panel" id="vp-wave-out">
+                    <div class="vp-hdr">
+                        <div>
+                            <span class="vp-ttl">Output Waveform</span>
+                            <div class="vp-sub" style="margin-top:2px;">Time domain · Ch0</div>
+                        </div>
+                        <span class="vp-badge output">OUTPUT</span>
+                    </div>
+                    <div class="canvas-wrap">
+                        <canvas id="wave-out"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ── STATUS BAR ── -->
+    <div class="status-bar">
+        <div class="sb-dot" id="sb-dot"></div>
+        <span id="sb-msg">Not connected — enter device IP and press Connect</span>
+        <span style="margin-left:auto;color:#1e2a3a;">|</span>
+        <span id="sb-frames" style="margin-left:8px;">Frames: --</span>
+        <span>·</span>
+        <span id="sb-mode">Mode: --</span>
+        <span>·</span>
+        <span id="sb-filter">Filter: --</span>
+    </div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   FULLSCREEN
+   ════════════════════════════════════════════════════════════════ */
+let _fsBtn = null;
+document.addEventListener('fullscreenchange', () => {
+    if (_fsBtn && !document.fullscreenElement) { _updateFsIcon(_fsBtn, false); _fsBtn = null; }
+});
+function toggleFullscreen(btn, elem) {
+    if (!document.fullscreenElement) {
+        elem.requestFullscreen().then(() => {
+            /* Resize canvases after fullscreen settles */
+            setTimeout(resizeAllCanvases, 100);
+        }).catch(err => console.warn('[fs]', err));
+        _fsBtn = btn; _updateFsIcon(btn, true);
+    } else { document.exitFullscreen(); setTimeout(resizeAllCanvases, 100); }
+}
+function _updateFsIcon(btn, isFs) {
+    const svg = btn.querySelector('svg'); if (!svg) return;
+    svg.innerHTML = isFs
+        ? '<path d="M8 3v3a2 2 0 0 1-2 2H3m18-5h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3m8 0v-3a2 2 0 0 1 2-2h3"/>'
+        : '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/>';
+    btn.title = isFs ? 'Exit fullscreen (Esc)' : 'Fullscreen';
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CANVAS RESIZE — keep internal pixel buffer = display size
+   ════════════════════════════════════════════════════════════════ */
+function resizeCanvas(id) {
+    const c = document.getElementById(id);
+    if (!c) return;
+    const w = c.parentElement.clientWidth;
+    const h = c.parentElement.clientHeight;
+    if (w > 0 && h > 0 && (c.width !== w || c.height !== h)) {
+        c.width  = w;
+        c.height = h;
+    }
+}
+function resizeAllCanvases() {
+    ['spec-in','spec-out','wave-in','wave-out'].forEach(resizeCanvas);
+    drawSpecIdle('in'); drawSpecIdle('out');
+    drawWaveIdle('in'); drawWaveIdle('out');
+}
+const _resizeObs = new ResizeObserver(resizeAllCanvases);
+['vp-spec-in','vp-spec-out','vp-wave-in','vp-wave-out'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) _resizeObs.observe(el);
+});
+
+/* ════════════════════════════════════════════════════════════════
+   FFT (radix-2 Cooley-Tukey DIT, in-place)
+   ════════════════════════════════════════════════════════════════ */
+function _fft(re, im) {
+    const N = re.length;
+    for (let i = 1, j = 0; i < N; i++) {
+        let bit = N >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) {
+            let t = re[i]; re[i] = re[j]; re[j] = t;
+            t = im[i]; im[i] = im[j]; im[j] = t;
+        }
+    }
+    for (let len = 2; len <= N; len <<= 1) {
+        const ang = -2 * Math.PI / len;
+        const wRe = Math.cos(ang), wIm = Math.sin(ang);
+        for (let i = 0; i < N; i += len) {
+            let uRe = 1, uIm = 0;
+            for (let j = 0; j < len / 2; j++) {
+                const eRe = re[i+j], eIm = im[i+j];
+                const oRe = re[i+j+len/2] * uRe - im[i+j+len/2] * uIm;
+                const oIm = re[i+j+len/2] * uIm + im[i+j+len/2] * uRe;
+                re[i+j]         = eRe + oRe; im[i+j]         = eIm + oIm;
+                re[i+j+len/2]   = eRe - oRe; im[i+j+len/2]   = eIm - oIm;
+                const nuRe = uRe*wRe - uIm*wIm; uIm = uRe*wIm + uIm*wRe; uRe = nuRe;
+            }
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SAMPLE ACCUMULATOR
+   Each incoming frame has FRAME_SAMPLES (256) S16LE samples.
+   We accumulate in a circular buffer large enough for FFT.
+   ════════════════════════════════════════════════════════════════ */
+const FFT_N      = 1024;   /* must be power-of-2 */
+const WAVE_WIN   = 2048;   /* circular buffer for waveform */
+const SR         = 48000;
+
+const _specBuf  = { in: new Float32Array(FFT_N),   out: new Float32Array(FFT_N)   };
+const _specHead = { in: 0, out: 0 };
+const _waveBuf  = { in: new Float32Array(WAVE_WIN), out: new Float32Array(WAVE_WIN) };
+const _waveHead = { in: 0, out: 0 };
+
+const _specDrawT = { in: 0, out: 0 };
+const _waveDrawT = { in: 0, out: 0 };
+
+const _specFFTRe = new Float32Array(FFT_N);
+const _specFFTIm = new Float32Array(FFT_N);
+
+function _clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+function appendSamples(which, b64pcm) {
+    const raw  = atob(b64pcm);
+    const n    = raw.length >> 1;   /* number of S16LE samples */
+
+    /* Spectrogram circular buffer */
+    const sbuf = _specBuf[which];
+    let   sh   = _specHead[which];
+    /* Waveform circular buffer */
+    const wbuf = _waveBuf[which];
+    let   wh   = _waveHead[which];
+
+    for (let i = 0; i < n; i++) {
+        const lo = raw.charCodeAt(i * 2) & 0xff;
+        const hi = raw.charCodeAt(i * 2 + 1) & 0xff;
+        let s = (hi << 8) | lo;
+        if (s >= 32768) s -= 65536;
+        const v = s / 32768;
+        sbuf[sh] = v;  sh = (sh + 1) % FFT_N;
+        wbuf[wh] = v;  wh = (wh + 1) % WAVE_WIN;
+    }
+    _specHead[which] = sh;
+    _waveHead[which] = wh;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SPECTROGRAM
+   ════════════════════════════════════════════════════════════════ */
+const _specColors = { in: '#3b82f6', out: '#22c55e' };
+
+/* Color scale: navy→blue→green→yellow (hot-ish) */
+function _specColor(v) {
+    if (v < 0.25) {
+        const t = v / 0.25;
+        return `rgb(${Math.round(t*29)},${Math.round(t*78)},${Math.round(78+t*100)})`;
+    } else if (v < 0.5) {
+        const t = (v - 0.25) / 0.25;
+        return `rgb(${Math.round(29+t*30)},${Math.round(78+t*100)},${Math.round(178-t*100)})`;
+    } else if (v < 0.75) {
+        const t = (v - 0.5) / 0.25;
+        return `rgb(${Math.round(59+t*140)},${Math.round(178+t*50)},${Math.round(78-t*60)})`;
+    } else {
+        const t = (v - 0.75) / 0.25;
+        return `rgb(${Math.round(199+t*56)},${Math.round(228-t*100)},${Math.round(18-t*18)})`;
+    }
+}
+
+function drawSpecIdle(which) {
+    const c = document.getElementById('spec-' + which);
+    if (!c || c.width === 0) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    ctx.fillStyle = '#05080f'; ctx.fillRect(0, 0, W, H);
+    /* frequency grid lines */
+    ctx.strokeStyle = '#1a2438'; ctx.lineWidth = 0.5;
+    [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+        const y = Math.round(f * H);
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    });
+    ctx.fillStyle = '#1e3350'; ctx.font = '8px monospace';
+    ctx.fillText('24k', 3, 10);
+    ctx.fillText('12k', 3, Math.round(H * 0.25) + 4);
+    ctx.fillText(' 6k', 3, Math.round(H * 0.5)  + 4);
+    ctx.fillText(' 0 ', 3, H - 3);
+    ctx.fillStyle = '#2d3f55'; ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText('No signal', W/2, H/2 + 4); ctx.textAlign = 'left';
+    _specBuf[which].fill(0); _specHead[which] = 0;
+}
+
+function drawSpecColumn(which) {
+    const now = performance.now();
+    if (now - (_specDrawT[which] || 0) < 33) return;
+    _specDrawT[which] = now;
+
+    const c = document.getElementById('spec-' + which);
+    if (!c || c.width === 0) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+
+    /* Build FFT input from circular buffer */
+    const buf  = _specBuf[which];
+    const head = _specHead[which];
+    for (let i = 0; i < FFT_N; i++) {
+        const w = 0.42 - 0.5 * Math.cos(2 * Math.PI * i / (FFT_N - 1))
+                       + 0.08 * Math.cos(4 * Math.PI * i / (FFT_N - 1));
+        _specFFTRe[i] = buf[(head + i) % FFT_N] * w;
+        _specFFTIm[i] = 0;
+    }
+    _fft(_specFFTRe, _specFFTIm);
+
+    /* Scroll canvas left 1 pixel */
+    ctx.drawImage(c, -1, 0);
+
+    /* Draw new right column */
+    const bins = FFT_N / 2;
+    for (let k = 0; k < bins; k++) {
+        const re = _specFFTRe[k], im = _specFFTIm[k];
+        const db = 20 * Math.log10(Math.sqrt(re*re + im*im) + 1e-6);
+        const v  = _clamp(db / 18, 0, 1);
+        ctx.fillStyle = _specColor(v);
+        const y1 = Math.round((1 - (k + 1) / bins) * H);
+        const y2 = Math.round((1 -  k      / bins) * H);
+        ctx.fillRect(W - 1, y1, 1, Math.max(1, y2 - y1));
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   WAVEFORM
+   ════════════════════════════════════════════════════════════════ */
+function drawWaveIdle(which) {
+    const c = document.getElementById('wave-' + which);
+    if (!c || c.width === 0) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    ctx.fillStyle = '#05080f'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#1e2a3a'; ctx.fillRect(0, Math.round(H/2), W, 1);
+    ctx.fillStyle = '#2d3f55'; ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText('No signal', W/2, H/2 + 4); ctx.textAlign = 'left';
+    _waveBuf[which].fill(0); _waveHead[which] = 0;
+}
+
+function drawWaveform(which) {
+    const now = performance.now();
+    if (now - (_waveDrawT[which] || 0) < 33) return;
+    _waveDrawT[which] = now;
+
+    const c = document.getElementById('wave-' + which);
+    if (!c || c.width === 0) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    const mid = H / 2;
+
+    ctx.fillStyle = '#05080f'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#1e2a3a'; ctx.fillRect(0, Math.round(mid), W, 1);
+
+    const buf  = _waveBuf[which];
+    const head = _waveHead[which];
+    const spp  = WAVE_WIN / W;
+    ctx.fillStyle = which === 'in' ? '#3b82f6' : '#22c55e';
+    for (let x = 0; x < W; x++) {
+        let mn = 1, mx = -1;
+        const s0 = Math.floor(x * spp), s1 = Math.ceil((x + 1) * spp);
+        for (let j = s0; j < s1; j++) {
+            const v = buf[(head + j) % WAVE_WIN];
+            if (v < mn) mn = v;
+            if (v > mx) mx = v;
+        }
+        const yTop = Math.round(mid - mx * (mid - 2));
+        const yBot = Math.round(mid - mn * (mid - 2));
+        ctx.fillRect(x, yTop, 1, Math.max(1, yBot - yTop));
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   METRICS STATE
+   ════════════════════════════════════════════════════════════════ */
+const _met = {
+    lat: { min: Infinity, max: -Infinity, sum: 0, n: 0 },
+    cpu: { min: Infinity, max: -Infinity, sum: 0, n: 0 },
+    dsp: { min: Infinity, max: -Infinity, sum: 0, n: 0 }
+};
+
+function updateMetrics(d) {
+    document.getElementById('m-frames').textContent = d.frame;
+    document.getElementById('m-amp').textContent    = d.avgAmp.toFixed(0);
+    document.getElementById('sb-frames').textContent = 'Frames: ' + d.frame;
+    document.getElementById('sb-mode').textContent   = 'Mode: ' + d.mode;
+
+    ['lat','cpu','dsp'].forEach(k => {
+        const val = k === 'lat' ? d.latency : k === 'cpu' ? d.cpuLoad : d.dspLoad;
+        const s   = _met[k];
+        if (val < s.min) s.min = val;
+        if (val > s.max) s.max = val;
+        s.sum += val; s.n++;
+        const avg = (s.sum / s.n).toFixed(k === 'lat' ? 2 : 1);
+        document.getElementById(`m-${k}-min`).textContent = s.min.toFixed(k === 'lat' ? 2 : 1);
+        document.getElementById(`m-${k}-max`).textContent = s.max.toFixed(k === 'lat' ? 2 : 1);
+        document.getElementById(`m-${k}-avg`).textContent = avg;
+    });
+}
+
+function resetMetrics() {
+    _met.lat = { min: Infinity, max: -Infinity, sum: 0, n: 0 };
+    _met.cpu = { min: Infinity, max: -Infinity, sum: 0, n: 0 };
+    _met.dsp = { min: Infinity, max: -Infinity, sum: 0, n: 0 };
+    ['frames','amp','lat-min','lat-max','lat-avg','cpu-min','cpu-max','cpu-avg','dsp-min','dsp-max','dsp-avg'].forEach(k => {
+        const el = document.getElementById('m-' + k); if (el) el.textContent = '--';
+    });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   STATUS UI
+   ════════════════════════════════════════════════════════════════ */
+function setStatus(state, msg) {
+    const live = state === 'connected';
+    const connecting = state === 'connecting';
+    const color = live ? '#22c55e' : connecting ? '#f59e0b' : '#ef4444';
+
+    ['nb-dot','side-dot','sb-dot'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.background = color;
+        el.style.boxShadow  = live ? `0 0 8px ${color}` : 'none';
+    });
+
+    document.getElementById('nb-status').textContent  = msg;
+    document.getElementById('side-state').textContent = state.charAt(0).toUpperCase() + state.slice(1);
+    document.getElementById('sb-msg').textContent     = msg;
+
+    const btn = document.getElementById('conn-btn');
+    if (live) {
+        btn.textContent = 'Disconnect';
+        btn.classList.add('active');
+    } else if (!connecting) {
+        btn.textContent = 'Connect';
+        btn.classList.remove('active');
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   WEBSOCKET
+   ════════════════════════════════════════════════════════════════ */
+let _ws    = null;
+let _wsConnected = false;
+
+function openWs() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    _ws = new WebSocket(`${proto}://${location.host}/audio-offload`);
+
+    _ws.onopen = () => {
+        _wsConnected = true;
+        console.log('[ao] WebSocket open');
+    };
+
+    _ws.onmessage = evt => {
+        let data;
+        try { data = JSON.parse(evt.data); } catch (e) { return; }
+
+        switch (data.type) {
+            case 'status':
+                setStatus(data.state, data.message || data.state);
+                if (data.state !== 'connected') {
+                    drawSpecIdle('in'); drawSpecIdle('out');
+                    drawWaveIdle('in'); drawWaveIdle('out');
+                    resetMetrics();
+                }
+                break;
+
+            case 'audio':
+                appendSamples(data.channel === 'output' ? 'out' : 'in', data.pcm);
+                drawSpecColumn(data.channel === 'output' ? 'out' : 'in');
+                drawWaveform  (data.channel === 'output' ? 'out' : 'in');
+                break;
+
+            case 'metrics':
+                updateMetrics(data);
+                break;
+        }
+    };
+
+    _ws.onclose = () => {
+        _wsConnected = false;
+        console.log('[ao] WebSocket closed');
+        setTimeout(openWs, 2000);
+    };
+
+    _ws.onerror = err => console.error('[ao] WS error', err);
+}
+
+function wsSend(obj) {
+    if (_ws && _ws.readyState === WebSocket.OPEN) _ws.send(JSON.stringify(obj));
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CONTROLS
+   ════════════════════════════════════════════════════════════════ */
+let _connected  = false;
+let _filterOn   = true;
+let _currentMode = 'DSP';
+
+function toggleConnection() {
+    if (_connected) {
+        wsSend({ type: 'disconnect' });
+        _connected = false;
+    } else {
+        const host = document.getElementById('host-input').value.trim() || '127.0.0.1';
+        wsSend({ type: 'connect', host });
+        _connected = true;
+    }
+}
+
+function toggleFilter() {
+    _filterOn = !_filterOn;
+    const btn = document.getElementById('filter-btn');
+    btn.textContent = _filterOn ? 'ON' : 'OFF';
+    btn.className   = 'toggle-btn ' + (_filterOn ? 'on' : 'off');
+    document.getElementById('sb-filter').textContent = 'Filter: ' + (_filterOn ? 'ON' : 'OFF');
+    wsSend({ type: 'set_filter', value: _filterOn ? 1 : 0 });
+}
+
+function setMode(mode) {
+    _currentMode = mode;
+    document.getElementById('mode-dsp').classList.toggle('active', mode === 'DSP');
+    document.getElementById('mode-arm').classList.toggle('active', mode === 'ARM');
+    wsSend({ type: 'set_mode', value: mode });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+    /* Initial canvas sizes */
+    setTimeout(() => {
+        resizeAllCanvases();
+        openWs();
+    }, 50);
+    document.getElementById('sb-filter').textContent = 'Filter: ON';
+});
+</script>
+</body>
+</html>
