@@ -79,6 +79,8 @@ const server = http.createServer(app);
 const port   = process.env.PORT || 3000;
 const wss    = new WebSocket.Server({ server });
 
+app.use(express.json({ limit: '512kb' }));
+
 /* Serve device-specific static files first (images, overrides), then common app */
 const deviceAppDir = path.join(path.dirname(deviceConfigPath), 'app');
 if (fs.existsSync(deviceAppDir)) {
@@ -98,6 +100,65 @@ app.get('/device-info', (req, res) => {
         docs:        device.docs   || null
     });
 });
+
+/* Update device config — merges body into in-memory device and writes to disk */
+app.post('/device-config', (req, res) => {
+    try {
+        const updates = req.body || {};
+        if (!updates || typeof updates !== 'object') return res.status(400).json({ error: 'Invalid body' });
+        /* Shallow-merge top-level keys; deep-merge boards and demoConfig */
+        Object.keys(updates).forEach(k => {
+            if (k === 'boards' && Array.isArray(updates.boards)) {
+                device.boards = updates.boards;
+            } else if (k === 'demoConfig' && typeof updates.demoConfig === 'object') {
+                device.demoConfig = Object.assign({}, device.demoConfig || {}, updates.demoConfig);
+            } else {
+                device[k] = updates[k];
+            }
+        });
+        fs.writeFileSync(deviceConfigPath, JSON.stringify(device, null, 2), 'utf8');
+        console.log('[Server] device.json updated via /device-config');
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[Server] /device-config error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/* List HTML files in Model-Inspector folder for the AI Model Inspector page */
+app.get('/model-inspector-list', (req, res) => {
+    const miDir = path.join(appDir, 'Model-Inspector');
+    try {
+        if (!fs.existsSync(miDir)) return res.json({ files: [] });
+        const files = fs.readdirSync(miDir)
+            .filter(f => /\.html?$/i.test(f))
+            .sort();
+        res.json({ files });
+    } catch (e) {
+        console.error('[Server] /model-inspector-list error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/* Upload a model HTML file into the Model-Inspector folder */
+app.post('/upload-model-file',
+    express.raw({ type: '*/*', limit: '100mb' }),
+    (req, res) => {
+        const raw = ((req.query.filename || '') + '').replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.+/g, '.').slice(0, 120);
+        const filename = raw || 'uploaded_model.html';
+        const miDir = path.join(appDir, 'Model-Inspector');
+        try {
+            if (!fs.existsSync(miDir)) fs.mkdirSync(miDir, { recursive: true });
+            const dest = path.join(miDir, filename);
+            fs.writeFileSync(dest, req.body);
+            console.log(`[Server] Model uploaded: ${dest} (${req.body.length} bytes)`);
+            res.json({ success: true, filename });
+        } catch (e) {
+            console.error('[Server] /upload-model-file error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    }
+);
 
 /* Active demo manifests — merged list of manifest.json for each active demo */
 app.get('/demo-manifests', (req, res) => {

@@ -1,0 +1,9 @@
+{
+  "id": "speech-enhancement",
+  "name": "Speech Enhancement",
+  "icon": "av:mic",
+  "description": "Real-time speech enhancement combining noise reduction on C7x DSP with TIDL-accelerated speech quality improvement",
+  "devices": ["am62dxx"],
+  "routes": ["/speech-devices", "/upload-speech-enhancement-file", "/start-speech-enhancement", "/stop-speech-enhancement"],
+  "websocket": "/speech"
+}

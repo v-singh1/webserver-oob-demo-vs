@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio DSP With Analytics - TI AM62D Demo Portal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e1a;
+            color: #e2e8f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── NAVBAR ── */
+        .navbar {
+            background: #0d1117;
+            border-bottom: 1px solid #1e2a3a;
+            height: 62px;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        .navbar-left { display: flex; align-items: center; gap: 12px; }
+        .ti-logo {
+            width: 38px; height: 38px; border-radius: 8px;
+            background: white;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; padding: 3px; box-sizing: border-box;
+        }
+        .ti-logo img { width: 100%; height: 100%; object-fit: contain; }
+        .brand-main { display: block; font-size: 15px; font-weight: 700; color: #fff; }
+        .brand-sub  { display: block; font-size: 10px; font-weight: 700; color: #4da6ff; letter-spacing: 2.5px; margin-top: 1px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .conn-block { padding-right: 16px; border-right: 1px solid #1e2a3a; }
+        .conn-top { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #e2e8f0; }
+        .conn-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 4px #22c55e} 50%{box-shadow:0 0 14px #22c55e} }
+        .conn-ip { font-size: 11px; color: #64748b; text-align: right; margin-top: 2px; }
+        .theme-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 20px; padding: 6px; border-radius: 8px; line-height: 1; }
+        .theme-btn:hover { color: #fff; }
+
+        /* ── LAYOUT ── */
+        .layout { display: flex; flex: 1; overflow: hidden; }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width: 222px;
+            background: #0d1117;
+            border-right: 1px solid #1e2a3a;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+        .sidebar-nav { flex: 1; padding: 10px 0; }
+        .nav-lbl {
+            font-size: 10px; font-weight: 700; color: #475569;
+            letter-spacing: 1.8px; text-transform: uppercase;
+            padding: 14px 16px 5px;
+        }
+        .nav-item {
+            display: flex; align-items: center; gap: 11px;
+            padding: 10px 16px; font-size: 13.5px; color: #94a3b8;
+            cursor: pointer; text-decoration: none;
+            border-left: 3px solid transparent;
+            transition: background 0.15s, color 0.15s;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.04); color: #e2e8f0; }
+        .nav-item.active { background: rgba(77,166,255,0.1); color: #4da6ff; border-left-color: #4da6ff; }
+        .nav-item svg { flex-shrink: 0; }
+        .sidebar-footer {
+            padding: 12px 14px;
+            border-top: 1px solid #1e2a3a;
+        }
+        .dl-link {
+            display: flex; align-items: center; gap: 10px;
+            text-decoration: none; color: #64748b;
+            font-size: 12.5px; transition: color 0.15s; cursor: pointer;
+        }
+        .dl-link:hover { color: #4da6ff; }
+        .dl-link .ext { color: #4da6ff; margin-left: auto; }
+
+        /* ── MAIN ── */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 18px 18px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* ── PAGE HEADER ── */
+        .page-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+        .ph-left { display: flex; align-items: center; gap: 14px; }
+        .ph-icon {
+            width: 50px; height: 50px; border-radius: 50%; flex-shrink: 0;
+            background: radial-gradient(circle at 40% 40%, #1a3a7a, #0a1540);
+            border: 2px solid #1d4ed8; color: #60a5fa;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .ph-title { font-size: 21px; font-weight: 800; color: #fff; margin-bottom: 3px; }
+        .ph-sub   { font-size: 13px; color: #64748b; }
+        .btn-run {
+            background: #1d6fe8; color: #fff; border: none;
+            padding: 11px 20px; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+            white-space: nowrap; transition: background 0.2s; flex-shrink: 0;
+        }
+        .btn-run:hover { background: #2563eb; }
+        .btn-run.running { background: #059669; }
+        .btn-run:disabled, .btn-run-this:disabled { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
+        .btn-inspect {
+            background: transparent; color: #c084fc;
+            border: 1.5px solid #7c3aed;
+            padding: 10px 18px; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+            white-space: nowrap; transition: background 0.2s, color 0.2s; flex-shrink: 0;
+        }
+        .btn-inspect:hover { background: rgba(124,58,237,0.15); color: #d8b4fe; }
+        .hdr-actions { display: flex; align-items: center; gap: 10px; }
+
+        /* ── 3-COLUMN GRID ── */
+        .grid3 {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 14px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ── CARD ── */
+        .card {
+            background: #0d1117;
+            border: 1px solid #1e2a3a;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+        .card-divider { border: none; border-top: 1px solid #1e2a3a; margin: 2px 0; flex-shrink: 0; }
+
+        /* ── DEMO SELECT LIST ── */
+        .dsi {
+            display: flex; align-items: center; gap: 11px;
+            padding: 11px 12px;
+            border: 1px solid #1e2a3a; border-radius: 9px;
+            cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+        }
+        .dsi:hover { border-color: #4da6ff; background: rgba(77,166,255,0.05); }
+        .dsi.active { border-color: #4da6ff; background: rgba(77,166,255,0.09); }
+        .dsi-ic {
+            width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .dsi-txt { flex: 1; min-width: 0; }
+        .dsi-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+        .dsi-sub  { font-size: 11px; color: #64748b; margin-top: 2px; }
+        .dsi-arr  { color: #4da6ff; font-size: 16px; flex-shrink: 0; }
+
+        /* ── DEMO DESCRIPTION ── */
+        .desc-text { font-size: 13px; color: #94a3b8; line-height: 1.65; flex-shrink: 0; }
+        .sub-ttl { font-size: 12.5px; font-weight: 700; color: #cbd5e1; flex-shrink: 0; }
+        .feat-list { list-style: none; display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+        .feat-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #94a3b8; }
+        .chk { color: #22c55e; flex-shrink: 0; }
+        .tags { display: flex; flex-wrap: wrap; gap: 7px; flex-shrink: 0; }
+        .tag {
+            background: rgba(77,166,255,0.1); border: 1px solid rgba(77,166,255,0.3);
+            color: #60a5fa; font-size: 11px; font-weight: 600;
+            padding: 3px 10px; border-radius: 20px;
+        }
+        .btn-run-this {
+            background: #1d6fe8; color: #fff; border: none;
+            padding: 11px; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: background 0.2s; flex-shrink: 0; margin-top: auto;
+        }
+        .btn-run-this:hover { background: #2563eb; }
+
+        /* ── SIGNAL FLOW ── */
+        .sig-flow {
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; padding: 8px 0; flex-shrink: 0;
+        }
+        .sf-node {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; text-align: center; flex-shrink: 0;
+        }
+        .sf-circle {
+            width: 58px; height: 58px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .sf-rect {
+            width: 86px; height: 58px; border-radius: 9px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .sf-lbl-main { font-size: 10px; font-weight: 700; margin-top: 4px; }
+        .sf-lbl-sub  { font-size: 9px; color: #64748b; }
+        .sf-arr { color: #4da6ff; font-size: 22px; line-height: 1; margin: 0 2px; }
+
+        canvas { display: block; width: 100%; border-radius: 6px; flex-shrink: 0; }
+        select {
+            background: #111827; border: 1px solid #1e2a3a; color: #e2e8f0;
+            font-size: 13px; padding: 6px 10px; border-radius: 6px;
+            width: 100%; cursor: pointer; outline: none;
+        }
+
+        /* ── STATUS BAR ── */
+        .statusbar {
+            background: #0d1117;
+            border-top: 1px solid #1e2a3a;
+            height: 42px;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-shrink: 0;
+            font-size: 12px;
+        }
+        .sb-item { display: flex; align-items: center; gap: 7px; color: #94a3b8; white-space: nowrap; }
+        .bar-t { width: 58px; height: 5px; background: #1a2438; border-radius: 3px; overflow: hidden; }
+        .bar-f { height: 100%; border-radius: 3px; transition: width 1s ease; }
+        .bar-f.g { background: linear-gradient(90deg,#16a34a,#4ade80); }
+        .bar-f.c { background: linear-gradient(90deg,#0891b2,#22d3ee); }
+        .sb-ram { color: #c084fc; font-weight: 600; }
+        .sb-spacer { flex: 1; }
+        .sb-copy { color: #475569; font-size: 12px; }
+        .sb-doc { color: #4da6ff; text-decoration: none; display: flex; align-items: center; gap: 4px; font-size: 12px; }
+        .sb-doc:hover { color: #93c5fd; }
+    </style>
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+<nav class="navbar">
+    <div class="navbar-left">
+        <div class="ti-logo"><img src="ti-logo.png" alt="Texas Instruments"></div>
+        <div>
+            <span class="brand-main">TI AM62D</span>
+            <span class="brand-sub">DEMO PORTAL</span>
+        </div>
+    </div>
+    <div class="navbar-right">
+        <div class="conn-block">
+            <div class="conn-top">
+                <div class="conn-dot"></div>
+                <span>Connected to AM62D EVM</span>
+            </div>
+            <div class="conn-ip" id="nav-ip">-</div>
+        </div>
+        <button class="theme-btn" title="Toggle theme">&#9728;</button>
+    </div>
+</nav>
+
+<!-- ── BODY LAYOUT ── -->
+<div class="layout">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+        <nav class="sidebar-nav">
+
+            <a href="index.html" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+                Home
+            </a>
+
+            <div class="nav-lbl">Demos</div>
+
+            <a href="audio-dsp.html" class="nav-item active">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
+                Audio DSP with Analytics
+            </a>
+
+            <div class="nav-lbl">Tools</div>
+
+            <a href="model-inspector.html" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                AI Model Inspector
+            </a>
+
+            <div class="nav-lbl">System</div>
+
+            <a href="#" class="nav-item" onclick="openPanel('device');return false;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Device Info
+            </a>
+
+            <a href="#" class="nav-item" onclick="openPanel('logs');return false;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+                Logs
+            </a>
+
+            <a href="#" class="nav-item" onclick="openPanel('settings');return false;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Settings
+            </a>
+
+            <a href="https://e2e.ti.com/support/processors/" target="_blank" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+                Help
+            </a>
+
+        </nav>
+
+    </aside>
+
+    <!-- ── MAIN ── -->
+    <main class="main">
+
+        <!-- Page Header -->
+        <div class="page-hdr">
+            <div class="ph-left">
+                <div class="ph-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
+                </div>
+                <div>
+                    <div class="ph-title">Audio DSP with Analytics Demos</div>
+                    <div class="ph-sub">Explore real-time audio processing and AI-powered analytics demos optimized for AM62D.</div>
+                </div>
+            </div>
+            <div class="hdr-actions">
+                <button class="btn-inspect" onclick="window.location.href='model-inspector.html'">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    Model Inspector
+                </button>
+                <button class="btn-run" id="topRunBtn" onclick="triggerRun(this)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                    Run Demo
+                </button>
+            </div>
+        </div>
+
+        <!-- 3-Column Grid -->
+        <div class="grid3">
+
+            <!-- COL 1: Demo Selection -->
+            <div class="card">
+                <div class="card-ttl">Demo Selection</div>
+
+                <div class="dsi active" data-demo="0">
+                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
+                    </div>
+                    <div class="dsi-txt">
+                        <div class="dsi-name">TVM Inference</div>
+                        <div class="dsi-sub">MobileNet v2 on C7x DSP via TIDL</div>
+                    </div>
+                    <span class="dsi-arr">›</span>
+                </div>
+
+                <div class="dsi" data-demo="1">
+                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#3b1c68,#1e0d40);border:2px solid #7c3aed;color:#c084fc">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    </div>
+                    <div class="dsi-txt">
+                        <div class="dsi-name">Audio Classification</div>
+                        <div class="dsi-sub">AI based audio event classification</div>
+                    </div>
+                    <span class="dsi-arr">›</span>
+                </div>
+
+                <div class="dsi" data-demo="2">
+                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#0d3a2e,#062018);border:2px solid #059669;color:#34d399">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                    </div>
+                    <div class="dsi-txt">
+                        <div class="dsi-name">Speech Enhancement</div>
+                        <div class="dsi-sub">C7x DSP noise reduction + TIDL</div>
+                    </div>
+                    <span class="dsi-arr">›</span>
+                </div>
+
+            </div>
+
+            <!-- COL 2: Demo Description -->
+            <div class="card">
+                <div class="card-ttl">Demo Description</div>
+
+                <!-- Static description (hidden for Audio Classification demo) -->
+                <div id="static-demo-section" style="display:none;">
+                    <p class="desc-text" id="desc-body">
+                        Real-time 8-channel audio equalizer with spectrum analyzer. Processes incoming audio using FFT on C7x DSP and outputs enhanced audio.
+                    </p>
+
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Key Features</div>
+                    <ul class="feat-list" id="feat-list">
+                        <li><span class="chk">&#10003;</span> 8-channel TDM audio support</li>
+                        <li><span class="chk">&#10003;</span> Real-time FFT spectrum (1024 points)</li>
+                        <li><span class="chk">&#10003;</span> Multi-band EQ (Low, Mid, High)</li>
+                        <li><span class="chk">&#10003;</span> Zero-copy data path (RPMsg DMA)</li>
+                        <li><span class="chk">&#10003;</span> ALSA playback support</li>
+                    </ul>
+
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Recommended Use</div>
+                    <div class="tags" id="tags-row">
+                        <span class="tag">Audio Processing</span>
+                        <span class="tag">Real-time DSP</span>
+                    </div>
+
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Signal Flow</div>
+                    <div class="sig-flow">
+                        <div class="sf-node">
+                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
+                            </div>
+                            <div class="sf-lbl-main" style="color:#60a5fa">Input</div>
+                            <div class="sf-lbl-sub">(ADC)</div>
+                        </div>
+                        <span class="sf-arr">&#8594;</span>
+                        <div class="sf-node">
+                            <div class="sf-rect" style="background:#0a2d1e;border:2px solid #059669;color:#34d399">
+                                <div style="font-size:11px;font-weight:700;color:#34d399">C7x DSP</div>
+                                <div style="font-size:10px;color:#6ee7b7;margin-top:2px">Processing</div>
+                            </div>
+                        </div>
+                        <span class="sf-arr">&#8594;</span>
+                        <div class="sf-node">
+                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#3b1c68,#1e0d40);border:2px solid #7c3aed;color:#c084fc">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            </div>
+                            <div class="sf-lbl-main" style="color:#c084fc">Output</div>
+                            <div class="sf-lbl-sub">(DAC)</div>
+                        </div>
+                    </div>
+                    <button class="btn-run-this" id="midRunBtn" onclick="triggerRun(this)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                        Run This Demo
+                    </button>
+                </div>
+
+                <!-- Live TVM Inference panel (shown when TVM demo is selected) -->
+                <div id="live-tvm-section" style="display:flex;flex-direction:column;gap:10px;flex:1;">
+                    <p class="desc-text">Hardware-accelerated ML inference using TVM+TIDL on AM62D C7x DSP. Benchmarks MobileNet v2 INT8 quantized model for edge AI performance measurement.</p>
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Model</div>
+                    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;">
+                        <div style="width:32px;height:32px;border-radius:6px;background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:1.5px solid #1d4ed8;display:flex;align-items:center;justify-content:center;color:#60a5fa;flex-shrink:0;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:13px;font-weight:600;color:#e2e8f0;">MobileNet v2</div>
+                            <div style="font-size:11px;color:#64748b;">INT8 · Image Classification · C7x DSP</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
+                        <span id="tvm-demo-dot" style="width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;"></span>
+                        <span id="tvm-demo-status" style="color:#64748b;">Ready</span>
+                    </div>
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Signal Flow</div>
+                    <div class="sig-flow">
+                        <div class="sf-node">
+                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
+                            </div>
+                            <div class="sf-lbl-main" style="color:#60a5fa">Input</div>
+                            <div class="sf-lbl-sub">(ADC)</div>
+                        </div>
+                        <span class="sf-arr">&#8594;</span>
+                        <div class="sf-node">
+                            <div class="sf-rect" style="background:#0a2d1e;border:2px solid #059669;color:#34d399">
+                                <div style="font-size:11px;font-weight:700;color:#34d399">C7x DSP</div>
+                                <div style="font-size:10px;color:#6ee7b7;margin-top:2px">Processing</div>
+                            </div>
+                        </div>
+                        <span class="sf-arr">&#8594;</span>
+                        <div class="sf-node">
+                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#3b1c68,#1e0d40);border:2px solid #7c3aed;color:#c084fc">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            </div>
+                            <div class="sf-lbl-main" style="color:#c084fc">Output</div>
+                            <div class="sf-lbl-sub">(DAC)</div>
+                        </div>
+                    </div>
+                    <div id="tvm-demo-results" style="display:none;">
+                        <div class="sub-ttl">Results</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+                            <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;text-align:center;">
+                                <div style="font-size:16px;font-weight:700;color:#4da6ff;" id="tvm-d-avg">--</div>
+                                <div style="font-size:10px;color:#64748b;">Avg (ms)</div>
+                            </div>
+                            <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;text-align:center;">
+                                <div style="font-size:16px;font-weight:700;color:#22c55e;" id="tvm-d-fps">--</div>
+                                <div style="font-size:10px;color:#64748b;">FPS</div>
+                            </div>
+                            <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;text-align:center;">
+                                <div style="font-size:14px;font-weight:700;color:#a78bfa;" id="tvm-d-min">--</div>
+                                <div style="font-size:10px;color:#64748b;">Min (ms)</div>
+                            </div>
+                            <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;text-align:center;">
+                                <div style="font-size:14px;font-weight:700;color:#fb923c;" id="tvm-d-max">--</div>
+                                <div style="font-size:10px;color:#64748b;">Max (ms)</div>
+                            </div>
+                        </div>
+                        <div class="sub-ttl">Top Predictions</div>
+                        <div id="tvm-d-preds" style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;font-size:12px;margin-top:4px;"></div>
+                    </div>
+                    <button id="tvm-demo-btn" onclick="toggleTvmDemo()" class="btn-run-this">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                        Run TVM Inference
+                    </button>
+                </div>
+
+                <!-- Live Audio Classification panel -->
+                <div id="live-audio-section" style="display:none;flex-direction:column;gap:10px;flex:1;">
+                    <p class="desc-text">AI-powered audio event classification using TIDL inference engine on C7x DSP. Detects and classifies environmental audio events in real-time.</p>
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Model</div>
+                    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;">
+                        <div style="width:32px;height:32px;border-radius:6px;background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:1.5px solid #1d4ed8;display:flex;align-items:center;justify-content:center;color:#60a5fa;flex-shrink:0;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:13px;font-weight:600;color:#e2e8f0;">YAMNet</div>
+                            <div style="font-size:11px;color:#64748b;">INT8 · Audio Classification · C7x DSP</div>
+                        </div>
+                    </div>
+                    <!-- Source toggle -->
+                    <div class="sub-ttl">Audio Source</div>
+                    <div style="display:flex;gap:6px;">
+                        <button id="src-live-btn" onclick="setAudioSource('live')" style="flex:1;padding:6px 8px;background:#1d4ed8;border:1px solid #2563eb;color:#e2e8f0;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                            Live Mic
+                        </button>
+                        <button id="src-file-btn" onclick="setAudioSource('file')" style="flex:1;padding:6px 8px;background:#0f172a;border:1px solid #1e2a3a;color:#64748b;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                            Audio File
+                        </button>
+                    </div>
+                    <!-- Live Mic panel -->
+                    <div id="src-live-panel">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                            <div class="sub-ttl" style="margin:0;">Input Device</div>
+                            <button onclick="loadAudioDevices()" title="Refresh device list" style="background:none;border:1px solid #1e2a3a;color:#64748b;font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;">&#8635; Refresh</button>
+                        </div>
+                        <select id="audio-device-sel" style="background:#111827;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:6px 10px;border-radius:6px;width:100%;cursor:pointer;outline:none;">
+                            <option value="default">Loading devices...</option>
+                        </select>
+                    </div>
+                    <!-- Audio File panel -->
+                    <div id="src-file-panel" style="display:none;">
+                        <div class="sub-ttl">Audio File</div>
+                        <div id="audio-file-drop"
+                             onclick="document.getElementById('audio-file-input').click()"
+                             ondragover="event.preventDefault();this.style.borderColor='#3b82f6'"
+                             ondragleave="this.style.borderColor='#1e3a5f'"
+                             ondrop="event.preventDefault();this.style.borderColor='#1e3a5f';onAudioFileDropped(event)"
+                             style="border:1.5px dashed #1e3a5f;background:#05080f;border-radius:6px;padding:14px 12px;text-align:center;cursor:pointer;transition:border-color .15s;">
+                            <input type="file" id="audio-file-input" accept=".wav,.mp3,.ogg,.flac,.aac,.m4a" style="display:none" onchange="onAudioFileSelected(this)">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" style="margin-bottom:5px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <div id="audio-file-name" style="color:#64748b;font-size:12px;">Click or drag audio file here</div>
+                            <div style="font-size:10px;color:#334155;margin-top:3px;">WAV &bull; MP3 &bull; OGG &bull; FLAC &bull; AAC</div>
+                        </div>
+                    </div>
+                    <!-- Status -->
+                    <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
+                        <span id="audio-status-dot" style="width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;"></span>
+                        <span id="audio-status-txt" style="color:#64748b;">Not running</span>
+                    </div>
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Signal Flow</div>
+                    <div class="sig-flow">
+                        <div class="sf-node">
+                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
+                            </div>
+                            <div class="sf-lbl-main" style="color:#60a5fa">Input</div>
+                            <div class="sf-lbl-sub">(ADC)</div>
+                        </div>
+                        <span class="sf-arr">&#8594;</span>
+                        <div class="sf-node">
+                            <div class="sf-rect" style="background:#0a2d1e;border:2px solid #059669;color:#34d399">
+                                <div style="font-size:11px;font-weight:700;color:#34d399">C7x DSP</div>
+                                <div style="font-size:10px;color:#6ee7b7;margin-top:2px">Processing</div>
+                            </div>
+                        </div>
+                        <span class="sf-arr">&#8594;</span>
+                        <div class="sf-node">
+                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#3b1c68,#1e0d40);border:2px solid #7c3aed;color:#c084fc">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            </div>
+                            <div class="sf-lbl-main" style="color:#c084fc">Output</div>
+                            <div class="sf-lbl-sub">(DAC)</div>
+                        </div>
+                    </div>
+                    <div class="sub-ttl">Results</div>
+                    <div id="audio-results" style="overflow-y:auto;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;min-height:80px;max-height:150px;font-size:12px;">
+                        <div style="color:#475569;text-align:center;padding:16px 0;" id="audio-results-placeholder">Results will appear here when running</div>
+                    </div>
+                    <button id="audio-run-btn" class="btn-run-this" disabled>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                        Not Supported Yet
+                    </button>
+                </div>
+
+                <!-- Live Speech Enhancement panel -->
+                <div id="live-speech-section" style="display:none;flex-direction:column;gap:10px;flex:1;">
+                    <p class="desc-text">Real-time speech enhancement combining noise reduction on C7x DSP with TIDL-accelerated speech quality improvement.</p>
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Model</div>
+                    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;">
+                        <div style="width:32px;height:32px;border-radius:6px;background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:1.5px solid #1d4ed8;display:flex;align-items:center;justify-content:center;color:#60a5fa;flex-shrink:0;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:13px;font-weight:600;color:#e2e8f0;">Gated CRN</div>
+                            <div style="font-size:11px;color:#64748b;">FP32 · Speech Enhancement · C7x DSP</div>
+                        </div>
+                    </div>
+                    <!-- Source toggle -->
+                    <div class="sub-ttl">Audio Source</div>
+                    <div style="display:flex;gap:6px;">
+                        <button id="sp-src-live-btn" onclick="setSpeechSource('live')" style="flex:1;padding:6px 8px;background:#1d4ed8;border:1px solid #2563eb;color:#e2e8f0;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                            Live Mic
+                        </button>
+                        <button id="sp-src-file-btn" onclick="setSpeechSource('file')" style="flex:1;padding:6px 8px;background:#0f172a;border:1px solid #1e2a3a;color:#64748b;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                            Audio File
+                        </button>
+                    </div>
+                    <!-- Live Mic panel -->
+                    <div id="sp-src-live-panel">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                            <div class="sub-ttl" style="margin:0;">Input Device</div>
+                            <button onclick="loadSpeechDevices()" title="Refresh device list" style="background:none;border:1px solid #1e2a3a;color:#64748b;font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;">&#8635; Refresh</button>
+                        </div>
+                        <select id="speech-device-sel" style="background:#111827;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:6px 10px;border-radius:6px;width:100%;cursor:pointer;outline:none;">
+                            <option value="default">Loading devices...</option>
+                        </select>
+                    </div>
+                    <!-- Audio File panel -->
+                    <div id="sp-src-file-panel" style="display:none;">
+                        <div class="sub-ttl">Audio File</div>
+                        <div id="speech-file-drop"
+                             onclick="document.getElementById('speech-file-input').click()"
+                             ondragover="event.preventDefault();this.style.borderColor='#3b82f6'"
+                             ondragleave="this.style.borderColor='#1e3a5f'"
+                             ondrop="event.preventDefault();this.style.borderColor='#1e3a5f';onSpeechFileDropped(event)"
+                             style="border:1.5px dashed #1e3a5f;background:#05080f;border-radius:6px;padding:14px 12px;text-align:center;cursor:pointer;transition:border-color .15s;">
+                            <input type="file" id="speech-file-input" accept=".wav,.mp3,.ogg,.flac,.aac,.m4a" style="display:none" onchange="onSpeechFileSelected(this)">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" style="margin-bottom:5px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <div id="speech-file-name" style="color:#64748b;font-size:12px;">Click or drag audio file here</div>
+                            <div style="font-size:10px;color:#334155;margin-top:3px;">WAV &bull; MP3 &bull; OGG &bull; FLAC &bull; AAC</div>
+                        </div>
+                    </div>
+                    <!-- Status -->
+                    <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
+                        <span id="speech-status-dot" style="width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;"></span>
+                        <span id="speech-status-txt" style="color:#64748b;">Not running</span>
+                    </div>
+                    <hr class="card-divider">
+                    <div class="sub-ttl">Signal Flow</div>
+                    <img src="images/speech-enhancement-flow.png" alt="Speech Enhancement Pipeline"
+                         style="width:100%;border-radius:8px;border:1px solid #1e2a3a;">
+                    <div class="sub-ttl">Spectrogram</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <div style="font-size:11px;color:#64748b;text-align:center;">Input (Noisy)</div>
+                            <canvas id="spec-in" width="220" height="88" style="border:1px solid #1e2a3a;"></canvas>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <div style="font-size:11px;color:#64748b;text-align:center;">Output (Enhanced)</div>
+                            <canvas id="spec-out" width="220" height="88" style="border:1px solid #1e2a3a;"></canvas>
+                        </div>
+                    </div>
+                    <div class="sub-ttl">Playback</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:11px;color:#64748b;margin-bottom:6px;">Input (Noisy)</div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <button id="play-in-btn" onclick="toggleSpeechPlay('in')" disabled
+                                    style="width:28px;height:28px;border-radius:50%;background:#0d1117;border:1px solid #1e2a3a;color:#475569;display:flex;align-items:center;justify-content:center;cursor:not-allowed;flex-shrink:0;transition:all .15s;">
+                                    <svg id="play-in-icon" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                                </button>
+                                <div style="flex:1;">
+                                    <div style="height:3px;background:#1a2438;border-radius:2px;overflow:hidden;cursor:pointer;" onclick="seekSpeechAudio('in',event)">
+                                        <div id="prog-in" style="height:100%;width:0%;background:#1d4ed8;border-radius:2px;transition:width .1s linear;pointer-events:none;"></div>
+                                    </div>
+                                </div>
+                                <span id="time-in" style="font-size:10px;color:#475569;white-space:nowrap;min-width:32px;text-align:right;">--:--</span>
+                            </div>
+                            <audio id="audio-in" style="display:none;"></audio>
+                        </div>
+                        <div style="background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px 10px;">
+                            <div style="font-size:11px;color:#64748b;margin-bottom:6px;">Output (Enhanced)</div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <button id="play-out-btn" onclick="toggleSpeechPlay('out')" disabled
+                                    style="width:28px;height:28px;border-radius:50%;background:#0d1117;border:1px solid #1e2a3a;color:#475569;display:flex;align-items:center;justify-content:center;cursor:not-allowed;flex-shrink:0;transition:all .15s;">
+                                    <svg id="play-out-icon" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                                </button>
+                                <div style="flex:1;">
+                                    <div style="height:3px;background:#1a2438;border-radius:2px;overflow:hidden;cursor:pointer;" onclick="seekSpeechAudio('out',event)">
+                                        <div id="prog-out" style="height:100%;width:0%;background:#22c55e;border-radius:2px;transition:width .1s linear;pointer-events:none;"></div>
+                                    </div>
+                                </div>
+                                <span id="time-out" style="font-size:10px;color:#475569;white-space:nowrap;min-width:32px;text-align:right;">--:--</span>
+                            </div>
+                            <audio id="audio-out" style="display:none;"></audio>
+                        </div>
+                    </div>
+                    <div class="sub-ttl">Results</div>
+                    <div id="speech-results" style="overflow-y:auto;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;min-height:80px;max-height:150px;font-size:12px;">
+                        <div style="color:#475569;text-align:center;padding:16px 0;" id="speech-results-placeholder">Enhancement metrics will appear here when running</div>
+                    </div>
+                    <button id="speech-run-btn" class="btn-run-this" disabled>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                        Not Supported Yet
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<!-- ── STATUS BAR ── -->
+<div class="statusbar">
+    <div class="sb-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+        Uptime: <span id="sb-uptime">2d 14h 32m</span>
+    </div>
+    <div class="sb-item">
+        CPU Load: <span id="sb-cpu-v">35%</span>
+        <div class="bar-t"><div class="bar-f g" id="sb-cpu-b" style="width:35%"></div></div>
+    </div>
+    <div class="sb-item" style="opacity:0.35;pointer-events:none;" title="DSP load monitoring not yet implemented">
+        C7x Load: <span id="sb-c7x-v" style="color:#64748b;">N/A</span>
+        <div class="bar-t"><div class="bar-f c" id="sb-c7x-b" style="width:0%"></div></div>
+    </div>
+    <div class="sb-item">
+        RAM (Used/Free): <span class="sb-ram" id="sb-ram-v">512MB / 1.0GB</span>
+    </div>
+    <div class="sb-spacer"></div>
+    <span class="sb-copy">&#169; 2026 Texas Instruments Incorporated</span>
+    <a href="https://software-dl.ti.com/processor-sdk-linux/esd/AM62DX/latest/exports/docs/devices/AM62DX/index.html" target="_blank" class="sb-doc">
+        Documentation
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    </a>
+</div>
+
+<script>
+/* ── DEMO DATA ── */
+const DEMOS = [
+    {
+        desc: "Hardware-accelerated ML inference using TVM+TIDL runtime on AM62D C7x DSP. Benchmarks MobileNet v2 quantized to INT8 for edge AI performance.",
+        features: ["TVM+TIDL runtime on C7x DSP","MobileNet v2 INT8 quantized","Avg / Min / Max latency metrics","FPS throughput measurement","Top-5 predictions output"],
+        tags: ["AI / ML","TVM Inference"],
+        preset: "flat"
+    },
+    {
+        desc: "AI-powered audio event classification using TIDL inference engine on C7x DSP. Detects and classifies environmental audio events in real-time.",
+        features: ["Real-time audio event detection","10+ audio event classes","TIDL optimised inference","Low power operation","Confidence score output"],
+        tags: ["AI / ML","Audio Classification"],
+        preset: "treble"
+    },
+    {
+        desc: "Real-time speech enhancement combining noise reduction on C7x DSP with TIDL-accelerated speech quality improvement. Delivers clean, intelligible audio at low latency.",
+        features: ["Noise reduction on C7x DSP","TIDL-accelerated speech enhancement","Low latency real-time processing","Background noise suppression","Improved speech intelligibility"],
+        tags: ["Noise Reduction","TIDL","C7x DSP"],
+        preset: "vocal"
+    }
+];
+
+const TVM_DEMO_IDX    = 0;
+const AUDIO_CLASS_IDX = 1;
+const SPEECH_IDX      = 2;
+let audioRunning  = false;
+let audioWs       = null;
+let _audioSource  = 'live';
+let _audioFile    = null;
+let speechRunning = false;
+let speechWs      = null;
+let _speechSource = 'live';
+let _speechFile   = null;
+
+/* ── DEMO SELECTION ── */
+document.querySelectorAll('.dsi').forEach((el, i) => {
+    el.addEventListener('click', () => {
+        document.querySelectorAll('.dsi').forEach(d => d.classList.remove('active'));
+        el.classList.add('active');
+        const d = DEMOS[i];
+        const isTvm    = (i === TVM_DEMO_IDX);
+        const isAudio  = (i === AUDIO_CLASS_IDX);
+        const isSpeech = (i === SPEECH_IDX);
+        const isLive   = isAudio || isTvm || isSpeech;
+        document.getElementById('static-demo-section').style.display = isLive ? 'none' : '';
+        document.getElementById('live-audio-section').style.display  = isAudio  ? 'flex' : 'none';
+        document.getElementById('live-tvm-section').style.display    = isTvm    ? 'flex' : 'none';
+        document.getElementById('live-speech-section').style.display = isSpeech ? 'flex' : 'none';
+        _setRunBtnState(isTvm);
+        if (isAudio)       { loadAudioDevices(); }
+        else if (isSpeech) { loadSpeechDevices(); }
+        else if (!isTvm) {
+            document.getElementById('desc-body').textContent = d.desc;
+            document.getElementById('feat-list').innerHTML = d.features.map(f => `<li><span class="chk">&#10003;</span> ${f}</li>`).join('');
+            document.getElementById('tags-row').innerHTML = d.tags.map(t => `<span class="tag">${t}</span>`).join('');
+        }
+        if (!isAudio  && audioRunning)  stopAudioClassification();
+        if (!isSpeech && speechRunning) stopSpeechEnhancement();
+    });
+});
+
+/* ── RUN BUTTON (header) ── */
+function triggerRun(btn) {
+    const activeIdx = Array.from(document.querySelectorAll('.dsi')).findIndex(d => d.classList.contains('active'));
+    if (activeIdx === TVM_DEMO_IDX) { toggleTvmDemo(); return; }
+    /* Audio Classification and Speech Enhancement not yet supported — do nothing */
+}
+
+function _setRunBtnState(isTvm) {
+    const top = document.getElementById('topRunBtn');
+    const mid = document.getElementById('midRunBtn');
+    if (top) top.disabled = !isTvm;
+    if (mid) mid.disabled = !isTvm;
+}
+
+/* ── AUDIO CLASSIFICATION BACKEND ── */
+function loadAudioDevices() {
+    const sel = document.getElementById('audio-device-sel');
+    if (sel) sel.innerHTML = '<option value="default">Fetching devices...</option>';
+    fetch('/audio-devices')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const lines = text.trim().split('\n').filter(Boolean);
+            if (!lines.length) { sel.innerHTML = '<option value="default">No devices found</option>'; return; }
+            sel.innerHTML = lines.map(line => {
+                const [id, name] = line.split('|');
+                return `<option value="${id.trim()}">${(name || id).trim()}</option>`;
+            }).join('');
+        })
+        .catch(err => {
+            if (sel) sel.innerHTML = '<option value="default">Default (unavailable)</option>';
+            console.warn('[audio] loadAudioDevices:', err.message);
+        });
+}
+
+function setAudioSource(mode) {
+    _audioSource = mode;
+    const liveBtn   = document.getElementById('src-live-btn');
+    const fileBtn   = document.getElementById('src-file-btn');
+    const livePanel = document.getElementById('src-live-panel');
+    const filePanel = document.getElementById('src-file-panel');
+    if (mode === 'live') {
+        liveBtn.style.background = '#1d4ed8'; liveBtn.style.borderColor = '#2563eb'; liveBtn.style.color = '#e2e8f0';
+        fileBtn.style.background = '#0f172a'; fileBtn.style.borderColor = '#1e2a3a'; fileBtn.style.color = '#64748b';
+        livePanel.style.display = ''; filePanel.style.display = 'none';
+    } else {
+        fileBtn.style.background = '#1d4ed8'; fileBtn.style.borderColor = '#2563eb'; fileBtn.style.color = '#e2e8f0';
+        liveBtn.style.background = '#0f172a'; liveBtn.style.borderColor = '#1e2a3a'; liveBtn.style.color = '#64748b';
+        livePanel.style.display = 'none'; filePanel.style.display = '';
+    }
+}
+
+function onAudioFileSelected(input) {
+    if (!input.files.length) return;
+    _audioFile = input.files[0];
+    const label = _audioFile.name + ' (' + (_audioFile.size / 1024).toFixed(0) + ' KB)';
+    const el = document.getElementById('audio-file-name');
+    el.textContent = label; el.style.color = '#e2e8f0';
+}
+
+function onAudioFileDropped(event) {
+    const file = event.dataTransfer && event.dataTransfer.files[0];
+    if (!file) return;
+    _audioFile = file;
+    const label = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+    const el = document.getElementById('audio-file-name');
+    el.textContent = label; el.style.color = '#e2e8f0';
+}
+
+function toggleAudioClassification() {
+    if (audioRunning) stopAudioClassification(); else startAudioClassification();
+}
+
+function startAudioClassification() {
+    setAudioStatus('Starting...', '#f59e0b', false);
+
+    if (_audioSource === 'file') {
+        if (!_audioFile) {
+            setAudioStatus('Select an audio file first', '#ef4444', false);
+            return;
+        }
+        const ext = (_audioFile.name.split('.').pop() || 'wav').toLowerCase();
+        setAudioStatus('Uploading file...', '#f59e0b', false);
+        _audioFile.arrayBuffer()
+            .then(buf => fetch('/upload-audio-classification-file?ext=' + encodeURIComponent(ext), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/octet-stream', 'x-file-ext': ext },
+                body: buf
+            }))
+            .then(r => { if (!r.ok) throw new Error('Upload failed HTTP ' + r.status); return r.json(); })
+            .then(data => fetch('/start-audio-classification?source=file&filepath=' + encodeURIComponent(data.path)))
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+            .then(() => {
+                audioRunning = true;
+                setAudioStatus('Processing file...', '#22c55e', true);
+                updateAudioRunBtn(true);
+                connectAudioWs();
+            })
+            .catch(err => setAudioStatus('Error: ' + err.message, '#ef4444', false));
+    } else {
+        const dev = document.getElementById('audio-device-sel').value || 'default';
+        fetch('/start-audio-classification?device=' + encodeURIComponent(dev))
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+            .then(() => {
+                audioRunning = true;
+                setAudioStatus('Live - listening for events', '#22c55e', true);
+                updateAudioRunBtn(true);
+                connectAudioWs();
+            })
+            .catch(err => setAudioStatus('Error: ' + err.message, '#ef4444', false));
+    }
+}
+
+function stopAudioClassification() {
+    fetch('/stop-audio-classification').catch(() => {});
+    if (audioWs) { audioWs.close(); audioWs = null; }
+    audioRunning = false;
+    setAudioStatus('Stopped', '#64748b', false);
+    updateAudioRunBtn(false);
+}
+
+function connectAudioWs() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    audioWs = new WebSocket(proto + '//' + location.host + '/audio');
+    audioWs.onmessage = e => {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.class) addAudioResult(data.class, data.timestamp);
+        } catch (_) {}
+    };
+    audioWs.onclose = () => { if (audioRunning) setAudioStatus('Connection lost - reload to retry', '#ef4444', false); };
+}
+
+function addAudioResult(cls, ts) {
+    const results = document.getElementById('audio-results');
+    const ph = document.getElementById('audio-results-placeholder');
+    if (ph) ph.remove();
+    const time = ts ? new Date(ts).toLocaleTimeString() : new Date().toLocaleTimeString();
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1e2a3a;';
+    row.innerHTML = `<span style="color:#e2e8f0;font-weight:600">${cls.replace(/</g,'&lt;')}</span><span style="color:#64748b">${time}</span>`;
+    results.insertBefore(row, results.firstChild);
+    while (results.children.length > 20) results.removeChild(results.lastChild);
+}
+
+function setAudioStatus(msg, color, pulse) {
+    document.getElementById('audio-status-txt').textContent = msg;
+    document.getElementById('audio-status-txt').style.color = color;
+    const dot = document.getElementById('audio-status-dot');
+    dot.style.background = color;
+    dot.style.animation = pulse ? 'pulse 2s infinite' : 'none';
+}
+
+function updateAudioRunBtn(_running) { /* button disabled — not supported yet */ }
+
+/* ── SPEECH ENHANCEMENT BACKEND ── */
+function loadSpeechDevices() {
+    const sel = document.getElementById('speech-device-sel');
+    if (sel) sel.innerHTML = '<option value="default">Fetching devices...</option>';
+    fetch('/audio-devices')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const lines = text.trim().split('\n').filter(Boolean);
+            if (!lines.length) { sel.innerHTML = '<option value="default">No devices found</option>'; return; }
+            sel.innerHTML = lines.map(line => {
+                const [id, name] = line.split('|');
+                return `<option value="${id.trim()}">${(name || id).trim()}</option>`;
+            }).join('');
+        })
+        .catch(err => {
+            if (sel) sel.innerHTML = '<option value="default">Default (unavailable)</option>';
+            console.warn('[speech] loadSpeechDevices:', err.message);
+        });
+}
+
+function setSpeechSource(mode) {
+    _speechSource = mode;
+    const liveBtn   = document.getElementById('sp-src-live-btn');
+    const fileBtn   = document.getElementById('sp-src-file-btn');
+    const livePanel = document.getElementById('sp-src-live-panel');
+    const filePanel = document.getElementById('sp-src-file-panel');
+    if (mode === 'live') {
+        liveBtn.style.background = '#1d4ed8'; liveBtn.style.borderColor = '#2563eb'; liveBtn.style.color = '#e2e8f0';
+        fileBtn.style.background = '#0f172a'; fileBtn.style.borderColor = '#1e2a3a'; fileBtn.style.color = '#64748b';
+        livePanel.style.display = ''; filePanel.style.display = 'none';
+    } else {
+        fileBtn.style.background = '#1d4ed8'; fileBtn.style.borderColor = '#2563eb'; fileBtn.style.color = '#e2e8f0';
+        liveBtn.style.background = '#0f172a'; liveBtn.style.borderColor = '#1e2a3a'; liveBtn.style.color = '#64748b';
+        livePanel.style.display = 'none'; filePanel.style.display = '';
+    }
+}
+
+function onSpeechFileSelected(input) {
+    if (!input.files.length) return;
+    _speechFile = input.files[0];
+    const label = _speechFile.name + ' (' + (_speechFile.size / 1024).toFixed(0) + ' KB)';
+    const el = document.getElementById('speech-file-name');
+    el.textContent = label; el.style.color = '#e2e8f0';
+    if (_speechInputBlobUrl) URL.revokeObjectURL(_speechInputBlobUrl);
+    _speechInputBlobUrl = URL.createObjectURL(_speechFile);
+    _enableSpeechPlayer('in', _speechInputBlobUrl);
+}
+
+function onSpeechFileDropped(event) {
+    const file = event.dataTransfer && event.dataTransfer.files[0];
+    if (!file) return;
+    _speechFile = file;
+    const label = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+    const el = document.getElementById('speech-file-name');
+    el.textContent = label; el.style.color = '#e2e8f0';
+    if (_speechInputBlobUrl) URL.revokeObjectURL(_speechInputBlobUrl);
+    _speechInputBlobUrl = URL.createObjectURL(file);
+    _enableSpeechPlayer('in', _speechInputBlobUrl);
+}
+
+function toggleSpeechEnhancement() {
+    if (speechRunning) stopSpeechEnhancement(); else startSpeechEnhancement();
+}
+
+function startSpeechEnhancement() {
+    setSpeechStatus('Starting...', '#f59e0b', false);
+
+    if (_speechSource === 'file') {
+        if (!_speechFile) {
+            setSpeechStatus('Select an audio file first', '#ef4444', false);
+            return;
+        }
+        const ext = (_speechFile.name.split('.').pop() || 'wav').toLowerCase();
+        setSpeechStatus('Uploading file...', '#f59e0b', false);
+        _speechFile.arrayBuffer()
+            .then(buf => fetch('/upload-speech-enhancement-file?ext=' + encodeURIComponent(ext), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/octet-stream', 'x-file-ext': ext },
+                body: buf
+            }))
+            .then(r => { if (!r.ok) throw new Error('Upload failed HTTP ' + r.status); return r.json(); })
+            .then(data => fetch('/start-speech-enhancement?source=file&filepath=' + encodeURIComponent(data.path)))
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+            .then(() => {
+                speechRunning = true;
+                setSpeechStatus('Processing file...', '#22c55e', true);
+                updateSpeechRunBtn(true);
+                connectSpeechWs();
+            })
+            .catch(err => setSpeechStatus('Error: ' + err.message, '#ef4444', false));
+    } else {
+        const dev = document.getElementById('speech-device-sel').value || 'default';
+        fetch('/start-speech-enhancement?device=' + encodeURIComponent(dev))
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+            .then(() => {
+                speechRunning = true;
+                setSpeechStatus('Live - enhancing speech', '#22c55e', true);
+                updateSpeechRunBtn(true);
+                connectSpeechWs();
+            })
+            .catch(err => setSpeechStatus('Error: ' + err.message, '#ef4444', false));
+    }
+}
+
+function stopSpeechEnhancement() {
+    fetch('/stop-speech-enhancement').catch(() => {});
+    if (speechWs) { speechWs.close(); speechWs = null; }
+    speechRunning = false;
+    stopSpeechSpectrogram();
+    _disableSpeechPlayers();
+    setSpeechStatus('Stopped', '#64748b', false);
+    updateSpeechRunBtn(false);
+}
+
+function connectSpeechWs() {
+    startSpeechSpectrogram();
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    speechWs = new WebSocket(proto + '//' + location.host + '/speech');
+    speechWs.onmessage = e => {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.label) addSpeechResult(data.label, data.timestamp);
+        } catch (_) {}
+    };
+    speechWs.onclose = () => { if (speechRunning) setSpeechStatus('Connection lost - reload to retry', '#ef4444', false); };
+}
+
+function addSpeechResult(label, ts) {
+    const results = document.getElementById('speech-results');
+    const ph = document.getElementById('speech-results-placeholder');
+    if (ph) ph.remove();
+    const time = ts ? new Date(ts).toLocaleTimeString() : new Date().toLocaleTimeString();
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1e2a3a;';
+    row.innerHTML = `<span style="color:#e2e8f0;font-weight:600">${label.replace(/</g,'&lt;')}</span><span style="color:#64748b">${time}</span>`;
+    results.insertBefore(row, results.firstChild);
+    while (results.children.length > 20) results.removeChild(results.lastChild);
+}
+
+function setSpeechStatus(msg, color, pulse) {
+    const txt = document.getElementById('speech-status-txt');
+    const dot = document.getElementById('speech-status-dot');
+    if (txt) { txt.textContent = msg; txt.style.color = color; }
+    if (dot) { dot.style.background = color; dot.style.animation = pulse ? 'pulse 2s infinite' : 'none'; }
+}
+
+function updateSpeechRunBtn(_running) { /* button disabled — not supported yet */ }
+
+/* ── SPEECH SPECTROGRAM ─────────────────────────────────────────────────── */
+let _specRunning  = false;
+let _specTimerId  = null;
+
+function _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function drawSpeechSpecIdle(which) {
+    const canvas = document.getElementById('spec-' + which);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.fillStyle = '#05080f';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#1a2438';
+    ctx.lineWidth = 0.5;
+    [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+        const y = Math.round(f * H);
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    });
+    ctx.fillStyle = '#1e3350';
+    ctx.font = '8px monospace';
+    ctx.fillText('8k', 3, 10);
+    ctx.fillText('4k', 3, Math.round(H * 0.25) + 4);
+    ctx.fillText('2k', 3, Math.round(H * 0.5) + 4);
+    ctx.fillText('0',  3, H - 3);
+    ctx.fillStyle = '#2d3f55';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No signal', W / 2, H / 2 + 4);
+    ctx.textAlign = 'left';
+}
+
+function startSpeechSpectrogram() {
+    if (_specRunning) return;
+    _specRunning = true;
+    _specTick();
+}
+
+function stopSpeechSpectrogram() {
+    _specRunning = false;
+    if (_specTimerId) { clearTimeout(_specTimerId); _specTimerId = null; }
+    drawSpeechSpecIdle('in');
+    drawSpeechSpecIdle('out');
+}
+
+function _specTick() {
+    if (!_specRunning) return;
+    const t = Date.now() / 1000;
+    _specScrollCol('in',  t, true);
+    _specScrollCol('out', t, false);
+    _specTimerId = setTimeout(_specTick, 80);
+}
+
+function _specScrollCol(which, t, noisy) {
+    const canvas = document.getElementById('spec-' + which);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.drawImage(canvas, -1, 0);
+    for (let y = 0; y < H; y++) {
+        const freq = 1 - y / H;
+        const inBand = freq > 0.05 && freq < 0.4;
+        const sig   = inBand ? 0.35 + 0.5 * Math.pow(Math.abs(Math.sin(t * 6 + freq * 30)), 2) : 0;
+        const noise = noisy ? Math.random() * 0.3 : Math.random() * 0.06;
+        const v = _clamp(sig + noise, 0, 1);
+        const r = Math.round(_clamp(v > 0.6  ? (v - 0.6) * 2.5 * 255 : 0, 0, 255));
+        const g = Math.round(_clamp(v > 0.35 ? (v - 0.35) * 1.8 * 255 : 0, 0, 255));
+        const b = Math.round(_clamp(v < 0.5  ? 80 + v * 2 * 120 : (1 - v) * 2 * 80, 0, 255));
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(W - 1, y, 1, 1);
+    }
+}
+
+/* ── SPEECH PLAYBACK ─────────────────────────────────────────────────────── */
+let _speechInputBlobUrl = null;
+
+function _speechPlaybackInit() {
+    ['in', 'out'].forEach(which => {
+        const audio = document.getElementById('audio-' + which);
+        if (!audio) return;
+        audio.addEventListener('timeupdate', () => {
+            if (!audio.duration) return;
+            document.getElementById('prog-' + which).style.width =
+                (audio.currentTime / audio.duration * 100).toFixed(1) + '%';
+            document.getElementById('time-' + which).textContent =
+                _fmtAt(audio.currentTime) + ' / ' + _fmtAt(audio.duration);
+        });
+        audio.addEventListener('ended', () => {
+            _setSpeechPlayIcon(which, false);
+            document.getElementById('prog-' + which).style.width = '0%';
+        });
+    });
+}
+
+function toggleSpeechPlay(which) {
+    const audio = document.getElementById('audio-' + which);
+    if (!audio || !audio.src) return;
+    if (audio.paused) { audio.play(); _setSpeechPlayIcon(which, true); }
+    else              { audio.pause(); _setSpeechPlayIcon(which, false); }
+}
+
+function seekSpeechAudio(which, event) {
+    const audio = document.getElementById('audio-' + which);
+    if (!audio || !audio.duration) return;
+    audio.currentTime = (event.offsetX / event.currentTarget.offsetWidth) * audio.duration;
+}
+
+function _setSpeechPlayIcon(which, playing) {
+    const btn = document.getElementById('play-' + which + '-btn');
+    if (!btn) return;
+    btn.innerHTML = playing
+        ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+        : `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>`;
+}
+
+function _enableSpeechPlayer(which, url) {
+    const audio = document.getElementById('audio-' + which);
+    const btn   = document.getElementById('play-' + which + '-btn');
+    if (!audio || !btn) return;
+    audio.src = url;
+    btn.disabled = false;
+    btn.style.cursor      = 'pointer';
+    btn.style.color       = which === 'in' ? '#60a5fa' : '#4ade80';
+    btn.style.borderColor = which === 'in' ? '#1d4ed8' : '#059669';
+    btn.style.background  = which === 'in' ? '#0a1a3a' : '#0a1f0e';
+}
+
+function _disableSpeechPlayers() {
+    ['in', 'out'].forEach(which => {
+        const audio = document.getElementById('audio-' + which);
+        const btn   = document.getElementById('play-' + which + '-btn');
+        if (audio) { audio.pause(); audio.src = ''; }
+        if (btn) {
+            btn.disabled = true;
+            btn.style.cursor = 'not-allowed';
+            btn.style.color = '#475569';
+            btn.style.borderColor = '#1e2a3a';
+            btn.style.background = '#0d1117';
+        }
+        _setSpeechPlayIcon(which, false);
+        const prog = document.getElementById('prog-' + which);
+        const time = document.getElementById('time-' + which);
+        if (prog) prog.style.width = '0%';
+        if (time) time.textContent = '--:--';
+    });
+    if (_speechInputBlobUrl) { URL.revokeObjectURL(_speechInputBlobUrl); _speechInputBlobUrl = null; }
+}
+
+function _fmtAt(s) {
+    if (!isFinite(s)) return '--:--';
+    return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+}
+
+/* ── TVM DEMO BACKEND ── */
+let _tvmDemoRunning = false;
+let _tvmDemoPollTimer = null;
+
+function toggleTvmDemo() {
+    if (_tvmDemoRunning) stopTvmDemo(); else startTvmDemo();
+}
+
+function startTvmDemo() {
+    _tvmDemoRunning = true;
+    setTvmDemoStatus('Starting inference on C7x DSP...', '#f59e0b', false);
+    updateTvmDemoBtn(true);
+    document.getElementById('tvm-demo-results').style.display = 'none';
+    fetch('/tvm-inference/run')
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) { setTvmDemoStatus('Error: ' + d.error, '#ef4444', false); _tvmDemoRunning = false; updateTvmDemoBtn(false); return; }
+            setTvmDemoStatus('Running... (~30-45 seconds)', '#22c55e', true);
+            _tvmDemoPollTimer = setInterval(pollTvmDemoResults, 2000);
+        })
+        .catch(err => { setTvmDemoStatus('Error: ' + err.message, '#ef4444', false); _tvmDemoRunning = false; updateTvmDemoBtn(false); });
+}
+
+function stopTvmDemo() {
+    fetch('/tvm-inference/stop').catch(() => {});
+    clearInterval(_tvmDemoPollTimer);
+    _tvmDemoRunning = false;
+    setTvmDemoStatus('Stopped', '#64748b', false);
+    updateTvmDemoBtn(false);
+}
+
+function pollTvmDemoResults() {
+    fetch('/tvm-inference/status')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.isRunning && d.hasResults) {
+                clearInterval(_tvmDemoPollTimer);
+                _tvmDemoRunning = false;
+                updateTvmDemoBtn(false);
+                displayTvmDemoResults(d.results);
+            }
+        })
+        .catch(() => {});
+}
+
+function displayTvmDemoResults(r) {
+    if (r.error) { setTvmDemoStatus('Error: ' + r.error, '#ef4444', false); return; }
+    setTvmDemoStatus('Completed', '#22c55e', false);
+    document.getElementById('tvm-d-avg').textContent = r.averageTime || '--';
+    document.getElementById('tvm-d-fps').textContent = r.fps || '--';
+    document.getElementById('tvm-d-min').textContent = r.minTime || '--';
+    document.getElementById('tvm-d-max').textContent = r.maxTime || '--';
+    const predsEl = document.getElementById('tvm-d-preds');
+    if (r.predictions && r.predictions.length) {
+        predsEl.innerHTML = r.predictions.slice(0, 5).map(p =>
+            `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1e2a3a;">
+                <span style="color:#94a3b8;">Class ${p.class}</span>
+                <span style="color:#e2e8f0;font-weight:600;">${p.percentage}</span>
+            </div>`
+        ).join('');
+    }
+    document.getElementById('tvm-demo-results').style.display = 'block';
+}
+
+function setTvmDemoStatus(msg, color, pulse) {
+    const txt = document.getElementById('tvm-demo-status');
+    const dot = document.getElementById('tvm-demo-dot');
+    if (txt) { txt.textContent = msg; txt.style.color = color; }
+    if (dot)  { dot.style.background = color; dot.style.animation = pulse ? 'pulse 2s infinite' : 'none'; }
+}
+
+function updateTvmDemoBtn(running) {
+    const btn = document.getElementById('tvm-demo-btn');
+    if (!btn) return;
+    if (running) {
+        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop Inference';
+        btn.style.background = '#dc2626';
+    } else {
+        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Run TVM Inference';
+        btn.style.background = '';
+    }
+}
+
+/* ── STATUS BAR ── */
+document.getElementById('nav-ip').textContent = window.location.hostname || '-';
+
+function pollCpuStatus() {
+    fetch('/cpu-load')
+        .then(r => r.json())
+        .then(d => {
+            const cpu = d.current_cpu_usage != null ? d.current_cpu_usage : (d.cpu_percent != null ? d.cpu_percent : null);
+            if (cpu != null) {
+                document.getElementById('sb-cpu-v').textContent = Math.round(cpu) + '%';
+                document.getElementById('sb-cpu-b').style.width = cpu + '%';
+            }
+        })
+        .catch(() => {});
+}
+setInterval(pollCpuStatus, 1000);
+pollCpuStatus();
+_setRunBtnState(true); /* TVM is default active demo */
+drawSpeechSpecIdle('in');
+drawSpeechSpecIdle('out');
+_speechPlaybackInit();
+
+/* C7x DSP load monitoring not yet implemented — update these when ready */
+
+function fmtUptime(secs) {
+    const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60);
+    return d + 'd ' + h + 'h ' + m + 'm';
+}
+function pollSidebar() {
+    fetch('/mem-info')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.total_kb) return;
+            const used = Math.round((d.total_kb - d.available_kb) / 1024);
+            const total = Math.round(d.total_kb / 1024);
+            const fmt = mb => mb >= 1024 ? (mb / 1024).toFixed(1) + 'GB' : mb + 'MB';
+            document.getElementById('sb-ram-v').textContent = fmt(used) + ' / ' + fmt(total);
+        }).catch(() => {});
+    fetch('/sys-uptime')
+        .then(r => r.json())
+        .then(d => { if (d.uptime_seconds != null) document.getElementById('sb-uptime').textContent = fmtUptime(d.uptime_seconds); })
+        .catch(() => {});
+}
+setInterval(pollSidebar, 10000);
+pollSidebar();
+
+/* ── PANEL SYSTEM ── */
+function openPanel(type) {
+    document.getElementById('panel-overlay').style.display = 'block';
+    const p = document.getElementById('side-panel');
+    p.style.display = 'flex';
+    if (type === 'device')   loadDevicePanel();
+    else if (type === 'logs')     loadLogsPanel();
+    else if (type === 'settings') loadSettingsPanel();
+}
+
+function closePanel() {
+    document.getElementById('panel-overlay').style.display = 'none';
+    document.getElementById('side-panel').style.display = 'none';
+    clearInterval(_logInterval);
+    _logInterval = null;
+}
+
+function _panelRow(label, value) {
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #1e2a3a;">
+        <span style="color:#64748b;font-size:13px;min-width:100px;">${label}</span>
+        <span style="color:#e2e8f0;font-size:13px;font-weight:500;text-align:right;word-break:break-all;">${value}</span>
+    </div>`;
+}
+
+function loadDevicePanel() {
+    document.getElementById('panel-title').textContent = 'Device Info';
+    document.getElementById('panel-body').innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    fetch('/device-info').then(r => r.json()).then(d => {
+        const board = (d.boards && d.boards[0]) || {};
+        const ip = document.getElementById('nav-ip') ? document.getElementById('nav-ip').textContent : window.location.hostname;
+        let html = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:#05080f;border:1px solid #1e2a3a;border-radius:8px;">
+            <div style="width:42px;height:42px;border-radius:8px;background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;display:flex;align-items:center;justify-content:center;color:#60a5fa;flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div><div style="font-size:15px;font-weight:700;color:#e2e8f0;">${d.displayName || d.id}</div>
+            <div style="font-size:12px;color:#4da6ff;margin-top:2px;">${board.name || ''}</div></div>
+        </div>`;
+        html += _panelRow('Board', board.name || '-');
+        html += _panelRow('SoC', d.soc || '-');
+        html += _panelRow('Device ID', d.id || '-');
+        html += _panelRow('IP Address', window.location.hostname);
+        html += _panelRow('Port', window.location.port || '3000');
+        html += _panelRow('Active Demos', (d.activeDemos || []).join(', ') || '-');
+        if (board.description) html += `<div style="margin-top:16px;padding:12px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;font-size:12px;color:#94a3b8;line-height:1.6;">${board.description}</div>`;
+        document.getElementById('panel-body').innerHTML = html;
+    }).catch(() => {
+        document.getElementById('panel-body').innerHTML = '<div style="color:#ef4444;font-size:13px;">Failed to load device info</div>';
+    });
+}
+
+let _logInterval = null;
+let _logLines = [];
+function loadLogsPanel() {
+    document.getElementById('panel-title').textContent = 'System Logs';
+    document.getElementById('panel-body').innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    clearInterval(_logInterval);
+    function fetchLogs() {
+        fetch('/logs').then(r => r.json()).then(d => {
+            _logLines = d.lines || [];
+            const body = document.getElementById('panel-body');
+            if (!body) return;
+            body.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;">
+                <span style="font-size:12px;color:#64748b;">${_logLines.length} entries &middot; auto-refresh 10s</span>
+                <button onclick="saveLogsToFile()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#1e3a5f'">
+                    &#8595; Save to File
+                </button>
+            </div>
+            <div style="font-family:monospace;font-size:11px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:10px;overflow-y:auto;max-height:calc(100vh - 200px);">
+                ${_logLines.length ? _logLines.map(l => `<div style="padding:2px 0;border-bottom:1px solid #0d1117;color:${l.match(/error/i) ? '#ef4444' : l.match(/warn/i) ? '#f59e0b' : '#94a3b8'};word-break:break-all;">${l.replace(/</g,'&lt;')}</div>`).join('') : '<div style="color:#475569;text-align:center;padding:20px 0;">No log entries</div>'}
+            </div>`;
+        }).catch(() => {
+            const body = document.getElementById('panel-body');
+            if (body) body.innerHTML = '<div style="color:#ef4444;font-size:13px;">Could not retrieve logs</div>';
+        });
+    }
+    fetchLogs();
+    _logInterval = setInterval(fetchLogs, 10000);
+}
+
+function saveLogsToFile() {
+    if (!_logLines.length) return;
+    const content = _logLines.slice().reverse().join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'webserver-oob-logs-' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function _field(id, label, value, type) {
+    const tag = type === 'textarea'
+        ? `<textarea id="sf-${id}" rows="3" style="width:100%;background:#05080f;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:6px 8px;border-radius:6px;resize:vertical;font-family:inherit;">${(value||'').replace(/</g,'&lt;')}</textarea>`
+        : `<input id="sf-${id}" type="text" value="${(value||'').replace(/"/g,'&quot;')}" style="width:100%;background:#05080f;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:6px 8px;border-radius:6px;outline:none;">`;
+    return `<div style="margin-bottom:14px;"><label style="display:block;font-size:11px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px;">${label}</label>${tag}</div>`;
+}
+
+function loadSettingsPanel() {
+    document.getElementById('panel-title').textContent = 'Settings';
+    document.getElementById('panel-body').innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    fetch('/device-info').then(r => r.json()).then(d => {
+        const board = (d.boards && d.boards[0]) || {};
+        const tvmCfg = (d.demoConfig && d.demoConfig['tvm-inference']) || {};
+        const html = `
+        <div style="font-size:12px;color:#64748b;margin-bottom:16px;">Edit fields and click Save to update device.json and reload.</div>
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Device</div>
+        ${_field('displayName','Display Name', d.displayName)}
+        ${_field('soc','SoC Description', d.soc)}
+        <div style="font-size:11px;font-weight:700;color:#475569;margin:16px 0 10px;text-transform:uppercase;letter-spacing:1px;">Board</div>
+        ${_field('boardName','Board Name', board.name)}
+        ${_field('boardDesc','Board Description', board.description, 'textarea')}
+        <div style="font-size:11px;font-weight:700;color:#475569;margin:16px 0 10px;text-transform:uppercase;letter-spacing:1px;">TVM Inference</div>
+        ${_field('tvmPath','Artifacts Path', tvmCfg.artifactsPath)}
+        ${_field('tvmModel','Model Name', tvmCfg.modelName)}
+        <div id="sf-status" style="min-height:20px;margin-bottom:10px;font-size:12px;"></div>
+        <button onclick="saveSettings()" style="width:100%;background:#1d4ed8;border:none;color:#fff;font-size:14px;font-weight:600;padding:10px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#1d4ed8'">
+            Save &amp; Reload
+        </button>
+        <div style="margin-top:12px;font-size:11px;color:#475569;">Server, Port and active demos require a service restart to change.</div>`;
+        document.getElementById('panel-body').innerHTML = html;
+        /* store full device for merging */
+        document.getElementById('side-panel')._deviceCache = d;
+    }).catch(() => {
+        document.getElementById('panel-body').innerHTML = '<div style="color:#ef4444;font-size:13px;">Failed to load settings</div>';
+    });
+}
+
+function saveSettings() {
+    const panel = document.getElementById('side-panel');
+    const base = panel._deviceCache || {};
+    const board = Object.assign({}, (base.boards && base.boards[0]) || {});
+    board.name        = document.getElementById('sf-boardName').value.trim();
+    board.description = document.getElementById('sf-boardDesc').value.trim();
+    const tvmCfg = Object.assign({}, (base.demoConfig && base.demoConfig['tvm-inference']) || {});
+    tvmCfg.artifactsPath = document.getElementById('sf-tvmPath').value.trim();
+    tvmCfg.modelName     = document.getElementById('sf-tvmModel').value.trim();
+    const payload = {
+        displayName: document.getElementById('sf-displayName').value.trim(),
+        soc:         document.getElementById('sf-soc').value.trim(),
+        boards:      [board],
+        demoConfig:  Object.assign({}, base.demoConfig || {}, { 'tvm-inference': tvmCfg })
+    };
+    const status = document.getElementById('sf-status');
+    status.textContent = 'Saving...';
+    status.style.color = '#94a3b8';
+    fetch('/device-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            status.textContent = 'Saved. Reloading...';
+            status.style.color = '#22c55e';
+            setTimeout(() => location.reload(), 800);
+        } else {
+            status.textContent = 'Error: ' + (d.error || 'unknown');
+            status.style.color = '#ef4444';
+        }
+    }).catch(e => {
+        status.textContent = 'Error: ' + e.message;
+        status.style.color = '#ef4444';
+    });
+}
+</script>
+
+<!-- ── SLIDE-IN PANEL ── -->
+<div id="panel-overlay" onclick="closePanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;"></div>
+<div id="side-panel" style="display:none;position:fixed;top:0;right:0;height:100%;width:360px;background:#0d1117;border-left:1px solid #1e2a3a;z-index:201;flex-direction:column;overflow:hidden;box-shadow:-4px 0 24px rgba(0,0,0,0.5);">
+    <div style="padding:16px 20px;border-bottom:1px solid #1e2a3a;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div id="panel-title" style="font-size:15px;font-weight:700;color:#e2e8f0;"></div>
+        <button onclick="closePanel()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px;padding:2px 6px;border-radius:4px;line-height:1;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#64748b'">&#10005;</button>
+    </div>
+    <div id="panel-body" style="padding:20px;overflow-y:auto;flex:1;"></div>
+</div>
+</body>
+</html>

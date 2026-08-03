@@ -5,9 +5,11 @@
  *
  * audio-classification demo server plugin
  * Registers:
- *   GET /audio-devices
- *   GET /start-audio-classification?device=<alsa-device>
- *   GET /stop-audio-classification
+ *   GET  /audio-devices
+ *   POST /upload-audio-classification-file   (raw binary, ?ext=wav)
+ *   GET  /start-audio-classification?device=<alsa-device>
+ *   GET  /start-audio-classification?source=file&filepath=<path>
+ *   GET  /stop-audio-classification
  *   WebSocket path: /audio
  *
  * Uses fifo-reader.js child process for blocking FIFO reads.
@@ -16,14 +18,17 @@
 
 'use strict';
 
-const { exec, spawn } = require('child_process');
-const fs              = require('fs');
-const path            = require('path');
+const { exec, execSync, spawn } = require('child_process');
+const express                   = require('express');
+const fs                        = require('fs');
+const path                      = require('path');
 
 const WS_OPEN = 1; /* WebSocket.OPEN — spec constant, no ws import needed */
 
-const MOCK     = process.env.MOCK === '1';
-const fifoPath = '/tmp/audio_classification_fifo';
+const MOCK       = process.env.MOCK === '1';
+const fifoPath   = '/tmp/audio_classification_fifo';
+const MODEL_PATH  = '/usr/share/oob-demo-assets/models/yamnet_audio_classification.tflite';
+const LABELS_PATH = '/usr/share/oob-demo-assets/labels/yamnet_label_list.txt';
 
 /* Resolve via WEBSERVER_DIR (set by server.js) so the path is correct on target
  * (/usr/lib/node_modules/webserver-oob/lib/) and in dev (repo common/webserver/lib/). */
@@ -43,6 +48,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
     let fifoReaderProcess = null;
     let audioProcess      = null;
     let mockInterval      = null;
+    let audioSourceMode   = 'device'; /* 'device' | 'file' */
     const connectedClients = new Set();
 
     /* ------------------------------------------------------------ */
@@ -62,17 +68,38 @@ module.exports = function registerAudioClassification(app, wss, device) {
         });
     });
 
+    /* File upload — saves raw audio binary to /tmp for later classification */
+    app.post('/upload-audio-classification-file',
+        express.raw({ type: '*/*', limit: '50mb' }),
+        (req, res) => {
+            if (MOCK) {
+                return res.json({ path: '/tmp/mock_audio.wav' });
+            }
+            const ext = ((req.headers['x-file-ext'] || 'wav') + '').replace(/[^a-z0-9]/gi, '').slice(0, 8);
+            const tmpPath = `/tmp/audio_classification_input.${ext}`;
+            try {
+                fs.writeFileSync(tmpPath, req.body);
+                console.log(`[audio] Saved uploaded file: ${tmpPath} (${req.body.length} bytes)`);
+                res.json({ path: tmpPath });
+            } catch (e) {
+                console.error('[audio] File save error:', e);
+                res.status(500).json({ error: e.message });
+            }
+        }
+    );
+
     app.get('/start-audio-classification', (req, res) => {
-        const device_param = req.query.device || 'default';
+        const source       = req.query.source   || 'device';
+        const device_param = req.query.device   || 'default';
+        const filepath     = req.query.filepath || '';
 
         if (audioProcess || mockInterval) {
             return res.status(400).send('Audio classification already running');
         }
 
-        console.log('[audio] Starting classification with device:', device_param);
+        audioSourceMode = (source === 'file') ? 'file' : 'device';
 
         if (MOCK) {
-            /* Mock mode: emit a random classification every 2 seconds */
             mockInterval = setInterval(() => {
                 const cls = MOCK_CLASSES[Math.floor(Math.random() * MOCK_CLASSES.length)];
                 const msg = JSON.stringify({ class: cls, timestamp: Date.now() });
@@ -84,28 +111,70 @@ module.exports = function registerAudioClassification(app, wss, device) {
             return res.send('Audio classification started (MOCK)');
         }
 
-        /* Real mode: spawn audio_utils + fifo reader */
-        audioProcess = spawn('/usr/bin/audio_utils', ['start_gst', device_param]);
+        if (source === 'file') {
+            if (!filepath) return res.status(400).send('filepath required for file source');
+            if (!fs.existsSync(filepath)) return res.status(400).send(`File not found: ${filepath}`);
 
-        audioProcess.on('error', (err) => {
-            console.error('[audio] Failed to start audio_utils:', err);
-            audioProcess = null;
-        });
+            ensureFifo();
+            startFifoReader();
 
-        audioProcess.on('exit', (code) => {
-            console.log(`[audio] audio_utils exited with code ${code}`);
-            audioProcess = null;
-            stopFifoReader();
-        });
-
-        startFifoReader();
-        res.send('Audio classification started');
+            const cmd = buildFilePipelineCmd(filepath);
+            console.log('[audio] Starting file pipeline:', cmd);
+            audioProcess = exec(cmd, (error) => {
+                if (error && !error.killed) console.error('[audio] File pipeline error:', error.message);
+                audioProcess = null;
+                stopFifoReader();
+            });
+            res.send('Audio classification started (file)');
+        } else {
+            console.log('[audio] Starting classification with device:', device_param);
+            audioProcess = spawn('/usr/bin/audio_utils', ['start_gst', device_param]);
+            audioProcess.on('error', (err) => {
+                console.error('[audio] Failed to start audio_utils:', err);
+                audioProcess = null;
+            });
+            audioProcess.on('exit', (code) => {
+                console.log(`[audio] audio_utils exited with code ${code}`);
+                audioProcess = null;
+                stopFifoReader();
+            });
+            startFifoReader();
+            res.send('Audio classification started');
+        }
     });
 
     app.get('/stop-audio-classification', (req, res) => {
         stopAll();
         res.send('Audio classification stopped');
     });
+
+    /* ------------------------------------------------------------ */
+    /* Pipeline helpers                                             */
+    /* ------------------------------------------------------------ */
+
+    function ensureFifo() {
+        if (!fs.existsSync(fifoPath)) {
+            try { execSync(`mkfifo "${fifoPath}"`); } catch (_) {}
+        }
+    }
+
+    function buildFilePipelineCmd(filepath) {
+        return [
+            'gst-launch-1.0 -e',
+            `filesrc location="${filepath}"`,
+            '! decodebin',
+            '! audioconvert',
+            '! audio/x-raw,format=S16LE,channels=1,rate=16000,layout=interleaved',
+            '! tensor_converter frames-per-tensor=3900',
+            '! tensor_aggregator frames-in=3900 frames-out=15600 frames-flush=3900 frames-dim=1',
+            '! tensor_transform mode=arithmetic option=typecast:float32,add:0.5,div:32767.5',
+            '! tensor_transform mode=transpose option=1:0:2:3',
+            '! queue leaky=2 max-size-buffers=10',
+            `! tensor_filter framework=tensorflow2-lite model=${MODEL_PATH} custom=Delegate:XNNPACK,NumThreads:2`,
+            `! tensor_decoder mode=image_labeling option1=${LABELS_PATH}`,
+            `! filesink buffer-mode=2 location=${fifoPath}`
+        ].join(' ');
+    }
 
     /* ------------------------------------------------------------ */
     /* FIFO reader child process                                     */
@@ -162,16 +231,16 @@ module.exports = function registerAudioClassification(app, wss, device) {
             mockInterval = null;
         }
         if (audioProcess) {
-            exec('/usr/bin/audio_utils stop_gst', (err) => {
-                if (err) console.error('[audio] Error stopping audio_utils:', err);
-            });
+            if (audioSourceMode === 'device') {
+                exec('/usr/bin/audio_utils stop_gst', (err) => {
+                    if (err) console.error('[audio] Error stopping audio_utils:', err);
+                });
+            }
             audioProcess.kill();
             audioProcess = null;
         }
         stopFifoReader();
-        exec('pkill -f gst-launch', (err) => {
-            if (err) console.log('[audio] No GStreamer processes to kill');
-        });
+        exec('pkill -f gst-launch', () => {});
     }
 
     /* ------------------------------------------------------------ */

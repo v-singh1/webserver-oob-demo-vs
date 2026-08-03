@@ -861,15 +861,18 @@ function initTvmInference() {
         tvmWebSocket = new WebSocket(wsUrl);
 
         tvmWebSocket.onmessage = function(event) {
+            console.log('[TVM DEBUG] WebSocket message received:', event.data);
             try {
                 const data = JSON.parse(event.data);
+                console.log('[TVM DEBUG] Parsed WebSocket data:', data);
                 if (data.type === 'tvm-inference-complete') {
+                    console.log('[TVM DEBUG] TVM inference complete, displaying results');
                     displayTvmResults(data.data);
                     setTvmStatus('completed', 'Inference completed successfully!');
                     setTvmRunning(false);
                 }
             } catch (e) {
-                console.error('TVM WebSocket message error:', e);
+                console.error('[TVM DEBUG] WebSocket message error:', e);
             }
         };
 
@@ -962,20 +965,29 @@ function initTvmInference() {
 
     // Run inference button
     runButton.addEventListener('click', function() {
+        console.log('[TVM DEBUG] Button clicked - starting inference');
         setTvmRunning(true);
         setTvmStatus('running', 'Starting TVM inference on C7x DSP...');
         resultsDiv.classList.remove('show');
 
         // Connect WebSocket for real-time updates
+        console.log('[TVM DEBUG] Connecting WebSocket for real-time updates');
         connectTvmWebSocket();
 
+        console.log('[TVM DEBUG] Making fetch request to /tvm-inference/run');
         fetch('/tvm-inference/run')
-            .then(response => response.json())
+            .then(response => {
+                console.log('[TVM DEBUG] Fetch response received:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('[TVM DEBUG] Response data:', data);
                 if (data.error) {
+                    console.log('[TVM DEBUG] Error in response:', data.error);
                     setTvmStatus('error', `Error: ${data.error}`);
                     setTvmRunning(false);
                 } else {
+                    console.log('[TVM DEBUG] Success response, starting polling');
                     setTvmStatus('running', 'Running inference... Please wait (takes ~30-45 seconds)');
 
                     // Start polling for status updates

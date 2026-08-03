@@ -11,13 +11,19 @@
 
 DEVICE     ?= am335x
 CC         ?= gcc
-BOARD_HOST ?= root@192.168.7.2
 INSTALL_DIR = /usr/share/webserver-oob
+NODE_PKG    = /usr/lib/node_modules/webserver-oob
+
+# Auto-discover board IP unless BOARD_HOST is explicitly set.
+# Scans ARP cache for a host serving port 3000 /device-info.
+# Override: make deploy BOARD_HOST=root@<ip>
+BOARD_HOST ?= $(shell bash tools/find-board.sh 2>/dev/null || echo root@192.168.7.2)
 
 export CC CFLAGS LDFLAGS
 
 .PHONY: all build deps build-native clean dev deploy \
-        deploy-bins deploy-server deploy-app deploy-restart
+        deploy-bins deploy-server deploy-app deploy-restart \
+        push push-server push-app find-board
 
 all: build
 
@@ -70,14 +76,16 @@ deploy-bins:
 deploy-server:
 	ssh $(BOARD_HOST) "rm -rf $(INSTALL_DIR)/server $(INSTALL_DIR)/demos && \
 	    mkdir -p $(INSTALL_DIR)/server $(INSTALL_DIR)/demos"
-	tar -C common/webserver --exclude node_modules -cf - . | \
+	tar -C common/webserver -cf - . | \
 	    ssh $(BOARD_HOST) "tar -C $(INSTALL_DIR)/server -xf -"
-	ssh $(BOARD_HOST) "cd $(INSTALL_DIR)/server && npm install --production"
 	tar -C demos -cf - . | \
 	    ssh $(BOARD_HOST) "tar -C $(INSTALL_DIR)/demos -xf -"
 	ssh $(BOARD_HOST) "\
 	    echo 'DEVICE_CONFIG=$(INSTALL_DIR)/app/device.json' > /etc/webserver-oob.conf && \
-	    echo 'APP_DIR=$(INSTALL_DIR)/app' >> /etc/webserver-oob.conf"
+	    echo 'APP_DIR=$(INSTALL_DIR)/app' >> /etc/webserver-oob.conf && \
+	    echo 'DEMOS_DIR=$(INSTALL_DIR)/demos' >> /etc/webserver-oob.conf"
+	# Sync server.js to the node package path where the systemd service runs it
+	scp common/webserver/server.js $(BOARD_HOST):$(NODE_PKG)/server.js
 
 deploy-app:
 	ssh $(BOARD_HOST) "rm -rf $(INSTALL_DIR)/app && mkdir -p $(INSTALL_DIR)/app"
@@ -91,6 +99,26 @@ deploy-app:
 
 deploy-restart:
 	ssh $(BOARD_HOST) "systemctl restart webserver-oob"
+
+# ── Quick push (no build — just sync changed web files and restart) ──
+
+push: push-server push-app deploy-restart
+	@echo "Push complete."
+
+push-server:
+	@echo "Board: $(BOARD_HOST)"
+	scp common/webserver/server.js $(BOARD_HOST):$(NODE_PKG)/server.js
+
+push-app:
+	@echo "Board: $(BOARD_HOST)"
+	scp common/app/index.html common/app/audio-dsp.html common/app/model-inspector.html \
+	    $(BOARD_HOST):$(INSTALL_DIR)/app/
+	@if [ -d devices/$(DEVICE)/app ]; then \
+	    scp -r devices/$(DEVICE)/app/. $(BOARD_HOST):$(INSTALL_DIR)/app/; \
+	fi
+
+find-board:
+	@bash tools/find-board.sh
 
 # ── Info ─────────────────────────────────────────────────────────────
 

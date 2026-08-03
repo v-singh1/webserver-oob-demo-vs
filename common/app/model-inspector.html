@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Model Inspector - TI AM62D Demo Portal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e1a;
+            color: #e2e8f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── NAVBAR ── */
+        .navbar {
+            background: #0d1117;
+            border-bottom: 1px solid #1e2a3a;
+            height: 62px;
+            padding: 0 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .navbar-left { display: flex; align-items: center; gap: 12px; }
+        .ti-logo {
+            width: 38px; height: 38px; border-radius: 8px;
+            background: white;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; padding: 3px; box-sizing: border-box;
+        }
+        .ti-logo img { width: 100%; height: 100%; object-fit: contain; }
+        .brand-main { display: block; font-size: 15px; font-weight: 700; color: #fff; }
+        .brand-sub  { display: block; font-size: 10px; font-weight: 700; color: #4da6ff; letter-spacing: 2.5px; margin-top: 1px; }
+        .navbar-right { display: flex; align-items: center; gap: 16px; }
+        .conn-block { padding-right: 16px; border-right: 1px solid #1e2a3a; }
+        .conn-top { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #e2e8f0; }
+        .conn-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 4px #22c55e} 50%{box-shadow:0 0 14px #22c55e} }
+        .conn-ip { font-size: 11px; color: #64748b; text-align: right; margin-top: 2px; }
+        .theme-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 20px; padding: 6px; border-radius: 8px; line-height: 1; }
+
+        /* ── LAYOUT ── */
+        .layout { display: flex; flex: 1; overflow: hidden; }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width: 222px; background: #0d1117;
+            border-right: 1px solid #1e2a3a;
+            display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+        }
+        .sidebar-nav { flex: 1; padding: 10px 0; }
+        .nav-lbl {
+            font-size: 10px; font-weight: 700; color: #475569;
+            letter-spacing: 1.8px; text-transform: uppercase; padding: 14px 16px 5px;
+        }
+        .nav-item {
+            display: flex; align-items: center; gap: 11px;
+            padding: 10px 16px; font-size: 13.5px; color: #94a3b8;
+            cursor: pointer; text-decoration: none;
+            border-left: 3px solid transparent;
+            transition: background 0.15s, color 0.15s;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.04); color: #e2e8f0; }
+        .nav-item.active { background: rgba(77,166,255,0.1); color: #4da6ff; border-left-color: #4da6ff; }
+        .nav-item svg { flex-shrink: 0; }
+        .sidebar-footer { padding: 12px 14px; border-top: 1px solid #1e2a3a; }
+        .dl-link { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #64748b; font-size: 12.5px; transition: color 0.15s; cursor: pointer; }
+        .dl-link:hover { color: #4da6ff; }
+        .dl-link .ext { color: #4da6ff; margin-left: auto; }
+
+        /* ── MAIN ── */
+        .main {
+            flex: 1; overflow: hidden;
+            padding: 18px 18px 14px;
+            display: flex; flex-direction: column; gap: 14px;
+        }
+
+        /* ── PAGE HEADER ── */
+        .page-hdr { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .ph-left { display: flex; align-items: center; gap: 14px; }
+        .ph-icon {
+            width: 50px; height: 50px; border-radius: 50%; flex-shrink: 0;
+            background: radial-gradient(circle at 40% 40%, #1a3a7a, #0a1540);
+            border: 2px solid #1d4ed8; color: #60a5fa;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .ph-title { font-size: 21px; font-weight: 800; color: #fff; margin-bottom: 3px; }
+        .ph-sub   { font-size: 13px; color: #64748b; }
+        .ph-badge {
+            background: rgba(77,166,255,0.1); border: 1px solid rgba(77,166,255,0.3);
+            color: #4da6ff; font-size: 11px; font-weight: 700;
+            padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px;
+        }
+
+        /* ── INSPECTOR GRID ── */
+        .inspector-grid {
+            display: grid;
+            grid-template-columns: 310px 1fr;
+            gap: 14px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ── MODEL LIST PANEL ── */
+        .panel {
+            background: #0d1117; border: 1px solid #1e2a3a;
+            border-radius: 12px; display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .panel-hdr {
+            padding: 14px 16px 12px;
+            border-bottom: 1px solid #1e2a3a;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .panel-ttl { font-size: 14px; font-weight: 700; color: #fff; }
+        .model-count { font-size: 11px; color: #64748b; background: #161e2e; padding: 3px 8px; border-radius: 10px; }
+        .model-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+        .model-card {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px; border: 1px solid #1e2a3a; border-radius: 10px;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .model-card:hover { border-color: #4da6ff; background: rgba(77,166,255,0.04); }
+        .model-card.selected { border-color: #4da6ff; background: rgba(77,166,255,0.09); }
+        .mc-icon {
+            width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; font-size: 18px;
+        }
+        .mc-body { flex: 1; min-width: 0; }
+        .mc-name  { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mc-meta  { display: flex; align-items: center; gap: 6px; }
+        .mc-type  { font-size: 11px; color: #64748b; }
+        .mc-quant {
+            font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px;
+        }
+        .mc-quant.int8  { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+        .mc-quant.fp16  { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+        .mc-quant.fp32  { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+        .mc-latency { font-size: 12px; font-weight: 700; color: #94a3b8; flex-shrink: 0; }
+
+        /* ── DETAIL PANEL ── */
+        .detail-panel {
+            background: #0d1117; border: 1px solid #1e2a3a;
+            border-radius: 12px; display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .detail-scroll { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+
+        /* Empty state */
+        .empty-state {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 12px;
+            color: #475569; text-align: center; padding: 40px;
+        }
+        .empty-state svg { opacity: 0.4; }
+        .empty-state h3 { font-size: 15px; color: #64748b; }
+        .empty-state p  { font-size: 13px; }
+
+        /* Detail header */
+        .det-hdr { display: flex; align-items: flex-start; gap: 14px; }
+        .det-icon {
+            width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; font-size: 24px;
+        }
+        .det-title  { font-size: 19px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+        .det-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .det-badge {
+            font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+        }
+        .det-badge.type     { background: rgba(77,166,255,0.12); color: #60a5fa; border: 1px solid rgba(77,166,255,0.3); }
+        .det-badge.fw       { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid #1e2a3a; }
+
+        /* 4 Stat cards */
+        .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+        .stat-card {
+            background: #111827; border: 1px solid #1e2a3a; border-radius: 10px;
+            padding: 12px 14px;
+        }
+        .stat-lbl { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+        .stat-val { font-size: 20px; font-weight: 800; }
+        .stat-sub { font-size: 10px; color: #475569; margin-top: 2px; }
+
+        /* Section heading */
+        .sec-ttl {
+            font-size: 13px; font-weight: 700; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        /* Architecture grid */
+        .arch-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+        .arch-item { background: #111827; border: 1px solid #1e2a3a; border-radius: 8px; padding: 10px 12px; }
+        .arch-lbl { font-size: 11px; color: #64748b; margin-bottom: 3px; }
+        .arch-val { font-size: 13px; font-weight: 600; color: #e2e8f0; font-family: 'Courier New', monospace; }
+        .arch-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+
+        /* Hardware utilization */
+        .hw-row { margin-bottom: 10px; }
+        .hw-row:last-child { margin-bottom: 0; }
+        .hw-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 13px; }
+        .hw-lbl { color: #94a3b8; display: flex; align-items: center; gap: 7px; }
+        .hw-val { font-weight: 700; }
+        .hw-bar-t { height: 7px; background: #1a2438; border-radius: 4px; overflow: hidden; }
+        .hw-bar-f { height: 100%; border-radius: 4px; transition: width 1s ease; }
+
+        /* Layer breakdown */
+        .layer-bar { height: 24px; border-radius: 6px; overflow: hidden; display: flex; margin-bottom: 10px; }
+        .layer-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.85); transition: width 0.8s ease; cursor: default; overflow: hidden; white-space: nowrap; }
+        .layer-seg:hover { filter: brightness(1.15); }
+        .layer-legend { display: flex; flex-wrap: wrap; gap: 8px; }
+        .ll-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #94a3b8; }
+        .ll-dot  { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+        /* Divider */
+        hr { border: none; border-top: 1px solid #1e2a3a; }
+
+        /* ── STATUS BAR ── */
+        .statusbar {
+            background: #0d1117; border-top: 1px solid #1e2a3a;
+            height: 42px; padding: 0 20px;
+            display: flex; align-items: center; gap: 20px;
+            flex-shrink: 0; font-size: 12px;
+        }
+        .sb-item { display: flex; align-items: center; gap: 7px; color: #94a3b8; white-space: nowrap; }
+        .bar-t { width: 58px; height: 5px; background: #1a2438; border-radius: 3px; overflow: hidden; }
+        .bar-f { height: 100%; border-radius: 3px; transition: width 1s ease; }
+        .bar-f.g { background: linear-gradient(90deg,#16a34a,#4ade80); }
+        .bar-f.c { background: linear-gradient(90deg,#0891b2,#22d3ee); }
+        .sb-ram  { color: #4da6ff; font-weight: 600; }
+        .sb-spacer { flex: 1; }
+        .sb-copy { color: #475569; }
+        .sb-doc  { color: #4da6ff; text-decoration: none; display: flex; align-items: center; gap: 4px; }
+        .sb-doc:hover { color: #93c5fd; }
+
+        @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e2a3a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2d3f5a; }
+    </style>
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+<nav class="navbar">
+    <div class="navbar-left">
+        <div class="ti-logo"><img src="ti-logo.png" alt="Texas Instruments"></div>
+        <div>
+            <span class="brand-main">TI AM62D</span>
+            <span class="brand-sub">DEMO PORTAL</span>
+        </div>
+    </div>
+    <div class="navbar-right">
+        <div class="conn-block">
+            <div class="conn-top"><div class="conn-dot"></div><span>Connected to AM62D EVM</span></div>
+            <div class="conn-ip" id="nav-ip">-</div>
+        </div>
+        <button class="theme-btn" title="Toggle theme">&#9728;</button>
+    </div>
+</nav>
+
+<!-- ── BODY LAYOUT ── -->
+<div class="layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <nav class="sidebar-nav">
+            <a href="index.html" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+                Home
+            </a>
+
+            <div class="nav-lbl">Demos</div>
+
+            <a href="audio-dsp.html" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
+                Audio DSP with Analytics
+            </a>
+
+            <div class="nav-lbl">Tools</div>
+
+            <a href="model-inspector.html" class="nav-item active">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                AI Model Inspector
+            </a>
+
+            <div class="nav-lbl">System</div>
+
+            <a href="#" class="nav-item" onclick="openPanel('device');return false;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Device Info
+            </a>
+
+            <a href="#" class="nav-item" onclick="openPanel('logs');return false;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+                Logs
+            </a>
+
+            <a href="#" class="nav-item" onclick="openPanel('settings');return false;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Settings
+            </a>
+
+            <a href="https://e2e.ti.com/support/processors/" target="_blank" class="nav-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+                Help
+            </a>
+        </nav>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+
+        <!-- Page Header -->
+        <div class="page-hdr">
+            <div class="ph-left">
+                <div class="ph-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </div>
+                <div>
+                    <div class="ph-title">AI Model Inspector</div>
+                    <div class="ph-sub">Browse and inspect AI models deployed on the AM62D platform via TIDL inference engine.</div>
+                </div>
+            </div>
+            <span class="ph-badge">TIDL Runtime</span>
+        </div>
+
+        <!-- Inspector Grid -->
+        <div class="inspector-grid">
+
+            <!-- Left: Model List -->
+            <div class="panel" style="display:flex;flex-direction:column;gap:0;overflow:hidden;">
+                <div class="panel-hdr">
+                    <span class="panel-ttl">Available Models</span>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span class="model-count" id="model-count">0 models</span>
+                        <button onclick="loadModelList()" title="Refresh model list"
+                            style="background:none;border:1px solid #1e2a3a;color:#64748b;font-size:12px;padding:2px 8px;border-radius:4px;cursor:pointer;line-height:1.4;transition:color .15s;"
+                            onmouseover="this.style.color='#4da6ff'" onmouseout="this.style.color='#64748b'">&#8635;</button>
+                        <button onclick="openUploadModal()" title="Upload model from PC"
+                            style="background:#1d4ed8;border:none;color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .15s;"
+                            onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#1d4ed8'">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Upload
+                        </button>
+                    </div>
+                </div>
+                <div class="model-list" id="model-list" style="flex:1;overflow-y:auto;">
+                    <!-- Injected by JS -->
+                </div>
+
+            </div>
+
+            <!-- Right: Model Detail -->
+            <div class="detail-panel" id="detail-panel">
+                <!-- Empty state shown until model is selected -->
+                <div class="empty-state" id="empty-state">
+                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <h3>Select a model to inspect</h3>
+                    <p>Click any model from the list to view its full Edge AI Model Inspector report.</p>
+                </div>
+                <iframe id="model-frame" src="" style="display:none;width:100%;flex:1;border:none;min-height:0;"></iframe>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+    <div class="sb-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+        Uptime: <span id="sb-uptime">2d 14h 32m</span>
+    </div>
+    <div class="sb-item">CPU Load: <span id="sb-cpu-v">35%</span><div class="bar-t"><div class="bar-f g" id="sb-cpu-b" style="width:35%"></div></div></div>
+    <div class="sb-item" style="opacity:0.35;pointer-events:none;" title="DSP load monitoring not yet implemented">C7x Load: <span id="sb-c7x-v" style="color:#64748b;">N/A</span><div class="bar-t"><div class="bar-f c" id="sb-c7x-b" style="width:0%"></div></div></div>
+    <div class="sb-item">RAM (Used/Free): <span class="sb-ram" id="sb-ram-v">512MB / 1.0GB</span></div>
+    <div class="sb-spacer"></div>
+    <span class="sb-copy">&#169; 2026 Texas Instruments Incorporated</span>
+    <a href="https://software-dl.ti.com/processor-sdk-linux/esd/AM62DX/latest/exports/docs/devices/AM62DX/index.html" target="_blank" class="sb-doc">Documentation <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
+</div>
+
+<script>
+/* ── MODEL DATA ── */
+const MODELS_STATIC = [
+    {
+        name: "ResNet-18",
+        type: "Image Classification",
+        quant: "INT8",
+        badge: "~9.7 ms",
+        iconBg: "radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540)",
+        iconBorder: "#1d4ed8", iconColor: "#60a5fa",
+        file: "Model-Inspector/modelinspector.html"
+    },
+    {
+        name: "ResNet-18 (Detailed)",
+        type: "Image Classification",
+        quant: "INT8",
+        badge: "TIDL",
+        iconBg: "radial-gradient(circle at 40% 40%,#0d3a2e,#062018)",
+        iconBorder: "#059669", iconColor: "#34d399",
+        file: "Model-Inspector/modelinspector_resnet.html"
+    },
+    {
+        name: "NanoDet RepVGG A1.2",
+        type: "Object Detection",
+        quant: "INT8",
+        badge: "TIDL",
+        iconBg: "radial-gradient(circle at 40% 40%,#3a2000,#1e0e00)",
+        iconBorder: "#d97706", iconColor: "#fbbf24",
+        file: "Model-Inspector/modelinspector_nano_dat.html"
+    },
+    {
+        name: "YOLOv9c",
+        type: "Object Detection",
+        quant: "INT8",
+        badge: "TIDL",
+        iconBg: "radial-gradient(circle at 40% 40%,#3a0a0a,#1e0505)",
+        iconBorder: "#dc2626", iconColor: "#f87171",
+        file: "Model-Inspector/modelinspector_yolo9c.html"
+    }
+];
+
+const STATIC_ICONS = [
+    `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
+    `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
+    `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 3l-4 4-4-4"/><rect x="7" y="11" width="4" height="4"/><rect x="13" y="11" width="4" height="4"/></svg>`,
+    `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></svg>`
+];
+
+const UPLOAD_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>`;
+
+/* Build filename → static-model index for fast lookup */
+const STATIC_BY_FILE = {};
+MODELS_STATIC.forEach((m, i) => { STATIC_BY_FILE[m.file.split('/').pop()] = i; });
+
+/* localStorage key for user-uploaded model metadata */
+const UPLOAD_META_KEY = 'mi-uploaded-models';
+function _getUploadedMeta() {
+    try { return JSON.parse(localStorage.getItem(UPLOAD_META_KEY) || '{}'); } catch { return {}; }
+}
+function _saveUploadedMeta(filename, meta) {
+    const all = _getUploadedMeta();
+    all[filename] = meta;
+    localStorage.setItem(UPLOAD_META_KEY, JSON.stringify(all));
+}
+
+let _models = []; /* current model list */
+
+/* ── RENDER MODEL LIST ── */
+function renderModelList() {
+    const listEl = document.getElementById('model-list');
+    listEl.innerHTML = '';
+    _models.forEach((m, i) => {
+        const qClass = m.quant === 'INT8' ? 'int8' : m.quant === 'FP16' ? 'fp16' : 'fp32';
+        const icon = (m._si != null) ? STATIC_ICONS[m._si] : UPLOAD_ICON;
+        const card = document.createElement('div');
+        card.className = 'model-card';
+        card.innerHTML = `
+            <div class="mc-icon" style="background:${m.iconBg};border:1.5px solid ${m.iconBorder};color:${m.iconColor}">${icon}</div>
+            <div class="mc-body">
+                <div class="mc-name">${m.name}</div>
+                <div class="mc-meta">
+                    <span class="mc-type">${m.type}</span>
+                    <span class="mc-quant ${qClass}">${m.quant}</span>
+                </div>
+            </div>
+            <div class="mc-latency">${m.badge}</div>
+        `;
+        card.addEventListener('click', () => selectModel(i));
+        listEl.appendChild(card);
+    });
+    const n = _models.length;
+    document.getElementById('model-count').textContent = n + ' model' + (n !== 1 ? 's' : '');
+}
+
+/* ── LOAD MODEL LIST FROM SERVER ── */
+async function loadModelList() {
+    let serverFiles = null;
+    try {
+        const r = await fetch('/model-inspector-list');
+        if (r.ok) { const d = await r.json(); serverFiles = d.files || null; }
+    } catch (_) {}
+
+    const uploadedMeta = _getUploadedMeta();
+
+    if (serverFiles) {
+        const serverSet = new Set(serverFiles);
+        const result = [];
+        /* Known static models first, in their original order */
+        MODELS_STATIC.forEach((m, i) => {
+            const fname = m.file.split('/').pop();
+            if (serverSet.has(fname)) result.push({ ...m, _si: i });
+        });
+        /* Uploaded / unknown files at the end */
+        serverFiles.forEach(fname => {
+            if (STATIC_BY_FILE[fname] != null) return;
+            const meta = uploadedMeta[fname] || {};
+            result.push({
+                name: meta.name || fname.replace(/\.html?$/i, '').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                type: meta.type || 'AI Model',
+                quant: meta.quant || 'INT8',
+                badge: 'Uploaded',
+                iconBg: 'radial-gradient(circle at 40% 40%,#0a2d2d,#051a1a)',
+                iconBorder: '#0891b2', iconColor: '#22d3ee',
+                file: 'Model-Inspector/' + fname
+            });
+        });
+        _models = result;
+    } else {
+        /* Server endpoint not reachable — fall back to static list */
+        _models = MODELS_STATIC.map((m, i) => ({ ...m, _si: i }));
+    }
+
+    renderModelList();
+    if (_models.length > 0) selectModel(0);
+}
+
+/* ── SELECT MODEL ── */
+function selectModel(idx) {
+    document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+    const cards = document.querySelectorAll('.model-card');
+    if (cards[idx]) cards[idx].classList.add('selected');
+    document.getElementById('empty-state').style.display = 'none';
+    const frame = document.getElementById('model-frame');
+    frame.style.display = 'block';
+    frame.src = _models[idx].file;
+}
+
+/* ── UPLOAD MODEL ── */
+let _uploadFile = null;
+
+function openUploadModal() {
+    _uploadFile = null;
+    document.getElementById('upload-file-input').value = '';
+    document.getElementById('upload-file-name-display').textContent = 'Click or drag model HTML file here';
+    document.getElementById('upload-file-name-display').style.color = '#64748b';
+    document.getElementById('upload-name-field').value = '';
+    document.getElementById('upload-status').textContent = '';
+    document.getElementById('upload-btn').disabled = false;
+    document.getElementById('upload-modal-overlay').style.display = 'flex';
+}
+
+function closeUploadModal() {
+    document.getElementById('upload-modal-overlay').style.display = 'none';
+}
+
+function onUploadFileSelected(input) {
+    if (!input.files.length) return;
+    _uploadFile = input.files[0];
+    document.getElementById('upload-file-name-display').textContent = _uploadFile.name;
+    document.getElementById('upload-file-name-display').style.color = '#e2e8f0';
+    document.getElementById('upload-name-field').value =
+        _uploadFile.name.replace(/\.html?$/i, '').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function onUploadFileDrop(event) {
+    const file = event.dataTransfer && event.dataTransfer.files[0];
+    if (!file) return;
+    _uploadFile = file;
+    document.getElementById('upload-file-name-display').textContent = file.name;
+    document.getElementById('upload-file-name-display').style.color = '#e2e8f0';
+    document.getElementById('upload-name-field').value =
+        file.name.replace(/\.html?$/i, '').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function doUpload() {
+    if (!_uploadFile) {
+        document.getElementById('upload-status').textContent = 'Select an HTML file first.';
+        document.getElementById('upload-status').style.color = '#ef4444';
+        return;
+    }
+    const name  = document.getElementById('upload-name-field').value.trim() || _uploadFile.name.replace(/\.html?$/i, '');
+    const type  = document.getElementById('upload-type-field').value;
+    const quant = document.getElementById('upload-quant-field').value;
+    const statusEl = document.getElementById('upload-status');
+    const uploadBtn = document.getElementById('upload-btn');
+    statusEl.textContent = 'Uploading...';
+    statusEl.style.color = '#94a3b8';
+    uploadBtn.disabled = true;
+    try {
+        const buf = await _uploadFile.arrayBuffer();
+        const r = await fetch('/upload-model-file?filename=' + encodeURIComponent(_uploadFile.name), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body: buf
+        });
+        if (!r.ok) throw new Error('Server returned HTTP ' + r.status);
+        _saveUploadedMeta(_uploadFile.name, { name, type, quant });
+        statusEl.textContent = 'Uploaded successfully!';
+        statusEl.style.color = '#22c55e';
+        setTimeout(() => { closeUploadModal(); loadModelList(); }, 800);
+    } catch (e) {
+        statusEl.textContent = 'Upload failed: ' + e.message;
+        statusEl.style.color = '#ef4444';
+        uploadBtn.disabled = false;
+    }
+}
+
+/* ── STATUS BAR ── */
+document.getElementById('nav-ip').textContent = window.location.hostname || '-';
+
+function pollCpuStatus() {
+    fetch('/cpu-load')
+        .then(r => r.json())
+        .then(d => {
+            const cpu = d.current_cpu_usage != null ? d.current_cpu_usage : (d.cpu_percent != null ? d.cpu_percent : null);
+            if (cpu != null) {
+                document.getElementById('sb-cpu-v').textContent = Math.round(cpu) + '%';
+                document.getElementById('sb-cpu-b').style.width = cpu + '%';
+            }
+        })
+        .catch(() => {});
+}
+setInterval(pollCpuStatus, 1000);
+pollCpuStatus();
+loadModelList();
+
+/* C7x DSP load monitoring not yet implemented — update when ready */
+
+function fmtUptime(secs) {
+    const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60);
+    return d + 'd ' + h + 'h ' + m + 'm';
+}
+function pollSidebar() {
+    fetch('/mem-info')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.total_kb) return;
+            const used = Math.round((d.total_kb - d.available_kb) / 1024);
+            const total = Math.round(d.total_kb / 1024);
+            const fmt = mb => mb >= 1024 ? (mb / 1024).toFixed(1) + 'GB' : mb + 'MB';
+            document.getElementById('sb-ram-v').textContent = fmt(used) + ' / ' + fmt(total);
+        }).catch(() => {});
+    fetch('/sys-uptime')
+        .then(r => r.json())
+        .then(d => { if (d.uptime_seconds != null) document.getElementById('sb-uptime').textContent = fmtUptime(d.uptime_seconds); })
+        .catch(() => {});
+}
+setInterval(pollSidebar, 10000);
+pollSidebar();
+
+/* ── PANEL SYSTEM ── */
+function openPanel(type) {
+    document.getElementById('panel-overlay').style.display = 'block';
+    const p = document.getElementById('side-panel');
+    p.style.display = 'flex';
+    if (type === 'device')        loadDevicePanel();
+    else if (type === 'logs')     loadLogsPanel();
+    else if (type === 'settings') loadSettingsPanel();
+}
+
+function closePanel() {
+    document.getElementById('panel-overlay').style.display = 'none';
+    document.getElementById('side-panel').style.display = 'none';
+    clearInterval(_logInterval);
+    _logInterval = null;
+}
+
+function _panelRow(label, value) {
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #1e2a3a;">
+        <span style="color:#64748b;font-size:13px;min-width:100px;">${label}</span>
+        <span style="color:#e2e8f0;font-size:13px;font-weight:500;text-align:right;word-break:break-all;">${value}</span>
+    </div>`;
+}
+
+function loadDevicePanel() {
+    document.getElementById('panel-title').textContent = 'Device Info';
+    document.getElementById('panel-body').innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    fetch('/device-info').then(r => r.json()).then(d => {
+        const board = (d.boards && d.boards[0]) || {};
+        let html = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:#05080f;border:1px solid #1e2a3a;border-radius:8px;">
+            <div style="width:42px;height:42px;border-radius:8px;background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;display:flex;align-items:center;justify-content:center;color:#60a5fa;flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div><div style="font-size:15px;font-weight:700;color:#e2e8f0;">${d.displayName || d.id}</div>
+            <div style="font-size:12px;color:#4da6ff;margin-top:2px;">${board.name || ''}</div></div>
+        </div>`;
+        html += _panelRow('Board', board.name || '-');
+        html += _panelRow('SoC', d.soc || '-');
+        html += _panelRow('Device ID', d.id || '-');
+        html += _panelRow('IP Address', window.location.hostname);
+        html += _panelRow('Port', window.location.port || '3000');
+        html += _panelRow('Active Demos', (d.activeDemos || []).join(', ') || '-');
+        if (board.description) html += `<div style="margin-top:16px;padding:12px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;font-size:12px;color:#94a3b8;line-height:1.6;">${board.description}</div>`;
+        document.getElementById('panel-body').innerHTML = html;
+    }).catch(() => {
+        document.getElementById('panel-body').innerHTML = '<div style="color:#ef4444;font-size:13px;">Failed to load device info</div>';
+    });
+}
+
+let _logInterval = null;
+let _logLines = [];
+function loadLogsPanel() {
+    document.getElementById('panel-title').textContent = 'System Logs';
+    document.getElementById('panel-body').innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    clearInterval(_logInterval);
+    function fetchLogs() {
+        fetch('/logs').then(r => r.json()).then(d => {
+            _logLines = d.lines || [];
+            const body = document.getElementById('panel-body');
+            if (!body) return;
+            body.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;">
+                <span style="font-size:12px;color:#64748b;">${_logLines.length} entries &middot; auto-refresh 10s</span>
+                <button onclick="saveLogsToFile()" style="background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#1e3a5f'">&#8595; Save to File</button>
+            </div>
+            <div style="font-family:monospace;font-size:11px;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:10px;overflow-y:auto;max-height:calc(100vh - 200px);">
+                ${_logLines.length ? _logLines.map(l => `<div style="padding:2px 0;border-bottom:1px solid #0d1117;color:${l.match(/error/i)?'#ef4444':l.match(/warn/i)?'#f59e0b':'#94a3b8'};word-break:break-all;">${l.replace(/</g,'&lt;')}</div>`).join('') : '<div style="color:#475569;text-align:center;padding:20px 0;">No log entries</div>'}
+            </div>`;
+        }).catch(() => {
+            const body = document.getElementById('panel-body');
+            if (body) body.innerHTML = '<div style="color:#ef4444;font-size:13px;">Could not retrieve logs</div>';
+        });
+    }
+    fetchLogs();
+    _logInterval = setInterval(fetchLogs, 10000);
+}
+
+function saveLogsToFile() {
+    if (!_logLines.length) return;
+    const blob = new Blob([_logLines.slice().reverse().join('\n')], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'webserver-oob-logs-' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function _field(id, label, value, type) {
+    const tag = type === 'textarea'
+        ? `<textarea id="sf-${id}" rows="3" style="width:100%;background:#05080f;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:6px 8px;border-radius:6px;resize:vertical;font-family:inherit;">${(value||'').replace(/</g,'&lt;')}</textarea>`
+        : `<input id="sf-${id}" type="text" value="${(value||'').replace(/"/g,'&quot;')}" style="width:100%;background:#05080f;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:6px 8px;border-radius:6px;outline:none;">`;
+    return `<div style="margin-bottom:14px;"><label style="display:block;font-size:11px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px;">${label}</label>${tag}</div>`;
+}
+
+function loadSettingsPanel() {
+    document.getElementById('panel-title').textContent = 'Settings';
+    document.getElementById('panel-body').innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px 0;text-align:center;">Loading...</div>';
+    fetch('/device-info').then(r => r.json()).then(d => {
+        const board = (d.boards && d.boards[0]) || {};
+        const tvmCfg = (d.demoConfig && d.demoConfig['tvm-inference']) || {};
+        const html = `
+        <div style="font-size:12px;color:#64748b;margin-bottom:16px;">Edit fields and click Save to update device.json and reload.</div>
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Device</div>
+        ${_field('displayName','Display Name', d.displayName)}
+        ${_field('soc','SoC Description', d.soc)}
+        <div style="font-size:11px;font-weight:700;color:#475569;margin:16px 0 10px;text-transform:uppercase;letter-spacing:1px;">Board</div>
+        ${_field('boardName','Board Name', board.name)}
+        ${_field('boardDesc','Board Description', board.description, 'textarea')}
+        <div style="font-size:11px;font-weight:700;color:#475569;margin:16px 0 10px;text-transform:uppercase;letter-spacing:1px;">TVM Inference</div>
+        ${_field('tvmPath','Artifacts Path', tvmCfg.artifactsPath)}
+        ${_field('tvmModel','Model Name', tvmCfg.modelName)}
+        <div id="sf-status" style="min-height:20px;margin-bottom:10px;font-size:12px;"></div>
+        <button onclick="saveSettings()" style="width:100%;background:#1d4ed8;border:none;color:#fff;font-size:14px;font-weight:600;padding:10px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#1d4ed8'">Save &amp; Reload</button>
+        <div style="margin-top:12px;font-size:11px;color:#475569;">Server, Port and active demos require a service restart to change.</div>`;
+        document.getElementById('panel-body').innerHTML = html;
+        document.getElementById('side-panel')._deviceCache = d;
+    }).catch(() => {
+        document.getElementById('panel-body').innerHTML = '<div style="color:#ef4444;font-size:13px;">Failed to load settings</div>';
+    });
+}
+
+function saveSettings() {
+    const panel = document.getElementById('side-panel');
+    const base = panel._deviceCache || {};
+    const board = Object.assign({}, (base.boards && base.boards[0]) || {});
+    board.name        = document.getElementById('sf-boardName').value.trim();
+    board.description = document.getElementById('sf-boardDesc').value.trim();
+    const tvmCfg = Object.assign({}, (base.demoConfig && base.demoConfig['tvm-inference']) || {});
+    tvmCfg.artifactsPath = document.getElementById('sf-tvmPath').value.trim();
+    tvmCfg.modelName     = document.getElementById('sf-tvmModel').value.trim();
+    const payload = {
+        displayName: document.getElementById('sf-displayName').value.trim(),
+        soc:         document.getElementById('sf-soc').value.trim(),
+        boards:      [board],
+        demoConfig:  Object.assign({}, base.demoConfig || {}, { 'tvm-inference': tvmCfg })
+    };
+    const status = document.getElementById('sf-status');
+    status.textContent = 'Saving...';
+    status.style.color = '#94a3b8';
+    fetch('/device-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(r => r.json()).then(d => {
+            if (d.success) { status.textContent = 'Saved. Reloading...'; status.style.color = '#22c55e'; setTimeout(() => location.reload(), 800); }
+            else { status.textContent = 'Error: ' + (d.error || 'unknown'); status.style.color = '#ef4444'; }
+        }).catch(e => { status.textContent = 'Error: ' + e.message; status.style.color = '#ef4444'; });
+}
+</script>
+
+<!-- ── UPLOAD MODEL MODAL ── -->
+<div id="upload-modal-overlay" onclick="closeUploadModal()"
+    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:300;align-items:center;justify-content:center;">
+    <div onclick="event.stopPropagation()"
+        style="background:#0d1117;border:1px solid #1e2a3a;border-radius:12px;width:430px;max-width:calc(100vw - 32px);padding:24px;position:relative;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <div style="font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Upload Model
+            </div>
+            <button onclick="closeUploadModal()" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#64748b'">&#10005;</button>
+        </div>
+        <!-- Drop zone -->
+        <div id="upload-drop-zone"
+            onclick="document.getElementById('upload-file-input').click()"
+            ondragover="event.preventDefault();this.style.borderColor='#3b82f6'"
+            ondragleave="this.style.borderColor='#1e3a5f'"
+            ondrop="event.preventDefault();this.style.borderColor='#1e3a5f';onUploadFileDrop(event)"
+            style="border:1.5px dashed #1e3a5f;background:#05080f;border-radius:8px;padding:20px;text-align:center;cursor:pointer;margin-bottom:16px;transition:border-color .15s;">
+            <input type="file" id="upload-file-input" accept=".html,.htm" style="display:none" onchange="onUploadFileSelected(this)">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" style="margin-bottom:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div id="upload-file-name-display" style="font-size:13px;color:#64748b;">Click or drag model HTML file here</div>
+            <div style="font-size:11px;color:#334155;margin-top:3px;">Edge AI Model Inspector HTML export</div>
+        </div>
+        <!-- Model Name -->
+        <div style="margin-bottom:12px;">
+            <label style="display:block;font-size:11px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px;">Model Name</label>
+            <input id="upload-name-field" type="text" placeholder="e.g. MobileNet v2"
+                style="width:100%;background:#05080f;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:8px 10px;border-radius:6px;outline:none;box-sizing:border-box;">
+        </div>
+        <!-- Type + Quant -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
+            <div>
+                <label style="display:block;font-size:11px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px;">Task Type</label>
+                <select id="upload-type-field" style="width:100%;background:#05080f;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:8px 10px;border-radius:6px;outline:none;cursor:pointer;">
+                    <option>Image Classification</option>
+                    <option>Object Detection</option>
+                    <option>Segmentation</option>
+                    <option>Keypoint Detection</option>
+                    <option>Other</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:block;font-size:11px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px;">Quantization</label>
+                <select id="upload-quant-field" style="width:100%;background:#05080f;border:1px solid #1e2a3a;color:#e2e8f0;font-size:13px;padding:8px 10px;border-radius:6px;outline:none;cursor:pointer;">
+                    <option value="INT8">INT8</option>
+                    <option value="FP16">FP16</option>
+                    <option value="FP32">FP32</option>
+                </select>
+            </div>
+        </div>
+        <div id="upload-status" style="min-height:18px;font-size:12px;margin-bottom:12px;text-align:center;"></div>
+        <button id="upload-btn" onclick="doUpload()"
+            style="width:100%;background:#1d4ed8;border:none;color:#fff;font-size:14px;font-weight:600;padding:11px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s;"
+            onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#1d4ed8'">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload &amp; Add to Inspector
+        </button>
+    </div>
+</div>
+
+<!-- ── SLIDE-IN PANEL ── -->
+<div id="panel-overlay" onclick="closePanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;"></div>
+<div id="side-panel" style="display:none;position:fixed;top:0;right:0;height:100%;width:360px;background:#0d1117;border-left:1px solid #1e2a3a;z-index:201;flex-direction:column;overflow:hidden;box-shadow:-4px 0 24px rgba(0,0,0,0.5);">
+    <div style="padding:16px 20px;border-bottom:1px solid #1e2a3a;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div id="panel-title" style="font-size:15px;font-weight:700;color:#e2e8f0;"></div>
+        <button onclick="closePanel()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px;padding:2px 6px;border-radius:4px;line-height:1;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#64748b'">&#10005;</button>
+    </div>
+    <div id="panel-body" style="padding:20px;overflow-y:auto;flex:1;"></div>
+</div>
+</body>
+</html>

@@ -23,7 +23,9 @@ module.exports = function registerTvmInference(app, wss, device) {
 
     /* Start TVM inference */
     app.get('/tvm-inference/run', (req, res) => {
+        console.log('[TVM DEBUG] Backend received /tvm-inference/run request');
         if (isRunning) {
+            console.log('[TVM DEBUG] Inference already running, rejecting request');
             return res.status(400).json({
                 error: 'Inference already running',
                 status: 'running'
@@ -31,6 +33,7 @@ module.exports = function registerTvmInference(app, wss, device) {
         }
 
         if (MOCK) {
+            console.log('[TVM DEBUG] MOCK mode detected, returning error');
             return res.json({
                 status: 'error',
                 message: 'TVM inference requires real hardware - MOCK mode not supported for this demo'
@@ -38,6 +41,7 @@ module.exports = function registerTvmInference(app, wss, device) {
         }
 
         // Real execution
+        console.log('[TVM DEBUG] Starting real TVM inference execution');
         isRunning = true;
         inferenceResults = null;
 
@@ -49,35 +53,42 @@ module.exports = function registerTvmInference(app, wss, device) {
             shell: true
         };
 
-        console.log('[tvm-inference] Starting inference:', command, args.join(' '));
+        console.log('[TVM DEBUG] About to spawn process:', command, args.join(' '), 'in directory:', options.cwd);
 
         inferenceProcess = spawn(command, args, options);
+
+        console.log('[TVM DEBUG] Process spawned with PID:', inferenceProcess.pid);
 
         let stdout = '';
         let stderr = '';
 
         inferenceProcess.stdout.on('data', (data) => {
             stdout += data.toString();
-            console.log('[tvm-inference] stdout:', data.toString());
+            console.log('[TVM DEBUG] stdout received:', data.toString());
         });
 
         inferenceProcess.stderr.on('data', (data) => {
             stderr += data.toString();
-            console.log('[tvm-inference] stderr:', data.toString());
+            console.log('[TVM DEBUG] stderr received:', data.toString());
         });
 
         inferenceProcess.on('close', (code) => {
             isRunning = false;
             inferenceProcess = null;
 
-            console.log('[tvm-inference] Process exited with code:', code);
+            console.log('[TVM DEBUG] Process completed with exit code:', code);
+            console.log('[TVM DEBUG] Full stdout output:', stdout);
+            console.log('[TVM DEBUG] Full stderr output:', stderr);
 
             if (code === 0) {
                 // Parse the output for results
                 try {
+                    console.log('[TVM DEBUG] Parsing inference output...');
                     inferenceResults = parseInferenceOutput(stdout);
+                    console.log('[TVM DEBUG] Parsed results:', inferenceResults);
 
                     // Broadcast results to WebSocket clients
+                    console.log('[TVM DEBUG] Broadcasting results to WebSocket clients');
                     if (wss && wss.clients) {
                         const message = JSON.stringify({
                             type: 'tvm-inference-complete',
@@ -118,10 +129,12 @@ module.exports = function registerTvmInference(app, wss, device) {
             };
         });
 
-        res.json({
+        const response = {
             status: 'started',
             message: 'TVM inference started on C7x DSP'
-        });
+        };
+        console.log('[TVM DEBUG] Sending response to client:', response);
+        res.json(response);
     });
 
     /* Get inference status and results */
