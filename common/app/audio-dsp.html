@@ -448,9 +448,12 @@
                             <div style="font-size:11px;color:#64748b;">INT8 · Audio Classification · C7x DSP</div>
                         </div>
                     </div>
-                    <!-- Source toggle -->
-                    <div class="sub-ttl">Audio Source</div>
-                    <div style="display:flex;gap:6px;">
+                    <!-- Input is owned by the RPMsg application on the target. -->
+                    <div class="sub-ttl">RPMsg Input</div>
+                    <div style="font-size:12px;color:#94a3b8;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:9px 10px;">
+                        <code>/usr/share/input.wav</code> &mdash; noisy sine test signal on the AM62D filesystem
+                    </div>
+                    <div style="display:none;gap:6px;">
                         <button id="src-live-btn" onclick="setAudioSource('live')" style="flex:1;padding:6px 8px;background:#1d4ed8;border:1px solid #2563eb;color:#e2e8f0;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                             Live Mic
@@ -568,7 +571,7 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Audio File panel -->
+                    <!-- Kept hidden: RPMsg reads its predefined target-side WAV file. -->
                     <div id="sp-src-file-panel" style="display:none;">
                         <div class="sub-ttl">Audio File</div>
                         <div id="speech-file-drop"
@@ -577,10 +580,10 @@
                              ondragleave="this.style.borderColor='#1e3a5f'"
                              ondrop="event.preventDefault();this.style.borderColor='#1e3a5f';onSpeechFileDropped(event)"
                              style="border:1.5px dashed #1e3a5f;background:#05080f;border-radius:6px;padding:14px 12px;text-align:center;cursor:pointer;transition:border-color .15s;">
-                            <input type="file" id="speech-file-input" accept=".wav,.mp3,.ogg,.flac,.aac,.m4a" style="display:none" onchange="onSpeechFileSelected(this)">
+                            <input type="file" id="speech-file-input" accept=".wav,audio/wav" style="display:none" onchange="onSpeechFileSelected(this)">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" style="margin-bottom:5px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             <div id="speech-file-name" style="color:#64748b;font-size:12px;">Click or drag audio file here</div>
-                            <div style="font-size:10px;color:#334155;margin-top:3px;">WAV &bull; MP3 &bull; OGG &bull; FLAC &bull; AAC</div>
+                            <div style="font-size:10px;color:#334155;margin-top:3px;">16-bit mono PCM WAV &bull; 16 kHz recommended</div>
                         </div>
                     </div>
                     <!-- Status -->
@@ -655,9 +658,9 @@
                     <div id="speech-results" style="overflow-y:auto;background:#05080f;border:1px solid #1e2a3a;border-radius:6px;padding:8px;min-height:80px;max-height:150px;font-size:12px;">
                         <div style="color:#475569;text-align:center;padding:16px 0;" id="speech-results-placeholder">Enhancement metrics will appear here when running</div>
                     </div>
-                    <button id="speech-run-btn" class="btn-run-this" onclick="toggleSpectrumDemo()">
+                    <button id="speech-run-btn" class="btn-run-this" onclick="toggleSpeechEnhancement()">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
-                        Start Spectrum
+                        Run Edge-AI Speech Enhancement
                     </button>
                 </div>
 
@@ -708,9 +711,9 @@ const DEMOS = [
         preset: "treble"
     },
     {
-        desc: "Real-time speech enhancement combining noise reduction on C7x DSP with TIDL-accelerated speech quality improvement. Delivers clean, intelligible audio at low latency.",
-        features: ["Noise reduction on C7x DSP","TIDL-accelerated speech enhancement","Low latency real-time processing","Background noise suppression","Improved speech intelligibility"],
-        tags: ["Noise Reduction","TIDL","C7x DSP"],
+        desc: "Speech enhancement using the Edge-AI RPMsg pipeline: input PCM is streamed through STFT, a configurable Neo-TVM stage, and ISTFT on the C7x DSP.",
+        features: ["RPMsg DMA buffer streaming","STFT → Neo-TVM → ISTFT pipeline","Live input and output spectrum","C7x processing telemetry","Input and enhanced WAV playback"],
+        tags: ["RPMsg DMA","Neo-TVM","C7x DSP"],
         preset: "vocal"
     }
 ];
@@ -724,7 +727,7 @@ let _audioSource  = 'live';
 let _audioFile    = null;
 let speechRunning = false;
 let speechWs      = null;
-let _speechSource = 'live';
+let _speechSource = 'file';
 let _speechFile   = null;
 
 /* ── DEMO SELECTION ── */
@@ -743,7 +746,7 @@ document.querySelectorAll('.dsi').forEach((el, i) => {
         document.getElementById('live-speech-section').style.display = isSpeech ? 'flex' : 'none';
         _setRunBtnState(isTvm);
         if (isAudio)       { loadAudioDevices(); loadAudioOutputDevices(); }
-        else if (isSpeech) { loadSpeechDevices(); loadSpeechOutputDevices(); }
+        else if (isSpeech) { loadSpeechOutputDevices(); }
         else if (!isTvm) {
             document.getElementById('desc-body').textContent = d.desc;
             document.getElementById('feat-list').innerHTML = d.features.map(f => `<li><span class="chk">&#10003;</span> ${f}</li>`).join('');
@@ -1039,39 +1042,18 @@ function toggleSpeechEnhancement() {
 
 function startSpeechEnhancement() {
     setSpeechStatus('Starting...', '#f59e0b', false);
+    // Subscribe before starting the short-buffer RPMsg job so its first input
+    // frame is never emitted before the browser has joined /speech.
+    connectSpeechWs();
 
-    if (_speechSource === 'file') {
-        if (!_speechFile) {
-            setSpeechStatus('Select an audio file first', '#ef4444', false);
-            return;
-        }
-        const ext = (_speechFile.name.split('.').pop() || 'wav').toLowerCase();
-        setSpeechStatus('Uploading file...', '#f59e0b', false);
-        _speechFile.arrayBuffer()
-            .then(buf => fetch('/upload-speech-enhancement-file?ext=' + encodeURIComponent(ext), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/octet-stream', 'x-file-ext': ext },
-                body: buf
-            }))
-            .then(r => { if (!r.ok) throw new Error('Upload failed HTTP ' + r.status); return r.json(); })
-            .then(data => fetch('/start-speech-enhancement?source=file&filepath=' + encodeURIComponent(data.path)))
+    {
+        setSpeechStatus('Starting RPMsg pipeline...', '#f59e0b', false);
+        fetch('/start-speech-enhancement')
             .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
             .then(() => {
                 speechRunning = true;
                 setSpeechStatus('Processing file...', '#22c55e', true);
                 updateSpeechRunBtn(true);
-                connectSpeechWs();
-            })
-            .catch(err => setSpeechStatus('Error: ' + err.message, '#ef4444', false));
-    } else {
-        const dev = document.getElementById('speech-device-sel').value || 'default';
-        fetch('/start-speech-enhancement?device=' + encodeURIComponent(dev))
-            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-            .then(() => {
-                speechRunning = true;
-                setSpeechStatus('Live - enhancing speech', '#22c55e', true);
-                updateSpeechRunBtn(true);
-                connectSpeechWs();
             })
             .catch(err => setSpeechStatus('Error: ' + err.message, '#ef4444', false));
     }
@@ -1094,6 +1076,8 @@ function connectSpeechWs() {
         try {
             const data = JSON.parse(e.data);
             if (data.label) addSpeechResult(data.label, data.timestamp);
+            if (data.type === 'metric') addSpeechResult(data.label, data.timestamp);
+            if (data.type === 'error') setSpeechStatus('Error: ' + data.message, '#ef4444', false);
             if (data.type === 'spectrum') {
                 const w = data.channel === 'output' ? 'out' : 'in';
                 drawSpectrumColumn(w, data.pcm);
@@ -1101,6 +1085,7 @@ function connectSpeechWs() {
             }
             if (data.type === 'spectrum_done') {
                 _spectrumRunning = false;
+                speechRunning = false;
                 updateSpeechRunBtn(false);
                 setSpeechStatus('Spectrum complete — audio ready for playback', '#22c55e', false);
                 _enableSpeechPlayer('in',  data.inputUrl);

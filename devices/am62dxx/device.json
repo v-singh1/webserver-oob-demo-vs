@@ -11,6 +11,14 @@
   "soc": "AM62Dx quad Cortex-A53 @ 1.4GHz + C7x DSP",
   "demos": ["cpu-monitor", "tvm-inference", "audio-classification", "speech-enhancement", "audio-offload", "2dfft", "sigchain-biquad"],
   "demoConfig": {
+    "speech-enhancement": {
+      "edgeAiBinary": "/usr/bin/rpmsg_inference_example",
+      "pipelinePath": "/usr/share/webserver-oob/demos/speech-enhancement/audio_pipeline_clean.json",
+      "artifactsPath": "/usr/share/edge-ai/artifacts",
+      "inputPath": "/usr/share/input.wav",
+      "streamSocket": "/tmp/edge-ai-speech.sock",
+      "outputName": "processed_output.wav"
+    },
     "tvm-inference": {
       "artifactsPath": "/root/artifacts_mobilenet_v2_tv-onnx/",
       "modelName": "MobileNet v2",

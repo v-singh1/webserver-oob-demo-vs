@@ -2,8 +2,8 @@
   "id": "speech-enhancement",
   "name": "Speech Enhancement",
   "icon": "av:mic",
-  "description": "Real-time speech enhancement combining noise reduction on C7x DSP with TIDL-accelerated speech quality improvement",
+  "description": "Edge-AI RPMsg speech pipeline with C7x STFT/ISTFT processing, buffer streaming, and a configurable Neo-TVM stage",
   "devices": ["am62dxx"],
-  "routes": ["/speech-devices", "/upload-speech-enhancement-file", "/start-speech-enhancement", "/stop-speech-enhancement"],
+  "routes": ["/speech-devices", "/speech-output-devices", "/upload-speech-enhancement-file", "/start-speech-enhancement", "/stop-speech-enhancement", "/speech-enhancement/status", "/speech-enhancement/wav"],
   "websocket": "/speech"
 }

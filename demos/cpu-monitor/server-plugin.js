@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2026 Texas Instruments Incorporated - http://www.ti.com/
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *
@@ -45,7 +45,7 @@ module.exports = function registerCpuMonitor(app, wss, device) {
     /* System info */
     app.get('/run-uname', (req, res) => {
         if (MOCK) {
-            return res.send('Linux mock-device 6.1.0-mock #1 SMP PREEMPT Thu Jan 1 00:00:00 UTC 2024 armv7l armv7l GNU/Linux');
+            return res.send('Linux mock-device 6.1.0-mock #1 SMP PREEMPT Thu Jan 1 00:00:00 UTC 2026 armv7l armv7l GNU/Linux');
         }
         exec('uname -a', (error, stdout) => {
             if (error) {
