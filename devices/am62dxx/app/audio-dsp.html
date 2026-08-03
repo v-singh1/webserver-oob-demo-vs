@@ -261,12 +261,12 @@
                 </div>
 
                 <div class="dsi active" data-demo="0">
-                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
+                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#0d3a2e,#062018);border:2px solid #059669;color:#34d399">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                     </div>
                     <div class="dsi-txt">
-                        <div class="dsi-name">TVM Inference</div>
-                        <div class="dsi-sub">MobileNet v2 on C7x DSP via TIDL</div>
+                        <div class="dsi-name">Speech Enhancement</div>
+                        <div class="dsi-sub">C7x DSP noise reduction + TIDL</div>
                     </div>
                     <span class="dsi-arr">›</span>
                 </div>
@@ -283,12 +283,12 @@
                 </div>
 
                 <div class="dsi" data-demo="2">
-                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#0d3a2e,#062018);border:2px solid #059669;color:#34d399">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                    <div class="dsi-ic" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
                     </div>
                     <div class="dsi-txt">
-                        <div class="dsi-name">Speech Enhancement</div>
-                        <div class="dsi-sub">C7x DSP noise reduction + TIDL</div>
+                        <div class="dsi-name">TVM Inference</div>
+                        <div class="dsi-sub">MobileNet v2 on C7x DSP via TIDL</div>
                     </div>
                     <span class="dsi-arr">›</span>
                 </div>
@@ -360,7 +360,7 @@
                 </div>
 
                 <!-- Live TVM Inference panel (shown when TVM demo is selected) -->
-                <div id="live-tvm-section" style="display:flex;flex-direction:column;gap:10px;flex:1;">
+                <div id="live-tvm-section" style="display:none;flex-direction:column;gap:10px;flex:1;">
                     <p class="desc-text">Hardware-accelerated ML inference using TVM+TIDL on AM62D C7x DSP. Benchmarks MobileNet v2 INT8 quantized model for edge AI performance measurement.</p>
                     <hr class="card-divider">
                     <div class="sub-ttl">Model</div>
@@ -376,34 +376,6 @@
                     <div style="display:flex;align-items:center;gap:7px;font-size:12px;">
                         <span id="tvm-demo-dot" style="width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;"></span>
                         <span id="tvm-demo-status" style="color:#64748b;">Ready</span>
-                    </div>
-                    <hr class="card-divider">
-                    <div class="sub-ttl sf-toggle" onclick="toggleSigFlow(this)">Signal Flow <svg class="sf-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg></div>
-                    <div class="sf-body">
-                    <div class="sig-flow">
-                        <div class="sf-node">
-                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 5,7 7,15 10,5 12,18 15,9 17,14 20,11 22,12"/></svg>
-                            </div>
-                            <div class="sf-lbl-main" style="color:#60a5fa">Input</div>
-                            <div class="sf-lbl-sub">(ADC)</div>
-                        </div>
-                        <span class="sf-arr">&#8594;</span>
-                        <div class="sf-node">
-                            <div class="sf-rect" style="background:#0a2d1e;border:2px solid #059669;color:#34d399">
-                                <div style="font-size:11px;font-weight:700;color:#34d399">C7x DSP</div>
-                                <div style="font-size:10px;color:#6ee7b7;margin-top:2px">Processing</div>
-                            </div>
-                        </div>
-                        <span class="sf-arr">&#8594;</span>
-                        <div class="sf-node">
-                            <div class="sf-circle" style="background:radial-gradient(circle at 40% 40%,#3b1c68,#1e0d40);border:2px solid #7c3aed;color:#c084fc">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                            </div>
-                            <div class="sf-lbl-main" style="color:#c084fc">Output</div>
-                            <div class="sf-lbl-sub">(DAC)</div>
-                        </div>
-                    </div>
                     </div>
                     <div id="tvm-demo-results" style="display:none;">
                         <div class="sub-ttl">Results</div>
@@ -523,7 +495,7 @@
                 </div>
 
                 <!-- Live Speech Enhancement panel -->
-                <div id="live-speech-section" style="display:none;flex-direction:column;gap:10px;flex:1;">
+                <div id="live-speech-section" style="display:flex;flex-direction:column;gap:10px;flex:1;">
                     <p class="desc-text">Real-time speech enhancement combining noise reduction on C7x DSP with TIDL-accelerated speech quality improvement.</p>
                     <hr class="card-divider">
                     <div class="sub-ttl">Model</div>
@@ -699,10 +671,10 @@
 /* ── DEMO DATA ── */
 const DEMOS = [
     {
-        desc: "Hardware-accelerated ML inference using TVM+TIDL runtime on AM62D C7x DSP. Benchmarks MobileNet v2 quantized to INT8 for edge AI performance.",
-        features: ["TVM+TIDL runtime on C7x DSP","MobileNet v2 INT8 quantized","Avg / Min / Max latency metrics","FPS throughput measurement","Top-5 predictions output"],
-        tags: ["AI / ML","TVM Inference"],
-        preset: "flat"
+        desc: "Real-time speech enhancement combining noise reduction on C7x DSP with TIDL-accelerated speech quality improvement. Delivers clean, intelligible audio at low latency.",
+        features: ["Noise reduction on C7x DSP","TIDL-accelerated speech enhancement","Low latency real-time processing","Background noise suppression","Improved speech intelligibility"],
+        tags: ["Noise Reduction","TIDL","C7x DSP"],
+        preset: "vocal"
     },
     {
         desc: "AI-powered audio event classification using TIDL inference engine on C7x DSP. Detects and classifies environmental audio events in real-time.",
@@ -711,16 +683,16 @@ const DEMOS = [
         preset: "treble"
     },
     {
-        desc: "Speech enhancement using the Edge-AI RPMsg pipeline: input PCM is streamed through STFT, a configurable Neo-TVM stage, and ISTFT on the C7x DSP.",
-        features: ["RPMsg DMA buffer streaming","STFT → Neo-TVM → ISTFT pipeline","Live input and output spectrum","C7x processing telemetry","Input and enhanced WAV playback"],
-        tags: ["RPMsg DMA","Neo-TVM","C7x DSP"],
-        preset: "vocal"
+        desc: "Hardware-accelerated ML inference using TVM+TIDL runtime on AM62D C7x DSP. Benchmarks MobileNet v2 quantized to INT8 for edge AI performance.",
+        features: ["TVM+TIDL runtime on C7x DSP","MobileNet v2 INT8 quantized","Avg / Min / Max latency metrics","FPS throughput measurement","Top-5 predictions output"],
+        tags: ["AI / ML","TVM Inference"],
+        preset: "flat"
     }
 ];
 
-const TVM_DEMO_IDX    = 0;
+const SPEECH_IDX      = 0;
 const AUDIO_CLASS_IDX = 1;
-const SPEECH_IDX      = 2;
+const TVM_DEMO_IDX    = 2;
 let audioRunning  = false;
 let audioWs       = null;
 let _audioSource  = 'live';
@@ -1847,7 +1819,7 @@ function toggleTheme() {
 }
 (function(){ if(document.documentElement.dataset.theme==='light'){ const b=document.getElementById('theme-btn'); if(b) b.innerHTML='&#9790;'; } })();
 
-document.addEventListener('DOMContentLoaded', () => { _checkDspOverlayConflict(); _HC.start(); });
+document.addEventListener('DOMContentLoaded', () => { _checkDspOverlayConflict(); _HC.start(); loadSpeechDevices(); loadSpeechOutputDevices(); _setRunBtnState(false); });
 </script>
 
 <!-- ── DSP audio overlay conflict modal ── -->
