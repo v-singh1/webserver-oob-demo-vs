@@ -5,9 +5,9 @@
     </div>
     <template v-else>
       <div class="timing-header">
-        <span>Chunk</span>
+        <span>Frames</span>
         <span>Pre-Processing (STFT)</span>
-        <span>Model Inference (TVM)</span>
+        <span>Model Inference (GCRN)</span>
         <span>Post-Processing (ISTFT)</span>
         <span>Total Time</span>
       </div>

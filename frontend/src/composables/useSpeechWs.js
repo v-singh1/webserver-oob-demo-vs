@@ -1,16 +1,19 @@
 import { ref, shallowRef, onUnmounted } from 'vue'
 
 export function useSpeechWs() {
-  const connected   = ref(false)
-  const running     = ref(false)
-  const statusMsg   = ref('Idle')
-  const statusColor = ref('secondary')
-  const error       = ref(null)
-  const chunkTimings = ref([])         // [{ chunk, total, stft, tvm, istft, totalMs }]
-  const inputPcm    = shallowRef(null)  // { pcm: Int16Array, sampleRate }
-  const outputPcm   = shallowRef(null)
-  const downloadUrls = ref(null)       // { inputUrl, outputUrl } after done
-  const metrics     = ref([])          // string[]
+  const connected    = ref(false)
+  const running      = ref(false)
+  const statusMsg    = ref('Idle')
+  const statusColor  = ref('secondary')
+  const error        = ref(null)
+  const chunkTimings  = ref([])         // [{ chunk, total, frameStart, frameEnd, stft, tvm, istft, totalMs }]
+  const runKey        = ref(0)          // increments on each new run — canvases watch this to clear history
+  const inputPcm      = shallowRef(null)
+  const outputPcm     = shallowRef(null)
+  const inputBuffer   = []              // accumulate all input frames for continuous waveform
+  const outputBuffer  = []              // accumulate all output frames
+  const downloadUrls = ref(null)
+  const metrics      = ref([])
 
   let ws = null
 
@@ -18,7 +21,7 @@ export function useSpeechWs() {
     if (ws) return
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
     ws = new WebSocket(`${proto}://${location.host}/speech`)
-    ws.onopen = () => { connected.value = true }
+    ws.onopen  = () => { connected.value = true }
     ws.onclose = () => { connected.value = false; ws = null }
     ws.onerror = () => { connected.value = false }
     ws.onmessage = (ev) => {
@@ -36,6 +39,7 @@ export function useSpeechWs() {
       case 'chunk_timing':
         chunkTimings.value = [...chunkTimings.value, {
           chunk: msg.chunk, total: msg.total,
+          frameStart: msg.frameStart ?? null, frameEnd: msg.frameEnd ?? null,
           stft: msg.stft, tvm: msg.tvm, istft: msg.istft, totalMs: msg.totalMs,
         }]
         break
@@ -69,20 +73,28 @@ export function useSpeechWs() {
     const bytes  = new Uint8Array(binary.length)
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
     const int16  = new Int16Array(bytes.buffer)
-    if (msg.channel === 'input')  inputPcm.value  = { pcm: int16, sampleRate: msg.sampleRate }
-    if (msg.channel === 'output') outputPcm.value = { pcm: int16, sampleRate: msg.sampleRate }
+
+    // For waveform: accumulate all frames; for spectrogram: show latest frame only
+    if (msg.channel === 'input') {
+      inputBuffer.push(...int16)
+      inputPcm.value = { pcm: new Int16Array(inputBuffer), sampleRate: msg.sampleRate }
+    } else {
+      outputBuffer.push(...int16)
+      outputPcm.value = { pcm: new Int16Array(outputBuffer), sampleRate: msg.sampleRate }
+    }
   }
 
   function reset() {
+    runKey.value++
     chunkTimings.value = []
-    metrics.value     = []
-    error.value       = null
+    metrics.value      = []
+    error.value        = null
     downloadUrls.value = null
-    inputPcm.value    = null
-    outputPcm.value   = null
-    statusMsg.value   = 'Starting…'
-    statusColor.value = 'primary'
-    running.value     = true
+    inputPcm.value     = null
+    outputPcm.value    = null
+    statusMsg.value    = 'Starting…'
+    statusColor.value  = 'primary'
+    running.value      = true
   }
 
   async function start(filePath) {
@@ -108,5 +120,5 @@ export function useSpeechWs() {
   onUnmounted(() => { if (ws) ws.close() })
   connect()
 
-  return { connected, running, statusMsg, statusColor, error, chunkTimings, inputPcm, outputPcm, downloadUrls, metrics, start, stop }
+  return { connected, running, statusMsg, statusColor, error, chunkTimings, runKey, inputPcm, outputPcm, downloadUrls, metrics, start, stop }
 }

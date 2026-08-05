@@ -116,7 +116,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         const retry = () => {
             if (!job || MOCK || dmaSocket) return;
             const socket = net.createConnection(streamSocket);
-            socket.on('connect', () => { dmaSocket = socket; send({ type: 'metric', label: 'Connected to RPMsg DMA audio stream' }); });
+            socket.on('connect', () => { dmaSocket = socket; send({ type: 'metric', label: 'Speech Enhancement Running' }); });
             socket.on('data', chunk => {
                 dmaBuffer = Buffer.concat([dmaBuffer, chunk]);
                 while (dmaBuffer.length >= 13) {
@@ -134,7 +134,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         retry();
     }
 
-    function streamWav(channel, filename, done) {
+    function streamWav(channel, filename, done, cancelRef) {
         let source;
         try { source = readPcmWav(filename); }
         catch (error) { send({ type: 'error', message: error.message }); return done && done(error); }
@@ -143,7 +143,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         let offset = 0;
         const periodMs = Math.max(1, Math.round(frameBytes / 2 / source.sampleRate * 1000));
         const emit = () => {
-            if (!job || job.cancelled) return;
+            if (cancelRef ? cancelRef.cancelled : (!job || job.cancelled)) return;
             if (offset >= source.pcm.length) return done && done();
             const pcm = source.pcm.subarray(offset, Math.min(offset + frameBytes, source.pcm.length));
             offset += pcm.length;
@@ -167,19 +167,10 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
             job = null;
             return;
         }
-        if (finished.dmaFrames) {
-            send({ type: 'spectrum_done', inputUrl: '/speech-enhancement/wav?channel=input', outputUrl: '/speech-enhancement/wav?channel=output' });
-            lastCompletedJob = finished;
-            job = null;
-            return;
-        }
-        send({ type: 'metric', label: 'C7x processing complete — streaming enhanced output' });
-        streamWav('output', finished.outputPath, () => {
-            if (job !== finished) return;
-            send({ type: 'spectrum_done', inputUrl: '/speech-enhancement/wav?channel=input', outputUrl: '/speech-enhancement/wav?channel=output' });
-            lastCompletedJob = finished;
-            job = null;
-        });
+        lastCompletedJob = finished;
+        job = null;
+        // Send completion immediately — live DMA frames already populated the canvases during processing
+        send({ type: 'spectrum_done', inputUrl: '/speech-enhancement/wav?channel=input', outputUrl: '/speech-enhancement/wav?channel=output' });
     }
 
     function startEdgeAi(inputPath) {
@@ -214,22 +205,30 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         job.process = child;
         console.log('[speech-enhancement] child process spawned, pid:', child.pid);
         connectDmaStream();
+        let frameOffset = 0;
         const collect = data => {
             const text = data.toString();
             if (job) job.stdout += text;
             console.log('[speech-enhancement] child stdout:', text.trim());
             text.split('\n').filter(Boolean).forEach(line => {
-                // [App] Chunk N/M | STFT=Xms TVM=Xms ISTFT=Xms total=Xms
-                const chunkMatch = line.match(/\[App\]\s+Chunk\s+(\d+)\/(\d+)\s*\|\s*STFT=([\d.]+)ms\s+TVM=([\d.]+)ms\s+ISTFT=([\d.]+)ms\s+total=([\d.]+)ms/i);
+                // [App] Chunk N/M [F real frames + zero-pad] | STFT=Xms TVM=Xms ISTFT=Xms total=Xms
+                const chunkMatch = line.match(/\[App\]\s+Chunk\s+(\d+)\/(\d+)\s*(?:\[(\d+)\s+real\s+frames[^\]]*\])?\s*\|\s*STFT=([\d.]+)ms\s+TVM=([\d.]+)ms\s+ISTFT=([\d.]+)ms\s+total=([\d.]+)ms/i);
                 if (chunkMatch) {
+                    const chunk = parseInt(chunkMatch[1]);
+                    const framesThisChunk = chunkMatch[3] ? parseInt(chunkMatch[3]) : 0;
+                    const frameStart = framesThisChunk > 0 ? frameOffset : null;
+                    const frameEnd   = framesThisChunk > 0 ? frameOffset + framesThisChunk - 1 : null;
+                    if (framesThisChunk > 0) frameOffset += framesThisChunk;
                     send({
-                        type:    'chunk_timing',
-                        chunk:   parseInt(chunkMatch[1]),
-                        total:   parseInt(chunkMatch[2]),
-                        stft:    parseFloat(chunkMatch[3]),
-                        tvm:     parseFloat(chunkMatch[4]),
-                        istft:   parseFloat(chunkMatch[5]),
-                        totalMs: parseFloat(chunkMatch[6]),
+                        type:       'chunk_timing',
+                        chunk,
+                        total:      parseInt(chunkMatch[2]),
+                        frameStart,
+                        frameEnd,
+                        stft:       parseFloat(chunkMatch[4]),
+                        tvm:        parseFloat(chunkMatch[5]),
+                        istft:      parseFloat(chunkMatch[6]),
+                        totalMs:    parseFloat(chunkMatch[7]),
                     });
                 }
                 if (/Pipeline completed successfully/i.test(line)) { send({ type: 'metric', label: 'Pipeline completed successfully' }); }

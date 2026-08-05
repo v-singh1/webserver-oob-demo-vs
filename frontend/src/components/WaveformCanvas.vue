@@ -10,29 +10,34 @@ const props = defineProps({
   color:    { type: String, default: '#4da6ff' },
   bgColor:  { type: String, default: '#05080f' },
   height:   { type: Number, default: 64 },
+  runKey:   { type: Number, default: 0 },
 })
 
-const canvasEl = ref(null)
+const canvasEl  = ref(null)
+let   lastPcm   = null   // retain last drawn pcm so resize can redraw
 
+watch(() => props.runKey,   () => { lastPcm = null; drawEmpty() })
 watch(() => props.pcmFrame, () => draw())
-watch(() => [props.color, props.bgColor], () => props.pcmFrame ? draw() : drawEmpty())
+watch(() => [props.color, props.bgColor], () => lastPcm ? draw() : drawEmpty())
 
 onMounted(() => drawEmpty())
 
 function draw() {
+  if (props.pcmFrame?.pcm) lastPcm = props.pcmFrame
   const canvas = canvasEl.value
   if (!canvas) return
   const w = canvas.offsetWidth || canvas.width
-  canvas.width = w
+  if (canvas.width !== w) canvas.width = w   // only reset when size actually changed
   const ctx = canvas.getContext('2d')
   const h = props.height
 
   ctx.fillStyle = props.bgColor
   ctx.fillRect(0, 0, w, h)
 
-  if (!props.pcmFrame?.pcm) { drawEmpty(); return }
+  const frame = props.pcmFrame ?? lastPcm
+  if (!frame?.pcm) { drawEmpty(); return }
 
-  const pcm  = props.pcmFrame.pcm
+  const pcm  = frame.pcm
   const midY = h / 2
 
   // Filled area above and below center
@@ -76,7 +81,7 @@ function drawEmpty() {
   const canvas = canvasEl.value
   if (!canvas) return
   const w = canvas.offsetWidth || canvas.width
-  canvas.width = w
+  if (canvas.width !== w) canvas.width = w
   const ctx = canvas.getContext('2d')
   const h = props.height
 

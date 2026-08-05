@@ -10,12 +10,15 @@ const props = defineProps({
   colorMap: { type: String, default: 'blue' },  // 'blue' | 'green'
   bgColor:  { type: String, default: '#05080f' },
   height:   { type: Number, default: 100 },
+  runKey:   { type: Number, default: 0 },
 })
 
 const canvasEl = ref(null)
 const history  = []      // Float32Array[] — one entry per received frame
 const NUM_BINS = 96      // more frequency bins → finer resolution
 const MAX_COLS = 200     // history length (time axis)
+
+watch(() => props.runKey, () => { history.length = 0; drawEmpty() })
 
 watch(() => props.pcmFrame, (frame) => {
   if (!frame?.pcm) return
@@ -35,7 +38,7 @@ function render() {
   const canvas = canvasEl.value
   if (!canvas) return
   const w = canvas.offsetWidth || canvas.width
-  canvas.width = w
+  if (canvas.width !== w) canvas.width = w
   const h   = props.height
   const ctx = canvas.getContext('2d')
 
@@ -86,7 +89,7 @@ function drawEmpty() {
   const canvas = canvasEl.value
   if (!canvas) return
   const w = canvas.offsetWidth || canvas.width
-  canvas.width = w
+  if (canvas.width !== w) canvas.width = w
   const ctx = canvas.getContext('2d')
   const [r, g, b] = hexToRgb(props.bgColor)
   ctx.fillStyle = `rgb(${r},${g},${b})`

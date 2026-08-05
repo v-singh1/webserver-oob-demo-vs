@@ -117,11 +117,11 @@
       <div class="viz-grid">
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: inputColor }">Input (Noisy)</div>
-          <SpectrogramCanvas :pcm-frame="ws.inputPcm.value" color-map="blue" :bg-color="spectBg" :height="160" />
+          <SpectrogramCanvas :pcm-frame="ws.inputPcm.value" color-map="blue" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" />
         </div>
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: outputColor }">Output (Enhanced)</div>
-          <SpectrogramCanvas :pcm-frame="ws.outputPcm.value" color-map="green" :bg-color="spectBg" :height="160" />
+          <SpectrogramCanvas :pcm-frame="ws.outputPcm.value" color-map="green" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" />
         </div>
       </div>
 
@@ -130,18 +130,18 @@
       <div class="viz-grid">
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: inputColor }">Input (Noisy)</div>
-          <WaveformCanvas :pcm-frame="ws.inputPcm.value" :color="inputColor" :bg-color="canvasBg" :height="90" />
+          <WaveformCanvas :pcm-frame="ws.inputPcm.value" :color="inputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" />
         </div>
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: outputColor }">Output (Enhanced)</div>
-          <WaveformCanvas :pcm-frame="ws.outputPcm.value" :color="outputColor" :bg-color="canvasBg" :height="90" />
+          <WaveformCanvas :pcm-frame="ws.outputPcm.value" :color="outputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" />
         </div>
       </div>
     </v-card>
 
     <!-- Chunk timing table -->
     <v-card class="ti-card" flat>
-      <div class="card-ttl">Chunk Processing Times</div>
+      <div class="card-ttl">Processing Times</div>
       <RmsTable :rows="ws.chunkTimings.value" />
     </v-card>
 
@@ -149,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import { useSpeechWs }    from '@/composables/useSpeechWs'
 import SpectrogramCanvas from '@/components/SpectrogramCanvas.vue'
@@ -166,7 +166,10 @@ const spectBg     = computed(() => isLight.value ? '#0f172a' : '#020408')
 
 const emit = defineEmits(['running-change'])
 
-const ws           = useSpeechWs()
+const ws = useSpeechWs()
+
+// Emit running-change whenever ws.running changes (not just on manual start/stop)
+watch(() => ws.running.value, (v) => emit('running-change', v))
 const fileInfo     = ref(null)
 const uploadedPath = ref(null)
 const uploadError  = ref(null)
@@ -205,8 +208,8 @@ function useDefault() {
   if (fileInfo.value) fileInfo.value = { ...fileInfo.value }
 }
 
-async function run()  { await ws.start(uploadedPath.value || null); emit('running-change', true)  }
-async function stop() { await ws.stop();                            emit('running-change', false) }
+async function run()  { await ws.start(uploadedPath.value || null) }
+async function stop() { await ws.stop() }
 
 defineExpose({ run, stop, isRunning: ws.running })
 </script>

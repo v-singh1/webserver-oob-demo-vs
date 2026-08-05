@@ -12,15 +12,27 @@
           <div class="ph-sub">Real-time audio analytics powered by the C7x DSP — AI-enabled noise reduction, speech enhancement, and acoustic event detection on AM62D.</div>
         </div>
       </div>
-      <v-btn
-        :color="activeDemo?.isRunning?.value ? 'success' : 'primary'"
-        :prepend-icon="activeDemo?.isRunning?.value ? 'mdi-stop' : 'mdi-play'"
-        :disabled="!canRun"
-        class="run-btn"
-        @click="toggleRun"
-      >
-        {{ activeDemo?.isRunning?.value ? 'Stop Demo' : 'Run Demo' }}
-      </v-btn>
+      <div class="run-btn-group">
+        <v-btn
+          color="primary"
+          prepend-icon="mdi-play"
+          :disabled="!canRun || demoRunning"
+          class="run-btn"
+          @click="activeDemo?.run()"
+        >
+          Run Demo
+        </v-btn>
+        <v-btn
+          v-if="demoRunning"
+          color="error"
+          variant="outlined"
+          prepend-icon="mdi-stop"
+          class="run-btn"
+          @click="activeDemo?.stop()"
+        >
+          Stop
+        </v-btn>
+      </div>
     </div>
 
     <!-- Two-column content grid -->
@@ -93,28 +105,23 @@ const demos = [
   },
 ]
 
-const activeIdx       = ref(0)
-const activeDemo      = ref(null)
+const activeIdx        = ref(0)
+const activeDemo       = ref(null)
 const currentComponent = shallowRef(demos[0].component)
+const demoRunning      = ref(false)
 const canRun = computed(() => demos[activeIdx.value].canRun)
 
 function selectDemo(i) {
-  if (activeDemo.value?.isRunning?.value) return   // don't switch while running
-  activeIdx.value       = i
+  if (demoRunning.value) return
+  activeIdx.value        = i
   currentComponent.value = demos[i].component
+  demoRunning.value      = false
 }
 
-function toggleRun() {
-  if (!activeDemo.value) return
-  activeDemo.value.isRunning?.value ? activeDemo.value.stop() : activeDemo.value.run()
-}
-
-function onRunningChange(v) { /* state is tracked inside demo component via ref */ }
+function onRunningChange(v) { demoRunning.value = v }
 
 onUnmounted(() => {
-  if (activeDemo.value?.isRunning?.value) {
-    activeDemo.value.stop()
-  }
+  if (demoRunning.value) activeDemo.value?.stop()
 })
 </script>
 
@@ -133,6 +140,7 @@ onUnmounted(() => {
 .ph-icon  { width:50px; height:50px; border-radius:50%; flex-shrink:0; background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540); border:2px solid #1d4ed8; display:flex; align-items:center; justify-content:center; }
 .ph-title { font-size:21px; font-weight:800; color:rgb(var(--v-theme-on-background)); margin-bottom:3px; }
 .ph-sub   { font-size:13px; color:#64748b; }
+.run-btn-group { display:flex; gap:8px; align-items:center; }
 .run-btn  { font-weight:600; letter-spacing:0; text-transform:none; }
 
 /* Content grid */
