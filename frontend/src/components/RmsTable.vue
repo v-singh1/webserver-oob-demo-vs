@@ -1,25 +1,23 @@
 <template>
-  <div class="rms-table-wrap">
-    <div v-if="!batches.length" class="placeholder">
-      RMS values will appear per batch when running
+  <div class="timing-table-wrap">
+    <div v-if="!rows.length" class="placeholder">
+      Chunk timing will appear here when running
     </div>
     <template v-else>
-      <div class="rms-header">
-        <span>Batch</span>
-        <span>Windows</span>
-        <span>Samples</span>
-        <span>Bytes</span>
-        <span class="col-rms">RMS Variance</span>
+      <div class="timing-header">
+        <span>Chunk</span>
+        <span>Pre-Processing (STFT)</span>
+        <span>Model Inference (TVM)</span>
+        <span>Post-Processing (ISTFT)</span>
+        <span>Total Time</span>
       </div>
-      <div class="rms-rows">
-        <div v-for="b in batches" :key="b.num" class="rms-row">
-          <span>{{ b.num }}/{{ b.total }}</span>
-          <span>{{ b.windows }}</span>
-          <span>{{ b.sampleStart }}–{{ b.sampleEnd }}</span>
-          <span>{{ b.bytes }}</span>
-          <span class="col-rms" :style="{ color: rmsColor(b.value) }">
-            {{ b.value.toFixed(4) }}
-          </span>
+      <div class="timing-rows">
+        <div v-for="r in rows" :key="r.chunk" class="timing-row">
+          <span>{{ r.chunk }}/{{ r.total }}</span>
+          <span>{{ r.stft.toFixed(1) }} ms</span>
+          <span class="col-tvm">{{ r.tvm.toFixed(1) }} ms</span>
+          <span>{{ r.istft.toFixed(1) }} ms</span>
+          <span class="col-total">{{ r.totalMs.toFixed(1) }} ms</span>
         </div>
       </div>
     </template>
@@ -27,17 +25,11 @@
 </template>
 
 <script setup>
-defineProps({ batches: { type: Array, default: () => [] } })
-
-function rmsColor(v) {
-  if (v < 0.2) return '#22c55e'
-  if (v < 0.5) return '#f59e0b'
-  return '#ef4444'
-}
+defineProps({ rows: { type: Array, default: () => [] } })
 </script>
 
 <style scoped>
-.rms-table-wrap {
+.timing-table-wrap {
   background: rgb(var(--v-theme-surface-variant));
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 6px;
@@ -51,14 +43,14 @@ function rmsColor(v) {
   text-align: center;
   padding: 16px 0;
 }
-.rms-header, .rms-row {
+.timing-header, .timing-row {
   display: grid;
-  grid-template-columns: 60px 60px 1fr 60px 90px;
+  grid-template-columns: 50px 1fr 1fr 1fr 80px;
   padding: 4px 10px;
   gap: 8px;
   align-items: center;
 }
-.rms-header {
+.timing-header {
   position: sticky;
   top: 0;
   background: rgb(var(--v-theme-surface));
@@ -68,9 +60,10 @@ function rmsColor(v) {
   padding-top: 6px;
   padding-bottom: 6px;
 }
-.rms-row {
+.timing-row {
   color: #94a3b8;
   border-bottom: 1px solid rgba(255,255,255,0.03);
 }
-.col-rms { color: #4da6ff; }
+.col-tvm   { color: #4da6ff; }
+.col-total { color: #22c55e; font-weight: 600; }
 </style>

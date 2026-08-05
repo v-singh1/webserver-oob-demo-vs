@@ -139,10 +139,10 @@
       </div>
     </v-card>
 
-    <!-- RMS Variance table -->
+    <!-- Chunk timing table -->
     <v-card class="ti-card" flat>
-      <div class="card-ttl">RMS Variance per Batch</div>
-      <RmsTable :batches="ws.rmsBatches.value" />
+      <div class="card-ttl">Chunk Processing Times</div>
+      <RmsTable :rows="ws.chunkTimings.value" />
     </v-card>
 
   </div>

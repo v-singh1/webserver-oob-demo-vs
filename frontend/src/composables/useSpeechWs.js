@@ -6,7 +6,7 @@ export function useSpeechWs() {
   const statusMsg   = ref('Idle')
   const statusColor = ref('secondary')
   const error       = ref(null)
-  const rmsBatches  = ref([])         // [{ num, total, windows, sampleStart, sampleEnd, bytes, value }]
+  const chunkTimings = ref([])         // [{ chunk, total, stft, tvm, istft, totalMs }]
   const inputPcm    = shallowRef(null)  // { pcm: Int16Array, sampleRate }
   const outputPcm   = shallowRef(null)
   const downloadUrls = ref(null)       // { inputUrl, outputUrl } after done
@@ -33,11 +33,10 @@ export function useSpeechWs() {
       case 'spectrum':
         handleSpectrum(msg)
         break
-      case 'rms':
-        rmsBatches.value = [...rmsBatches.value, {
-          num: msg.num, total: msg.total, windows: msg.windows,
-          sampleStart: msg.sampleStart, sampleEnd: msg.sampleEnd,
-          bytes: msg.bytes, value: msg.value,
+      case 'chunk_timing':
+        chunkTimings.value = [...chunkTimings.value, {
+          chunk: msg.chunk, total: msg.total,
+          stft: msg.stft, tvm: msg.tvm, istft: msg.istft, totalMs: msg.totalMs,
         }]
         break
       case 'metric':
@@ -75,7 +74,7 @@ export function useSpeechWs() {
   }
 
   function reset() {
-    rmsBatches.value  = []
+    chunkTimings.value = []
     metrics.value     = []
     error.value       = null
     downloadUrls.value = null
@@ -109,5 +108,5 @@ export function useSpeechWs() {
   onUnmounted(() => { if (ws) ws.close() })
   connect()
 
-  return { connected, running, statusMsg, statusColor, error, rmsBatches, inputPcm, outputPcm, downloadUrls, metrics, start, stop }
+  return { connected, running, statusMsg, statusColor, error, chunkTimings, inputPcm, outputPcm, downloadUrls, metrics, start, stop }
 }
