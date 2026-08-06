@@ -11,6 +11,7 @@ const props = defineProps({
   bgColor:  { type: String, default: '#05080f' },
   height:   { type: Number, default: 64 },
   runKey:   { type: Number, default: 0 },
+  yZoom:    { type: Number, default: 1 },        // amplitude zoom multiplier
 })
 
 const canvasEl  = ref(null)
@@ -18,7 +19,7 @@ let   lastPcm   = null   // retain last drawn pcm so resize can redraw
 
 watch(() => props.runKey,   () => { lastPcm = null; drawEmpty() })
 watch(() => props.pcmFrame, () => draw())
-watch(() => [props.color, props.bgColor], () => lastPcm ? draw() : drawEmpty())
+watch(() => [props.color, props.bgColor, props.yZoom], () => lastPcm ? draw() : drawEmpty())
 
 onMounted(() => drawEmpty())
 
@@ -50,7 +51,7 @@ function draw() {
   ctx.moveTo(0, midY)
   for (let x = 0; x <= w; x++) {
     const idx = Math.floor(x * pcm.length / w)
-    const val = (pcm[Math.min(idx, pcm.length - 1)] / 32768) * midY * 0.9
+    const val = Math.max(-midY, Math.min(midY, (pcm[Math.min(idx, pcm.length - 1)] / 32768) * props.yZoom * midY * 0.9))
     ctx.lineTo(x, midY - val)
   }
   ctx.lineTo(w, midY)
@@ -63,7 +64,7 @@ function draw() {
   ctx.lineWidth = 1.5
   for (let x = 0; x <= w; x++) {
     const idx = Math.floor(x * pcm.length / w)
-    const val = (pcm[Math.min(idx, pcm.length - 1)] / 32768) * midY * 0.9
+    const val = Math.max(-midY, Math.min(midY, (pcm[Math.min(idx, pcm.length - 1)] / 32768) * props.yZoom * midY * 0.9))
     x === 0 ? ctx.moveTo(x, midY - val) : ctx.lineTo(x, midY - val)
   }
   ctx.stroke()

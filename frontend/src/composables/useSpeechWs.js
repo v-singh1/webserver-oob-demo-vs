@@ -6,12 +6,14 @@ export function useSpeechWs() {
   const statusMsg    = ref('Idle')
   const statusColor  = ref('secondary')
   const error        = ref(null)
-  const chunkTimings  = ref([])         // [{ chunk, total, frameStart, frameEnd, stft, tvm, istft, totalMs }]
-  const runKey        = ref(0)          // increments on each new run — canvases watch this to clear history
-  const inputPcm      = shallowRef(null)
-  const outputPcm     = shallowRef(null)
-  const inputBuffer   = []              // accumulate all input frames for continuous waveform
-  const outputBuffer  = []              // accumulate all output frames
+  const chunkTimings   = ref([])         // [{ chunk, total, frameStart, frameEnd, stft, tvm, istft, totalMs }]
+  const runKey         = ref(0)          // increments on each new run — canvases watch this to clear history
+  const inputPcmFrame  = shallowRef(null)  // latest frame → spectrogram FFT
+  const outputPcmFrame = shallowRef(null)
+  const inputPcm       = shallowRef(null)  // accumulated signal → waveform
+  const outputPcm      = shallowRef(null)
+  const inputBuffer    = []              // accumulate all input frames for continuous waveform
+  const outputBuffer   = []             // accumulate all output frames
   const downloadUrls = ref(null)
   const metrics      = ref([])
 
@@ -76,9 +78,11 @@ export function useSpeechWs() {
 
     // For waveform: accumulate all frames; for spectrogram: show latest frame only
     if (msg.channel === 'input') {
+      inputPcmFrame.value = { pcm: int16, sampleRate: msg.sampleRate }
       inputBuffer.push(...int16)
       inputPcm.value = { pcm: new Int16Array(inputBuffer), sampleRate: msg.sampleRate }
     } else {
+      outputPcmFrame.value = { pcm: int16, sampleRate: msg.sampleRate }
       outputBuffer.push(...int16)
       outputPcm.value = { pcm: new Int16Array(outputBuffer), sampleRate: msg.sampleRate }
     }
@@ -86,15 +90,19 @@ export function useSpeechWs() {
 
   function reset() {
     runKey.value++
-    chunkTimings.value = []
-    metrics.value      = []
-    error.value        = null
-    downloadUrls.value = null
-    inputPcm.value     = null
-    outputPcm.value    = null
-    statusMsg.value    = 'Starting…'
-    statusColor.value  = 'primary'
-    running.value      = true
+    chunkTimings.value   = []
+    metrics.value        = []
+    error.value          = null
+    downloadUrls.value   = null
+    inputPcmFrame.value  = null
+    outputPcmFrame.value = null
+    inputPcm.value       = null
+    outputPcm.value      = null
+    inputBuffer.length   = 0
+    outputBuffer.length  = 0
+    statusMsg.value      = 'Starting…'
+    statusColor.value    = 'primary'
+    running.value        = true
   }
 
   async function start(filePath) {
@@ -120,5 +128,5 @@ export function useSpeechWs() {
   onUnmounted(() => { if (ws) ws.close() })
   connect()
 
-  return { connected, running, statusMsg, statusColor, error, chunkTimings, runKey, inputPcm, outputPcm, downloadUrls, metrics, start, stop }
+  return { connected, running, statusMsg, statusColor, error, chunkTimings, runKey, inputPcmFrame, outputPcmFrame, inputPcm, outputPcm, downloadUrls, metrics, start, stop }
 }

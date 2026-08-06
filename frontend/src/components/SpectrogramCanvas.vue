@@ -11,20 +11,25 @@ const props = defineProps({
   bgColor:  { type: String, default: '#05080f' },
   height:   { type: Number, default: 100 },
   runKey:   { type: Number, default: 0 },
+  maxCols:  { type: Number, default: 200 },      // time-axis window (zoom)
 })
 
 const canvasEl = ref(null)
 const history  = []      // Float32Array[] — one entry per received frame
 const NUM_BINS = 96      // more frequency bins → finer resolution
-const MAX_COLS = 200     // history length (time axis)
 
 watch(() => props.runKey, () => { history.length = 0; drawEmpty() })
 
 watch(() => props.pcmFrame, (frame) => {
   if (!frame?.pcm) return
   history.push(computeMagnitudes(frame.pcm, NUM_BINS))
-  if (history.length > MAX_COLS) history.shift()
+  if (history.length > props.maxCols) history.shift()
   render()
+})
+
+watch(() => props.maxCols, (newCols) => {
+  while (history.length > newCols) history.shift()
+  history.length === 0 ? drawEmpty() : render()
 })
 
 watch(() => [props.bgColor, props.colorMap], () => {
@@ -61,8 +66,8 @@ function render() {
 
   for (let t = 0; t < history.length; t++) {
     const mags = history[t]
-    const x0 = Math.floor((t + MAX_COLS - history.length) * w / MAX_COLS)
-    const x1 = Math.min(w, Math.floor((t + MAX_COLS - history.length + 1) * w / MAX_COLS))
+    const x0 = Math.floor((t + props.maxCols - history.length) * w / props.maxCols)
+    const x1 = Math.min(w, Math.floor((t + props.maxCols - history.length + 1) * w / props.maxCols))
     if (x0 >= x1) continue
 
     for (let i = 0; i < NUM_BINS; i++) {

@@ -113,28 +113,50 @@
       <div class="card-ttl">Visualization</div>
 
       <!-- Spectrogram row -->
-      <div class="viz-section-lbl">Spectrogram</div>
+      <div class="viz-section-hdr">
+        <div class="viz-section-lbl">Spectrogram</div>
+        <div class="zoom-controls">
+          <v-btn icon size="x-small" variant="text" :disabled="spectZoomIdx === 0" @click="spectZoomIdx--" title="Zoom out (more history)">
+            <v-icon size="14">mdi-magnify-minus-outline</v-icon>
+          </v-btn>
+          <span class="zoom-label">{{ spectZoomLevels[spectZoomIdx] }}</span>
+          <v-btn icon size="x-small" variant="text" :disabled="spectZoomIdx === spectZoomLevels.length - 1" @click="spectZoomIdx++" title="Zoom in (fewer frames, more detail)">
+            <v-icon size="14">mdi-magnify-plus-outline</v-icon>
+          </v-btn>
+        </div>
+      </div>
       <div class="viz-grid">
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: inputColor }">Input (Noisy)</div>
-          <SpectrogramCanvas :pcm-frame="ws.inputPcm.value" color-map="blue" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" />
+          <SpectrogramCanvas :pcm-frame="ws.inputPcmFrame.value" color-map="blue" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
         </div>
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: outputColor }">Output (Enhanced)</div>
-          <SpectrogramCanvas :pcm-frame="ws.outputPcm.value" color-map="green" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" />
+          <SpectrogramCanvas :pcm-frame="ws.outputPcmFrame.value" color-map="green" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
         </div>
       </div>
 
       <!-- Waveform row -->
-      <div class="viz-section-lbl" style="margin-top:12px;">Waveform</div>
+      <div class="viz-section-hdr" style="margin-top:12px;">
+        <div class="viz-section-lbl">Waveform</div>
+        <div class="zoom-controls">
+          <v-btn icon size="x-small" variant="text" :disabled="waveZoomIdx === 0" @click="waveZoomIdx--" title="Zoom out">
+            <v-icon size="14">mdi-magnify-minus-outline</v-icon>
+          </v-btn>
+          <span class="zoom-label">{{ waveZoomLevels[waveZoomIdx] }}×</span>
+          <v-btn icon size="x-small" variant="text" :disabled="waveZoomIdx === waveZoomLevels.length - 1" @click="waveZoomIdx++" title="Zoom in (amplify)">
+            <v-icon size="14">mdi-magnify-plus-outline</v-icon>
+          </v-btn>
+        </div>
+      </div>
       <div class="viz-grid">
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: inputColor }">Input (Noisy)</div>
-          <WaveformCanvas :pcm-frame="ws.inputPcm.value" :color="inputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" />
+          <WaveformCanvas :pcm-frame="ws.inputPcm.value" :color="inputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
         </div>
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: outputColor }">Output (Enhanced)</div>
-          <WaveformCanvas :pcm-frame="ws.outputPcm.value" :color="outputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" />
+          <WaveformCanvas :pcm-frame="ws.outputPcm.value" :color="outputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
         </div>
       </div>
     </v-card>
@@ -173,6 +195,12 @@ watch(() => ws.running.value, (v) => emit('running-change', v))
 const fileInfo     = ref(null)
 const uploadedPath = ref(null)
 const uploadError  = ref(null)
+
+// Zoom controls
+const spectZoomLevels = [400, 200, 100, 50]    // maxCols: more = zoomed out (more history)
+const spectZoomIdx    = ref(1)                 // default 200
+const waveZoomLevels  = [1, 2, 4, 8]           // amplitude multiplier
+const waveZoomIdx     = ref(0)                 // default 1×
 
 const features = [
   'Noise reduction on C7x DSP',
@@ -293,7 +321,10 @@ defineExpose({ run, stop, isRunning: ws.running })
 @keyframes pulse    { 0%,100%{opacity:1}  50%{opacity:0.5} }
 
 /* Visualization */
-.viz-section-lbl { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+.viz-section-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.viz-section-lbl { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; }
+.zoom-controls   { display:flex; align-items:center; gap:4px; }
+.zoom-label      { font-size:10px; color:#94a3b8; min-width:32px; text-align:center; }
 .viz-grid        { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .viz-col         { display:flex; flex-direction:column; gap:4px; }
 .viz-ch-label    { font-size:12px; font-weight:700; margin-bottom:2px; }
