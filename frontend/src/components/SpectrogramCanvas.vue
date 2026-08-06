@@ -38,6 +38,8 @@ watch(() => [props.bgColor, props.colorMap], () => {
 
 onMounted(() => drawEmpty())
 
+defineExpose({ getCanvas: () => canvasEl.value })
+
 /* ── render ────────────────────────────────────────────────────────────── */
 function render() {
   const canvas = canvasEl.value

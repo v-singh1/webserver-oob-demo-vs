@@ -23,6 +23,8 @@ watch(() => [props.color, props.bgColor, props.yZoom], () => lastPcm ? draw() : 
 
 onMounted(() => drawEmpty())
 
+defineExpose({ getCanvas: () => canvasEl.value })
+
 function draw() {
   if (props.pcmFrame?.pcm) lastPcm = props.pcmFrame
   const canvas = canvasEl.value

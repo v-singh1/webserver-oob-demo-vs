@@ -110,7 +110,17 @@
 
     <!-- Visualization -->
     <v-card class="ti-card" flat>
-      <div class="card-ttl">Visualization</div>
+      <div class="card-ttl-row">
+        <div class="card-ttl">Visualization</div>
+        <v-btn
+          size="x-small"
+          variant="tonal"
+          color="primary"
+          prepend-icon="mdi-content-save-outline"
+          :disabled="!canSave"
+          @click="saveArtifacts"
+        >Save</v-btn>
+      </div>
 
       <!-- Spectrogram row -->
       <div class="viz-section-hdr">
@@ -128,11 +138,11 @@
       <div class="viz-grid">
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: inputColor }">Input (Noisy)</div>
-          <SpectrogramCanvas :pcm-frame="ws.inputPcmFrame.value" color-map="blue" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
+          <SpectrogramCanvas ref="spectInRef" :pcm-frame="ws.inputPcmFrame.value" color-map="blue" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
         </div>
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: outputColor }">Output (Enhanced)</div>
-          <SpectrogramCanvas :pcm-frame="ws.outputPcmFrame.value" color-map="green" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
+          <SpectrogramCanvas ref="spectOutRef" :pcm-frame="ws.outputPcmFrame.value" color-map="green" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
         </div>
       </div>
 
@@ -152,11 +162,11 @@
       <div class="viz-grid">
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: inputColor }">Input (Noisy)</div>
-          <WaveformCanvas :pcm-frame="ws.inputPcm.value" :color="inputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
+          <WaveformCanvas ref="waveInRef" :pcm-frame="ws.inputPcm.value" :color="inputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
         </div>
         <div class="viz-col">
           <div class="viz-ch-label" :style="{ color: outputColor }">Output (Enhanced)</div>
-          <WaveformCanvas :pcm-frame="ws.outputPcm.value" :color="outputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
+          <WaveformCanvas ref="waveOutRef" :pcm-frame="ws.outputPcm.value" :color="outputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
         </div>
       </div>
     </v-card>
@@ -202,6 +212,14 @@ const spectZoomIdx    = ref(1)                 // default 200
 const waveZoomLevels  = [1, 2, 4, 8]           // amplitude multiplier
 const waveZoomIdx     = ref(0)                 // default 1×
 
+// Canvas refs for save
+const spectInRef  = ref(null)
+const spectOutRef = ref(null)
+const waveInRef   = ref(null)
+const waveOutRef  = ref(null)
+
+const canSave = computed(() => !ws.running.value && (ws.inputPcm.value !== null || ws.chunkTimings.value.length > 0))
+
 const features = [
   'Noise reduction on C7x DSP',
   'TIDL-accelerated speech enhancement',
@@ -234,6 +252,77 @@ function useDefault() {
   uploadedPath.value = null
   uploadError.value  = null
   if (fileInfo.value) fileInfo.value = { ...fileInfo.value }
+}
+
+function saveArtifacts() {
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+
+  // ── Composite visualization PNG ──────────────────────────────────────────
+  const spectIn  = spectInRef.value?.getCanvas()
+  const spectOut = spectOutRef.value?.getCanvas()
+  const waveIn   = waveInRef.value?.getCanvas()
+  const waveOut  = waveOutRef.value?.getCanvas()
+
+  if (spectIn || waveIn) {
+    const PAD = 12, LABEL_H = 18, HEADER_H = 36
+    const colW   = Math.max(spectIn?.width || 0, spectOut?.width || 0, waveIn?.width || 0, waveOut?.width || 0) || 400
+    const spectH = spectIn?.height  || 160
+    const waveH  = waveIn?.height   || 90
+    const W = colW * 2 + PAD * 3
+    const H = HEADER_H + PAD + (LABEL_H + spectH) + PAD + (LABEL_H + waveH) + PAD
+
+    const off = document.createElement('canvas')
+    off.width = W; off.height = H
+    const ctx = off.getContext('2d')
+
+    ctx.fillStyle = '#0a0f1e'
+    ctx.fillRect(0, 0, W, H)
+
+    ctx.fillStyle = 'rgba(29,111,232,0.15)'
+    ctx.fillRect(0, 0, W, HEADER_H)
+    ctx.fillStyle = '#e2e8f0'
+    ctx.font = 'bold 13px system-ui, sans-serif'
+    ctx.fillText(`Speech Enhancement  —  ${ts.replace('T', '  ').replace(/-/g, (m, o) => o > 10 ? ':' : '-')}`, PAD, HEADER_H / 2 + 5)
+
+    const lbl = (text, x, y, color) => {
+      ctx.font = 'bold 11px system-ui, sans-serif'
+      ctx.fillStyle = color
+      ctx.fillText(text, x, y)
+    }
+
+    let y = HEADER_H + PAD
+    lbl('Spectrogram — Input (Noisy)',     PAD,              y + LABEL_H - 4, '#4da6ff')
+    lbl('Spectrogram — Output (Enhanced)', PAD + colW + PAD, y + LABEL_H - 4, '#22c55e')
+    y += LABEL_H
+    if (spectIn)  ctx.drawImage(spectIn,  PAD,              y, colW, spectH)
+    if (spectOut) ctx.drawImage(spectOut, PAD + colW + PAD, y, colW, spectH)
+
+    y += spectH + PAD
+    lbl('Waveform — Input (Noisy)',     PAD,              y + LABEL_H - 4, '#4da6ff')
+    lbl('Waveform — Output (Enhanced)', PAD + colW + PAD, y + LABEL_H - 4, '#22c55e')
+    y += LABEL_H
+    if (waveIn)  ctx.drawImage(waveIn,  PAD,              y, colW, waveH)
+    if (waveOut) ctx.drawImage(waveOut, PAD + colW + PAD, y, colW, waveH)
+
+    const a = document.createElement('a')
+    a.download = `speech-enhancement-${ts}.png`
+    a.href = off.toDataURL('image/png')
+    a.click()
+  }
+
+  // ── Processing times CSV ─────────────────────────────────────────────────
+  if (ws.chunkTimings.value.length > 0) {
+    const header = 'Frames,STFT (ms),GCRN (ms),ISTFT (ms),Total (ms)'
+    const lines  = ws.chunkTimings.value.map(r =>
+      `${r.chunk}/${r.total},${r.stft.toFixed(3)},${r.tvm.toFixed(3)},${r.istft.toFixed(3)},${r.totalMs.toFixed(3)}`
+    )
+    const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.download = `speech-enhancement-timings-${ts}.csv`
+    a.href = URL.createObjectURL(blob)
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }
 }
 
 async function run()  { await ws.start(uploadedPath.value || null) }
@@ -274,7 +363,8 @@ defineExpose({ run, stop, isRunning: ws.running })
   min-height: 48px !important;
 }
 
-.card-ttl  { font-size: 12.5px; font-weight: 700; color: rgb(var(--v-theme-on-surface)); }
+.card-ttl      { font-size: 12.5px; font-weight: 700; color: rgb(var(--v-theme-on-surface)); }
+.card-ttl-row  { display:flex; align-items:center; justify-content:space-between; }
 .desc-text { font-size: 13px; color: #94a3b8; line-height: 1.65; margin-bottom: 10px; }
 
 /* Signal flow image */
