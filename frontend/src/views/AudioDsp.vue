@@ -12,27 +12,15 @@
           <div class="ph-sub">Real-time audio analytics powered by the C7x DSP — AI-enabled noise reduction, speech enhancement, and acoustic event detection on AM62D.</div>
         </div>
       </div>
-      <div class="run-btn-group">
-        <v-btn
-          color="primary"
-          prepend-icon="mdi-play"
-          :disabled="!canRun || demoRunning"
-          class="run-btn"
-          @click="activeDemo?.run()"
-        >
-          Run Demo
-        </v-btn>
-        <v-btn
-          v-if="demoRunning"
-          color="error"
-          variant="outlined"
-          prepend-icon="mdi-stop"
-          class="run-btn"
-          @click="activeDemo?.stop()"
-        >
-          Stop
-        </v-btn>
-      </div>
+      <v-btn
+        :color="demoRunning ? 'error' : 'primary'"
+        variant="flat"
+        size="small"
+        :disabled="!canRun && !demoRunning"
+        :prepend-icon="demoRunning ? 'mdi-stop' : 'mdi-play'"
+        class="run-btn"
+        @click="triggerRun"
+      >{{ demoRunning ? 'Stop Demo' : 'Run Demo' }}</v-btn>
     </div>
 
     <!-- Two-column content grid -->
@@ -120,6 +108,11 @@ function selectDemo(i) {
 
 function onRunningChange(v) { demoRunning.value = v }
 
+function triggerRun() {
+  if (demoRunning.value) activeDemo.value?.stop()
+  else activeDemo.value?.run()
+}
+
 onUnmounted(() => {
   if (demoRunning.value) activeDemo.value?.stop()
 })
@@ -140,7 +133,6 @@ onUnmounted(() => {
 .ph-icon  { width:50px; height:50px; border-radius:50%; flex-shrink:0; background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540); border:2px solid #1d4ed8; display:flex; align-items:center; justify-content:center; }
 .ph-title { font-size:21px; font-weight:800; color:rgb(var(--v-theme-on-background)); margin-bottom:3px; }
 .ph-sub   { font-size:13px; color:#64748b; }
-.run-btn-group { display:flex; gap:8px; align-items:center; }
 .run-btn  { font-weight:600; letter-spacing:0; text-transform:none; }
 
 /* Content grid */
