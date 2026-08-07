@@ -220,6 +220,50 @@ const waveOutRef  = ref(null)
 
 const canSave = computed(() => !ws.running.value && (ws.inputPcm.value !== null || ws.chunkTimings.value.length > 0))
 
+function renderWaveformToCanvas(pcmData, color, bgColor, width, height, yZoom) {
+  const off = document.createElement('canvas')
+  off.width = width; off.height = height
+  const ctx = off.getContext('2d')
+  const pcm = pcmData.pcm
+  const midY = height / 2
+
+  ctx.fillStyle = bgColor
+  ctx.fillRect(0, 0, width, height)
+
+  const r = parseInt(color.slice(1, 3), 16)
+  const g = parseInt(color.slice(3, 5), 16)
+  const b = parseInt(color.slice(5, 7), 16)
+
+  ctx.beginPath()
+  ctx.fillStyle = `rgba(${r},${g},${b},0.18)`
+  ctx.moveTo(0, midY)
+  for (let x = 0; x <= width; x++) {
+    const idx = Math.floor(x * pcm.length / width)
+    const val = Math.max(-midY, Math.min(midY, (pcm[Math.min(idx, pcm.length - 1)] / 32768) * yZoom * midY * 0.9))
+    ctx.lineTo(x, midY - val)
+  }
+  ctx.lineTo(width, midY)
+  ctx.closePath()
+  ctx.fill()
+
+  ctx.beginPath()
+  ctx.strokeStyle = color
+  ctx.lineWidth = 1.5
+  for (let x = 0; x <= width; x++) {
+    const idx = Math.floor(x * pcm.length / width)
+    const val = Math.max(-midY, Math.min(midY, (pcm[Math.min(idx, pcm.length - 1)] / 32768) * yZoom * midY * 0.9))
+    x === 0 ? ctx.moveTo(x, midY - val) : ctx.lineTo(x, midY - val)
+  }
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.strokeStyle = `rgba(${r},${g},${b},0.25)`
+  ctx.lineWidth = 0.5
+  ctx.moveTo(0, midY); ctx.lineTo(width, midY)
+  ctx.stroke()
+  return off
+}
+
 const features = [
   'Noise reduction on C7x DSP',
   'TIDL-accelerated speech enhancement',
@@ -260,8 +304,11 @@ async function saveArtifacts() {
   // ── Composite visualization PNG ──────────────────────────────────────────
   const spectIn  = spectInRef.value?.getCanvas()
   const spectOut = spectOutRef.value?.getCanvas()
-  const waveIn   = waveInRef.value?.getCanvas()
-  const waveOut  = waveOutRef.value?.getCanvas()
+  // Re-render waveforms from full accumulated PCM at save time (not screenshot of live canvas)
+  const saveW    = waveInRef.value?.getCanvas()?.offsetWidth || 800
+  const saveH    = waveInRef.value?.getCanvas()?.height || 130
+  const waveIn   = ws.inputPcm.value  ? renderWaveformToCanvas(ws.inputPcm.value,  inputColor.value,  canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
+  const waveOut  = ws.outputPcm.value ? renderWaveformToCanvas(ws.outputPcm.value, outputColor.value, canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
 
   const savePng = (canvas1, label1, color1, canvas2, label2, color2, suffix, canvasH) => {
     if (!canvas1 && !canvas2) return
