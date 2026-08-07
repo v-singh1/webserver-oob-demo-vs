@@ -304,11 +304,33 @@ async function saveArtifacts() {
   // ── Composite visualization PNG ──────────────────────────────────────────
   const spectIn  = spectInRef.value?.getCanvas()
   const spectOut = spectOutRef.value?.getCanvas()
-  // Re-render waveforms from full accumulated PCM at save time (not screenshot of live canvas)
-  const saveW    = waveInRef.value?.getCanvas()?.offsetWidth || 800
-  const saveH    = waveInRef.value?.getCanvas()?.height || 130
-  const waveIn   = ws.inputPcm.value  ? renderWaveformToCanvas(ws.inputPcm.value,  inputColor.value,  canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
-  const waveOut  = ws.outputPcm.value ? renderWaveformToCanvas(ws.outputPcm.value, outputColor.value, canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
+  // Fetch and decode WAV files from server for accurate full-audio waveforms
+  const saveW = waveInRef.value?.getCanvas()?.offsetWidth || 800
+  const saveH = waveInRef.value?.getCanvas()?.height || 130
+  const decodeWav = async (url) => {
+    try {
+      const resp = await fetch(url)
+      if (!resp.ok) return null
+      const buf = await resp.arrayBuffer()
+      const view = new DataView(buf)
+      // Find 'data' chunk
+      let offset = 12
+      while (offset + 8 <= buf.byteLength) {
+        const id  = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2), view.getUint8(offset+3))
+        const len = view.getUint32(offset + 4, true)
+        if (id === 'data') return new Int16Array(buf, offset + 8, len / 2)
+        offset += 8 + len + (len & 1)
+      }
+    } catch { /* fall back to streamed */ }
+    return null
+  }
+  const [inPcmRaw, outPcmRaw] = ws.downloadUrls.value
+    ? await Promise.all([decodeWav(ws.downloadUrls.value.inputUrl), decodeWav(ws.downloadUrls.value.outputUrl)])
+    : [null, null]
+  const inPcm  = inPcmRaw  ? { pcm: inPcmRaw }  : ws.inputPcm.value
+  const outPcm = outPcmRaw ? { pcm: outPcmRaw } : ws.outputPcm.value
+  const waveIn   = inPcm  ? renderWaveformToCanvas(inPcm,  inputColor.value,  canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
+  const waveOut  = outPcm ? renderWaveformToCanvas(outPcm, outputColor.value, canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
 
   const savePng = (canvas1, label1, color1, canvas2, label2, color2, suffix, canvasH) => {
     if (!canvas1 && !canvas2) return
