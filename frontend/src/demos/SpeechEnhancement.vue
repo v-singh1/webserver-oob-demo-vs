@@ -135,14 +135,14 @@
           </v-btn>
         </div>
       </div>
-      <div class="viz-grid">
-        <div class="viz-col">
+      <div class="viz-stack">
+        <div class="viz-row">
           <div class="viz-ch-label" :style="{ color: inputColor }">Input (Noisy)</div>
-          <SpectrogramCanvas ref="spectInRef" :pcm-frame="ws.inputPcmFrame.value" color-map="blue" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
+          <SpectrogramCanvas ref="spectInRef" :pcm-frame="ws.inputPcmFrame.value" color-map="blue" :bg-color="spectBg" :height="220" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
         </div>
-        <div class="viz-col">
+        <div class="viz-row">
           <div class="viz-ch-label" :style="{ color: outputColor }">Output (Enhanced)</div>
-          <SpectrogramCanvas ref="spectOutRef" :pcm-frame="ws.outputPcmFrame.value" color-map="green" :bg-color="spectBg" :height="160" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
+          <SpectrogramCanvas ref="spectOutRef" :pcm-frame="ws.outputPcmFrame.value" color-map="green" :bg-color="spectBg" :height="220" :run-key="ws.runKey.value" :max-cols="spectZoomLevels[spectZoomIdx]" />
         </div>
       </div>
 
@@ -159,14 +159,14 @@
           </v-btn>
         </div>
       </div>
-      <div class="viz-grid">
-        <div class="viz-col">
+      <div class="viz-stack">
+        <div class="viz-row">
           <div class="viz-ch-label" :style="{ color: inputColor }">Input (Noisy)</div>
-          <WaveformCanvas ref="waveInRef" :pcm-frame="ws.inputPcm.value" :color="inputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
+          <WaveformCanvas ref="waveInRef" :pcm-frame="ws.inputPcm.value" :color="inputColor" :bg-color="canvasBg" :height="130" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
         </div>
-        <div class="viz-col">
+        <div class="viz-row">
           <div class="viz-ch-label" :style="{ color: outputColor }">Output (Enhanced)</div>
-          <WaveformCanvas ref="waveOutRef" :pcm-frame="ws.outputPcm.value" :color="outputColor" :bg-color="canvasBg" :height="90" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
+          <WaveformCanvas ref="waveOutRef" :pcm-frame="ws.outputPcm.value" :color="outputColor" :bg-color="canvasBg" :height="130" :run-key="ws.runKey.value" :y-zoom="waveZoomLevels[waveZoomIdx]" />
         </div>
       </div>
     </v-card>
@@ -254,7 +254,7 @@ function useDefault() {
   if (fileInfo.value) fileInfo.value = { ...fileInfo.value }
 }
 
-function saveArtifacts() {
+async function saveArtifacts() {
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
 
   // ── Composite visualization PNG ──────────────────────────────────────────
@@ -263,52 +263,42 @@ function saveArtifacts() {
   const waveIn   = waveInRef.value?.getCanvas()
   const waveOut  = waveOutRef.value?.getCanvas()
 
-  if (spectIn || waveIn) {
-    const PAD = 12, LABEL_H = 18, HEADER_H = 36
-    const colW   = Math.max(spectIn?.width || 0, spectOut?.width || 0, waveIn?.width || 0, waveOut?.width || 0) || 400
-    const spectH = spectIn?.height  || 160
-    const waveH  = waveIn?.height   || 90
-    const W = colW * 2 + PAD * 3
-    const H = HEADER_H + PAD + (LABEL_H + spectH) + PAD + (LABEL_H + waveH) + PAD
-
+  const savePng = (canvas1, label1, color1, canvas2, label2, color2, suffix, canvasH) => {
+    if (!canvas1 && !canvas2) return
+    const PAD = 16, LABEL_H = 20, HEADER_H = 36
+    const W = (canvas1?.width || canvas2?.width || 800)
+    const H = HEADER_H + PAD + (LABEL_H + canvasH + PAD) + (LABEL_H + canvasH + PAD)
     const off = document.createElement('canvas')
     off.width = W; off.height = H
     const ctx = off.getContext('2d')
-
     ctx.fillStyle = '#0a0f1e'
     ctx.fillRect(0, 0, W, H)
-
-    ctx.fillStyle = 'rgba(29,111,232,0.15)'
+    ctx.fillStyle = 'rgba(29,111,232,0.12)'
     ctx.fillRect(0, 0, W, HEADER_H)
     ctx.fillStyle = '#e2e8f0'
     ctx.font = 'bold 13px system-ui, sans-serif'
-    ctx.fillText(`Speech Enhancement  —  ${ts.replace('T', '  ').replace(/-/g, (m, o) => o > 10 ? ':' : '-')}`, PAD, HEADER_H / 2 + 5)
-
-    const lbl = (text, x, y, color) => {
-      ctx.font = 'bold 11px system-ui, sans-serif'
+    ctx.fillText(`Speech Enhancement — ${suffix}  —  ${ts.replace('T', '  ').replace(/-/g, (m, o) => o > 10 ? ':' : '-')}`, PAD, HEADER_H / 2 + 5)
+    const lbl = (text, y, color) => {
+      ctx.font = 'bold 12px system-ui, sans-serif'
       ctx.fillStyle = color
-      ctx.fillText(text, x, y)
+      ctx.fillText(text, PAD, y)
     }
-
     let y = HEADER_H + PAD
-    lbl('Spectrogram — Input (Noisy)',     PAD,              y + LABEL_H - 4, '#4da6ff')
-    lbl('Spectrogram — Output (Enhanced)', PAD + colW + PAD, y + LABEL_H - 4, '#22c55e')
+    lbl(label1, y + LABEL_H - 4, color1)
     y += LABEL_H
-    if (spectIn)  ctx.drawImage(spectIn,  PAD,              y, colW, spectH)
-    if (spectOut) ctx.drawImage(spectOut, PAD + colW + PAD, y, colW, spectH)
-
-    y += spectH + PAD
-    lbl('Waveform — Input (Noisy)',     PAD,              y + LABEL_H - 4, '#4da6ff')
-    lbl('Waveform — Output (Enhanced)', PAD + colW + PAD, y + LABEL_H - 4, '#22c55e')
+    if (canvas1) ctx.drawImage(canvas1, 0, y, W, canvasH)
+    y += canvasH + PAD
+    lbl(label2, y + LABEL_H - 4, color2)
     y += LABEL_H
-    if (waveIn)  ctx.drawImage(waveIn,  PAD,              y, colW, waveH)
-    if (waveOut) ctx.drawImage(waveOut, PAD + colW + PAD, y, colW, waveH)
-
+    if (canvas2) ctx.drawImage(canvas2, 0, y, W, canvasH)
     const a = document.createElement('a')
-    a.download = `speech-enhancement-${ts}.png`
+    a.download = `speech-enhancement-${suffix.toLowerCase()}-${ts}.png`
     a.href = off.toDataURL('image/png')
     a.click()
   }
+
+  savePng(spectIn, 'Input (Noisy)', '#4da6ff', spectOut, 'Output (Enhanced)', '#22c55e', 'Spectrogram', spectIn?.height || 220)
+  savePng(waveIn,  'Input (Noisy)', '#4da6ff', waveOut,  'Output (Enhanced)', '#22c55e', 'Waveform',    waveIn?.height  || 130)
 
   // ── Processing times CSV ─────────────────────────────────────────────────
   if (ws.chunkTimings.value.length > 0) {
@@ -322,6 +312,23 @@ function saveArtifacts() {
     a.href = URL.createObjectURL(blob)
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }
+
+  // ── Audio WAV files ───────────────────────────────────────────────────────
+  if (ws.downloadUrls.value) {
+    for (const [channel, url] of [['input', ws.downloadUrls.value.inputUrl], ['output', ws.downloadUrls.value.outputUrl]]) {
+      try {
+        const resp = await fetch(url)
+        if (!resp.ok) continue
+        const blob = await resp.blob()
+        const a = document.createElement('a')
+        a.download = `speech-enhancement-${channel}-${ts}.wav`
+        a.href = URL.createObjectURL(blob)
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+        await new Promise(r => setTimeout(r, 300))  // small gap between downloads
+      } catch { /* skip if unavailable */ }
+    }
   }
 }
 
@@ -415,8 +422,8 @@ defineExpose({ run, stop, isRunning: ws.running })
 .viz-section-lbl { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; }
 .zoom-controls   { display:flex; align-items:center; gap:4px; }
 .zoom-label      { font-size:10px; color:#94a3b8; min-width:32px; text-align:center; }
-.viz-grid        { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.viz-col         { display:flex; flex-direction:column; gap:4px; }
+.viz-stack       { display:flex; flex-direction:column; gap:10px; }
+.viz-row         { display:flex; flex-direction:column; gap:4px; }
 .viz-ch-label    { font-size:12px; font-weight:700; margin-bottom:2px; }
 
 /* Playback */
