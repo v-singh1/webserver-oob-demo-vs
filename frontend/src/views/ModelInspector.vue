@@ -148,7 +148,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useTheme } from 'vuetify'
 
 /* ── Static model definitions ── */
 const ICON_GRID = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`
@@ -200,6 +201,20 @@ const uploadStatusType = ref('')
 const uploadBusy    = ref(false)
 const dropHover     = ref(false)
 const fileInput     = ref(null)
+
+/* ── Theme sync ── */
+const vuetifyTheme = useTheme()
+
+function applyThemeToFrame() {
+  try {
+    const d = frameEl.value?.contentDocument
+    if (!d) return
+    const t = vuetifyTheme.global.name.value === 'tiLight' ? 'light' : 'dark'
+    d.documentElement.setAttribute('data-theme', t)
+  } catch (_) {}
+}
+
+watch(() => vuetifyTheme.global.name.value, applyThemeToFrame)
 
 /* ── Helpers ── */
 function quantClass(q) {
@@ -272,6 +287,7 @@ function onFrameLoad() {
     sc.textContent = '(function(){var B=1280;function r(){var s=window.top.innerWidth/B;document.documentElement.style.zoom=s<1?s:"";}r();window.addEventListener("resize",r);})();'
     d.head.appendChild(sc)
   } catch (_) {}
+  applyThemeToFrame()
 }
 
 /* ── Upload ── */
