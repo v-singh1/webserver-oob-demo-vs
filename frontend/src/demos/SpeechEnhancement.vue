@@ -42,10 +42,10 @@
           Model Info
         </v-expansion-panel-title>
         <v-expansion-panel-text>
-          <div class="model-row"><span class="model-lbl">Architecture</span><span class="model-val">GTCRN</span></div>
+          <div class="model-row"><span class="model-lbl">Architecture</span><span class="model-val">GCRN</span></div>
           <div class="model-row"><span class="model-lbl">Runtime</span>      <span class="model-val">TVM + TIDL</span></div>
           <div class="model-row"><span class="model-lbl">Target</span>       <span class="model-val">C7x DSP</span></div>
-          <div class="model-row"><span class="model-lbl">Input</span>        <span class="model-val">48kHz mono PCM</span></div>
+          <div class="model-row"><span class="model-lbl">Input</span>        <span class="model-val">16kHz mono PCM</span></div>
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>

@@ -25,7 +25,7 @@
 
       <!-- Explore Demos -->
       <v-card flat class="ti-card">
-        <div class="card-ttl">Explore Demos</div>
+        <div class="card-ttl">Explore Demos And Tools</div>
 
         <div
           v-for="demo in demos" :key="demo.to"
