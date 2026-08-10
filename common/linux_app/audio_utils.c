@@ -115,6 +115,7 @@ void signal_handler(int signum) {
  * @param line  Null-terminated line from arecord/aplay output.
  * @return 1 if a valid device entry was populated, 0 to skip.
  */
+#ifdef AM62DXX
 static int parse_alsa_line(const char *line) {
     int card_num = -1, dev_num = -1;
     char card_name[128] = {0};
@@ -235,6 +236,99 @@ char* get_arecord_devices() {
 
     return device_list;
 }
+#else
+/* Keep the established single-device-per-card enumeration for non-AM62D
+ * builds.  Several existing device demos consume this output directly. */
+char* get_arecord_devices() {
+    FILE *fp;
+    char path[1035];
+    char *device_list = malloc(4096);
+
+    if (!device_list) return NULL;
+    device_list[0] = '\0';
+    device_count = 0;
+
+    fp = popen("which arecord 2>/dev/null", "r");
+    if (fp == NULL || !fgets(path, sizeof(path), fp)) {
+        fprintf(stderr, "arecord not found on system\n");
+        if (fp) pclose(fp);
+        strcpy(device_list, "No audio devices found - arecord not available");
+        return device_list;
+    }
+    pclose(fp);
+
+    fp = popen("arecord -l 2>/dev/null", "r");
+    if (fp == NULL) {
+        fprintf(stderr, "Failed to run command: arecord -l\n");
+        strcpy(device_list, "Error running arecord command");
+        return device_list;
+    }
+
+    char current_card_name[256] = {0};
+    int card_num = -1;
+
+    // Reset device array
+    memset(audio_devices, 0, sizeof(audio_devices));
+
+    // Process arecord output
+    while (fgets(path, sizeof(path), fp) != NULL) {
+        if (strncmp(path, "card", 4) == 0) {
+            char *card_str = strstr(path, "card ");
+            if (card_str) {
+                sscanf(card_str, "card %d:", &card_num);
+            }
+
+            char *name_start = strchr(path, '[');
+            char *name_end = strchr(path, ']');
+            if (name_start && name_end && name_end > name_start && device_count < MAX_DEVICES) {
+                int name_len = name_end - name_start - 1;
+                if (name_len > 0 && name_len < sizeof(current_card_name)) {
+                    strncpy(current_card_name, name_start + 1, name_len);
+                    current_card_name[name_len] = '\0';
+
+                    /* Skip HDMI, playback-only, and USB video capture (webcam) devices */
+                    if (strstr(current_card_name, "HDMI")    != NULL ||
+                        strstr(current_card_name, "hdmi")    != NULL ||
+                        strstr(current_card_name, "cape")    != NULL ||
+                        strstr(current_card_name, "Webcam")  != NULL ||
+                        strstr(current_card_name, "webcam")  != NULL ||
+                        strstr(current_card_name, "Camera")  != NULL ||
+                        strstr(current_card_name, "camera")  != NULL) {
+                        fprintf(stderr, "Skipping non-audio device: %s (card %d)\n",
+                                current_card_name, card_num);
+                        continue;
+                    }
+
+                    // Save device details
+                    strncpy(audio_devices[device_count].display_name,
+                            current_card_name,
+                            sizeof(audio_devices[device_count].display_name) - 1);
+                    audio_devices[device_count].display_name[sizeof(audio_devices[device_count].display_name) - 1] = '\0';
+
+                    snprintf(audio_devices[device_count].alsa_device,
+                             sizeof(audio_devices[device_count].alsa_device),
+                             "plughw:%d,0", card_num);
+
+                    // Add to return string with newline separation
+                    if (device_count > 0) {
+                        strcat(device_list, "\n");
+                    }
+                    strcat(device_list, current_card_name);
+
+                    fprintf(stderr, "Found capture device: %s -> %s\n",
+                           current_card_name, audio_devices[device_count].alsa_device);
+
+                    device_count++;
+                }
+            }
+        }
+    }
+    pclose(fp);
+
+    if (device_count == 0) strcpy(device_list, "No audio input devices found");
+    return device_list;
+}
+#endif
 
 /**
  * @brief Log a classification result to stderr.

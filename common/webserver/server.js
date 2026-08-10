@@ -67,6 +67,7 @@ if (!fs.existsSync(deviceConfigPath)) {
 }
 
 const device = JSON.parse(fs.readFileSync(deviceConfigPath, 'utf8'));
+const isAm62d = device.id === 'am62dxx';
 console.log(`[Server] Loaded device config: ${device.id} (${device.displayName})`);
 console.log(`[Server] Active demos: ${device.demos.join(', ')}`);
 
@@ -79,28 +80,30 @@ const server = http.createServer(app);
 const port   = process.env.PORT || 3000;
 const wss    = new WebSocket.Server({ server });
 
-/* Dedicated health-check socket — frontend connects here for instant disconnect detection */
-wss.on('connection', (ws, req) => {
-    if (req.url !== '/health') return;
-    ws.on('error', () => {});
-});
-
-app.use(express.json({ limit: '512kb' }));
-
 /* Determine device app directory and Vue entry point before registering any middleware.
  * app.get('/') must be registered before express.static() so it wins over the automatic
  * index.html serving that express.static does for GET / — otherwise the legacy
  * common/app/index.html would be returned instead of vue-dist/index.html. */
 const deviceAppDir = path.join(path.dirname(deviceConfigPath), 'app');
 
-const vueIndex = [
+const vueIndex = isAm62d && [
     path.join(deviceAppDir, 'vue-dist', 'index.html'),
     path.join(appDir,       'vue-dist', 'index.html'),
 ].find(p => fs.existsSync(p));
 
-if (vueIndex) {
-    app.get('/', (req, res) => res.sendFile(vueIndex));
-    console.log('[Server] Vue app root: ' + vueIndex);
+if (isAm62d) {
+    /* Dedicated health-check socket — used only by the AM62D Vue portal. */
+    wss.on('connection', (ws, req) => {
+        if (req.url !== '/health') return;
+        ws.on('error', () => {});
+    });
+
+    app.use(express.json({ limit: '512kb' }));
+
+    if (vueIndex) {
+        app.get('/', (req, res) => res.sendFile(vueIndex));
+        console.log('[Server] Vue app root: ' + vueIndex);
+    }
 }
 
 /* Serve device-specific static files first (images, overrides), then common app */
@@ -110,8 +113,10 @@ if (fs.existsSync(deviceAppDir)) {
 }
 app.use(express.static(appDir));
 
-/* Health check — used by frontend to detect disconnects and post-reboot reconnect */
-app.get('/ping', (req, res) => res.json({ ok: true }));
+if (isAm62d) {
+    /* Health check — used by the Vue portal to detect disconnects and reconnect. */
+    app.get('/ping', (req, res) => res.json({ ok: true }));
+}
 
 /* Device info endpoint — frontend calls this on load */
 app.get('/device-info', (req, res) => {
@@ -125,6 +130,9 @@ app.get('/device-info', (req, res) => {
     });
 });
 
+/* AM62D portal management APIs.  Keep legacy devices on their pre-AM62D
+ * request surface and static UI flow. */
+if (isAm62d) {
 /* Update device config — merges body into in-memory device and writes to disk */
 app.post('/device-config', (req, res) => {
     try {
@@ -183,6 +191,7 @@ app.post('/upload-model-file',
         }
     }
 );
+}
 
 /* Active demo manifests — merged list of manifest.json for each active demo */
 app.get('/demo-manifests', (req, res) => {
@@ -224,7 +233,7 @@ for (const demoId of device.demos) {
 
 /* Must come after all API routes and plugin registrations so API paths
  * are never caught here. Only fires when vue-dist/index.html exists. */
-if (fs.existsSync(vueIndex)) {
+if (isAm62d && vueIndex) {
     app.get('*', (req, res) => res.sendFile(vueIndex));
 }
 
