@@ -23,7 +23,13 @@ export CC CFLAGS LDFLAGS
 all: build
 
 build: deps build-native
-	@if [ -d frontend ]; then $(MAKE) build-frontend; fi
+
+# The Vue/Vuetify portal and spectrum helper are AM62D-only.  Keep the
+# existing build graph for every other device so their Yocto/native builds do
+# not acquire an npm frontend dependency.
+ifeq ($(DEVICE),am62dxx)
+build: build-frontend
+endif
 
 deps:
 	cd common/webserver && npm install
@@ -39,11 +45,11 @@ clean:
 	@if [ -d devices/$(DEVICE)/linux_app ]; then \
 	    $(MAKE) -C devices/$(DEVICE)/linux_app clean; \
 	fi
-	@if [ -d frontend ]; then rm -rf frontend/dist frontend/.vite; fi
+	@if [ "$(DEVICE)" = "am62dxx" ] && [ -d frontend ]; then rm -rf frontend/dist frontend/.vite; fi
 
 
 # ── AM62D: Vue/Vuetify frontend ──────────────────────────────────────
-# Only present for am62dxx; no-op for other devices (frontend/ absent).
+# Built only when DEVICE=am62dxx (see the conditional build dependency above).
 
 build-frontend:
 	cd frontend && npm install && npm run build
@@ -75,6 +81,9 @@ deploy-bins:
 	fi
 	@if [ -f devices/$(DEVICE)/linux_app/rpmsg_json ]; then \
 	    scp devices/$(DEVICE)/linux_app/rpmsg_json $(BOARD_HOST):/usr/bin/rpmsg_json; \
+	fi
+	@if [ -f devices/$(DEVICE)/linux_app/spectrum_utils ]; then \
+	    scp devices/$(DEVICE)/linux_app/spectrum_utils $(BOARD_HOST):/usr/bin/spectrum_utils; \
 	fi
 
 deploy-server:

@@ -41,11 +41,12 @@ function getCpuPercent(cb) {
 }
 
 module.exports = function registerCpuMonitor(app, wss, device) {
+    const isAm62d = device.id === 'am62dxx';
 
     /* System info */
     app.get('/run-uname', (req, res) => {
         if (MOCK) {
-            return res.send('Linux mock-device 6.1.0-mock #1 SMP PREEMPT Thu Jan 1 00:00:00 UTC 2026 armv7l armv7l GNU/Linux');
+            return res.send(`Linux mock-device 6.1.0-mock #1 SMP PREEMPT Thu Jan 1 00:00:00 UTC 2026'} armv7l armv7l GNU/Linux`);
         }
         exec('uname -a', (error, stdout) => {
             if (error) {
@@ -60,17 +61,24 @@ module.exports = function registerCpuMonitor(app, wss, device) {
     app.get('/cpu-load', (req, res) => {
         if (MOCK) {
             const load = (20 + Math.random() * 60).toFixed(1);
-            return res.json({
+            const result = {
                 cpu_percent:     parseFloat(load),
-                current_cpu_usage: parseFloat(load),
-                average_cpu_usage: parseFloat((parseFloat(load) * 0.9).toFixed(1)),
-                max_cpu_usage:   parseFloat((parseFloat(load) * 1.1).toFixed(1)),
                 history: Array.from({length: 10}, () => parseFloat((Math.random() * 80).toFixed(1)))
-            });
+            };
+            if (isAm62d) {
+                result.current_cpu_usage = parseFloat(load);
+                result.average_cpu_usage = parseFloat((parseFloat(load) * 0.9).toFixed(1));
+                result.max_cpu_usage = parseFloat((parseFloat(load) * 1.1).toFixed(1));
+            }
+            return res.send(JSON.stringify(result));
         }
         exec('/usr/bin/cpu_stats enhanced', (error, stdout) => {
             if (!error && stdout.trim()) {
                 return res.send(stdout);
+            }
+            if (!isAm62d) {
+                console.error('[cpu-monitor] cpu_stats error:', error);
+                return res.status(500).send(error.message);
             }
             /* Binary unavailable — fall back to /proc/stat */
             getCpuPercent(pct => {
@@ -99,6 +107,7 @@ module.exports = function registerCpuMonitor(app, wss, device) {
         });
     });
 
+    if (isAm62d) {
     /* System logs — recent journal entries for the webserver service */
     app.get('/logs', (req, res) => {
         const n = Math.min(parseInt(req.query.n) || 80, 200);
@@ -139,6 +148,7 @@ module.exports = function registerCpuMonitor(app, wss, device) {
             });
         });
     });
+    }
 
     console.log('[cpu-monitor] Plugin registered' + (MOCK ? ' (MOCK mode)' : ''));
 };

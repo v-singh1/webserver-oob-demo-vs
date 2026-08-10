@@ -123,6 +123,7 @@ const MOCK_CLASSES = [
  *                          for per-device tuning parameters.
  */
 module.exports = function registerAudioClassification(app, wss, device) {
+    const isAm62d = device.id === 'am62dxx';
 
     let fifoReaderProcess = null;
     let audioProcess      = null;
@@ -136,7 +137,18 @@ module.exports = function registerAudioClassification(app, wss, device) {
 
     app.get('/audio-devices', (req, res) => {
         if (MOCK) {
-            return res.send('plughw:0,0|Mock Card: mock-input-0\nplughw:1,0|Mock Card: mock-input-1');
+            return res.send(isAm62d
+                ? 'plughw:0,0|Mock Card: mock-input-0\nplughw:1,0|Mock Card: mock-input-1'
+                : 'plughw:0,0|Mock USB Microphone\nplughw:1,0|Mock Built-in Mic');
+        }
+        if (!isAm62d) {
+            return exec('/usr/bin/audio_utils devices', (error, stdout) => {
+                if (error) {
+                    console.error('[audio] audio_utils devices error:', error);
+                    return res.status(500).send('Error listing audio devices');
+                }
+                res.send(stdout);
+            });
         }
         exec('arecord -l 2>/dev/null', (error, stdout) => {
             if (error) {
@@ -148,6 +160,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
         });
     });
 
+    if (isAm62d) {
     app.get('/audio-output-devices', (req, res) => {
         if (MOCK) {
             return res.send('plughw:0,0|Mock Card: mock-output-0\nplughw:0,1|Mock Card: mock-output-1');
@@ -181,9 +194,10 @@ module.exports = function registerAudioClassification(app, wss, device) {
             }
         }
     );
+    }
 
     app.get('/start-audio-classification', (req, res) => {
-        const source       = req.query.source   || 'device';
+        const source       = isAm62d ? (req.query.source || 'device') : 'device';
         const device_param = req.query.device   || 'default';
         const filepath     = req.query.filepath || '';
 
@@ -191,7 +205,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
             return res.status(400).send('Audio classification already running');
         }
 
-        audioSourceMode = (source === 'file') ? 'file' : 'device';
+        audioSourceMode = (isAm62d && source === 'file') ? 'file' : 'device';
 
         if (MOCK) {
             mockInterval = setInterval(() => {
@@ -205,7 +219,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
             return res.send('Audio classification started (MOCK)');
         }
 
-        if (source === 'file') {
+        if (isAm62d && source === 'file') {
             if (!filepath) return res.status(400).send('filepath required for file source');
             if (!fs.existsSync(filepath)) return res.status(400).send(`File not found: ${filepath}`);
 
