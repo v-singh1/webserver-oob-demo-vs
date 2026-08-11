@@ -81,7 +81,9 @@ function readPcmWavInfo(filename) {
         const bitsPerSample = fmt.readUInt16LE(14);
         const dataBytes = data ? data.length : 0;
         const durationSec = sampleRate > 0 ? parseFloat((dataBytes / (sampleRate * channels * (bitsPerSample / 8))).toFixed(2)) : 0;
-        return { channels, sampleRate, bitsPerSample, durationSec };
+        const totalSamples = (channels > 0 && bitsPerSample > 0)
+            ? Math.round(dataBytes / (channels * bitsPerSample / 8)) : 0;
+        return { channels, sampleRate, bitsPerSample, durationSec, totalSamples };
     } catch (_) { return null; }
 }
 
@@ -169,8 +171,17 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         }
         lastCompletedJob = finished;
         job = null;
-        // Send completion immediately — live DMA frames already populated the canvases during processing
-        send({ type: 'spectrum_done', inputUrl: '/speech-enhancement/wav?channel=input', outputUrl: '/speech-enhancement/wav?channel=output' });
+        // Read exact sample counts from both WAVs so the frontend can trim
+        // zero-padded tails from the accumulated PCM buffers.
+        const inInfo  = readPcmWavInfo(finished.inputPath);
+        const outInfo = readPcmWavInfo(finished.outputPath);
+        send({
+            type:               'spectrum_done',
+            inputUrl:           '/speech-enhancement/wav?channel=input',
+            outputUrl:          '/speech-enhancement/wav?channel=output',
+            totalInputSamples:  inInfo  ? inInfo.totalSamples  : null,
+            totalOutputSamples: outInfo ? outInfo.totalSamples : null,
+        });
     }
 
     function startEdgeAi(inputPath) {

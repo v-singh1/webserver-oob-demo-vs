@@ -6,28 +6,48 @@
 
 /**
  * @file spectrum_utils.c
- * @brief PCM streaming utility for real-time input/output spectrum visualization.
+ * @brief Live PCM streaming proxy for the AM62D speech-enhancement spectrogram.
  *
- * Reads a 48 kHz S16LE mono WAV file (input) and an optional second WAV
- * file (output) in a loop.  Each iteration reads CHUNK_BYTES (1024 bytes /
- * 512 samples) from each file and writes a framed binary message to stdout:
+ * Connects to the edge-AI pipeline's Unix domain socket
+ * (/tmp/edge-ai-speech.sock by default) and reads the EASP binary frames
+ * produced by pipeline_manager.cpp at each model-inference boundary.
  *
+ * Pipeline model parameters (GCRN @ 16 kHz):
+ *   FRAMES_PER_BATCH = 401  one application chunk: 6 model inferences × 64 frames + 17 tail
+ *   HOP_SAMPLES      = 100  STFT hop size (10 ms at 16 kHz)
+ *   TAIL_FRAMES      = 17   trailing zero-padded frames appended to every batch
+ *   VALID_FRAMES     = 384  (401 − 17) — frames carrying real enhanced audio per full chunk
+ *   CHUNK_BYTES      = 76800 (384 × 100 × 2) valid PCM bytes per normal batch
+ *
+ * EASP wire format sent by pipeline_manager.cpp (13-byte header + payload):
  * @verbatim
- *   Byte 0   : channel  (0x00 = input, 0x01 = output)
- *   Bytes 1-1024 : raw S16LE PCM samples (little-endian)
+ *   Bytes  0-3  : magic 'E','A','S','P'
+ *   Byte   4    : direction  0=input  1=output
+ *   Bytes  5-8  : uint32 LE  sample rate (always 16000)
+ *   Bytes  9-12 : uint32 LE  payload length in bytes
+ *   Bytes 13..  : S16LE PCM  (FRAMES_PER_BATCH × HOP_SAMPLES × 2 bytes normally)
  * @endverbatim
  *
- * The Node.js webserver plugin reads stdout, decodes each 1025-byte frame,
- * and broadcasts the raw PCM over WebSocket so the browser can compute an
- * FFT and render the frequency spectrum.
+ * Why 17 trailing frames are discarded:
+ *   The GCRN model requires TAIL_FRAMES of future-context to produce a valid
+ *   output frame.  The pipeline pads every inference block with TAIL_FRAMES
+ *   zero frames so the model can flush its state; those zero frames appear as
+ *   silence in the ISTFT output.  Trimming them keeps the visualisation free
+ *   of periodic silence gaps.  The very last inference block of a file may
+ *   carry more or fewer zero-padded frames depending on audio length — the
+ *   fixed trim is applied there too (acceptable; any residual zeros appear as
+ *   a brief tail-silence, not a repeated artefact).
  *
- * The loop repeats from the WAV data start when the end-of-file is reached,
- * providing continuous playback.  Timing is paced to 48 kHz real-time using
- * nanosleep() so the browser UI updates at approximately the audio rate.
+ * Stdout frame format (read by the Node.js server plugin):
+ * @verbatim
+ *   Byte  0     : direction  (0x00=input, 0x01=output)
+ *   Bytes 1..N  : S16LE PCM  (valid_bytes; N=CHUNK_BYTES for normal batches)
+ * @endverbatim
  *
  * @par Usage
  * @code
- *   spectrum_utils <input.wav> [output.wav]
+ *   spectrum_utils [socket_path]
+ *   spectrum_utils /tmp/edge-ai-speech.sock
  * @endcode
  */
 
@@ -37,200 +57,190 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <signal.h>
-#include <time.h>
-
-/** Number of PCM bytes read and streamed per iteration (512 S16LE samples). */
-#define CHUNK_BYTES        1024
-
-/** Expected sample rate of input WAV files. */
-#define SAMPLE_RATE        48000
-
-/**
- * Real-time sleep interval per chunk in nanoseconds.
- * 512 samples / 48000 Hz ≈ 10.666 ms.
- */
-#define SAMPLES_PER_CHUNK  (CHUNK_BYTES / 2)
-#define NS_PER_CHUNK       ((long)(SAMPLES_PER_CHUNK * 1000000000LL / SAMPLE_RATE))
-
-/** Channel byte written before each PCM block for the input (noisy) audio. */
-#define CHAN_INPUT   0x00
-
-/** Channel byte written before each PCM block for the output (enhanced) audio. */
-#define CHAN_OUTPUT  0x01
+#include <sys/socket.h>
+#include <sys/un.h>
 
 /* ------------------------------------------------------------------ */
-/*  WAV header                                                          */
+/*  Pipeline inference constants                                       */
 /* ------------------------------------------------------------------ */
 
-/**
- * @brief Parsed subset of a WAV file header.
- */
-typedef struct {
-    uint32_t data_offset;     /**< Byte offset in the file where PCM data begins. */
-    uint32_t data_size;       /**< Total PCM data bytes in the file.              */
-    uint16_t channels;        /**< Number of audio channels.                      */
-    uint32_t sample_rate;     /**< Sample rate in Hz.                             */
-    uint16_t bits_per_sample; /**< Bit depth per sample.                          */
-} wav_info_t;
-
-static int read_le16(FILE *fp, uint16_t *out)
-{
-    uint8_t b[2];
-    if (fread(b, 1, 2, fp) != 2) return -1;
-    *out = (uint16_t)(b[0] | (b[1] << 8));
-    return 0;
-}
-
-static int read_le32(FILE *fp, uint32_t *out)
-{
-    uint8_t b[4];
-    if (fread(b, 1, 4, fp) != 4) return -1;
-    *out = (uint32_t)(b[0] | ((uint32_t)b[1]<<8) | ((uint32_t)b[2]<<16) | ((uint32_t)b[3]<<24));
-    return 0;
-}
+/** Pipeline audio sample rate (matches the rate field in every EASP header). */
+#define SAMPLE_RATE         16000
 
 /**
- * @brief Parse the RIFF/WAVE header of a WAV file and locate the PCM data chunk.
- *
- * Iterates over all RIFF sub-chunks and stops when both the @c fmt  and
- * @c data chunks have been found.  Non-PCM audio formats (e.g. ADPCM, MP3)
- * are rejected.  Unknown chunks (LIST, INFO, etc.) are silently skipped.
- *
- * @param fp    Open FILE* positioned at the start of the WAV file.
- * @param info  Populated on success with sample rate, channel count,
- *              bit depth, PCM data offset and PCM data size.
- * @return 0 on success, -1 on parse error or unsupported format.
+ * Total STFT frames in one application chunk sent over the EASP socket.
+ * = 6 model inferences × 64 frames + 17 tail frames = 401.
  */
-static int parse_wav_header(FILE *fp, wav_info_t *info)
-{
-    char     tag[5] = {0};
-    uint32_t chunk_size;
-    uint16_t audio_format;
+#define FRAMES_PER_BATCH    401
 
-    if (fread(tag, 1, 4, fp) != 4 || memcmp(tag, "RIFF", 4) != 0) {
-        fprintf(stderr, "[spectrum] Not a RIFF file\n");
-        return -1;
-    }
-    if (read_le32(fp, &chunk_size) < 0) return -1;
-    if (fread(tag, 1, 4, fp) != 4 || memcmp(tag, "WAVE", 4) != 0) {
-        fprintf(stderr, "[spectrum] Not a WAVE file\n");
-        return -1;
-    }
+/** STFT hop size in PCM samples (10 ms at 16 kHz). */
+#define HOP_SAMPLES         100
 
-    memset(info, 0, sizeof(*info));
-    int found_fmt = 0, found_data = 0;
+/**
+ * Trailing zero-padded STFT frames appended to every inference batch.
+ * These represent future-context padding required by the GCRN model and
+ * produce silence in the ISTFT output — they must be discarded.
+ */
+#define TAIL_FRAMES         17
 
-    while (!found_data) {
-        if (fread(tag, 1, 4, fp) != 4) break;
-        tag[4] = '\0';
-        if (read_le32(fp, &chunk_size) < 0) break;
+/** Valid STFT output frames per full chunk = FRAMES_PER_BATCH − TAIL_FRAMES. */
+#define VALID_FRAMES        (FRAMES_PER_BATCH - TAIL_FRAMES)
 
-        if (memcmp(tag, "fmt ", 4) == 0) {
-            if (read_le16(fp, &audio_format) < 0) return -1;
-            if (audio_format != 1) {
-                fprintf(stderr, "[spectrum] Only PCM (format 1) supported, got %u\n",
-                        audio_format);
-                return -1;
-            }
-            uint32_t byte_rate;
-            uint16_t block_align;
-            if (read_le16(fp, &info->channels)        < 0) return -1;
-            if (read_le32(fp, &info->sample_rate)     < 0) return -1;
-            if (read_le32(fp, &byte_rate)             < 0) return -1;
-            if (read_le16(fp, &block_align)           < 0) return -1;
-            if (read_le16(fp, &info->bits_per_sample) < 0) return -1;
-            if (chunk_size > 16) fseek(fp, (long)(chunk_size - 16), SEEK_CUR);
-            found_fmt = 1;
+/**
+ * Valid PCM bytes per normal chunk.
+ * = VALID_FRAMES × HOP_SAMPLES × sizeof(int16_t) = 384 × 100 × 2 = 76800.
+ */
+#define CHUNK_BYTES         (VALID_FRAMES * HOP_SAMPLES * 2)
 
-        } else if (memcmp(tag, "data", 4) == 0) {
-            info->data_size   = chunk_size;
-            info->data_offset = (uint32_t)ftell(fp);
-            found_data = 1;
+/**
+ * Zero-padded tail bytes trimmed from every chunk.
+ * = TAIL_FRAMES × HOP_SAMPLES × sizeof(int16_t) = 17 × 100 × 2 = 3400.
+ */
+#define TAIL_BYTES          (TAIL_FRAMES * HOP_SAMPLES * 2)
 
-        } else {
-            /* skip unknown chunk — pad to even byte boundary */
-            fseek(fp, (long)(chunk_size + (chunk_size & 1)), SEEK_CUR);
-        }
-    }
+/** Maximum expected EASP payload (full batch + generous headroom). */
+#define MAX_PAYLOAD         (FRAMES_PER_BATCH * HOP_SAMPLES * 2 + 512)
 
-    if (!found_fmt || !found_data) {
-        fprintf(stderr, "[spectrum] Incomplete WAV (fmt=%d data=%d)\n",
-                found_fmt, found_data);
-        return -1;
-    }
-    return 0;
-}
+/** EASP header size in bytes. */
+#define EASP_HDR_SIZE       13
+
+/** Default Unix domain socket path (pipeline_manager.cpp uses the same). */
+#define DEFAULT_SOCKET      "/tmp/edge-ai-speech.sock"
 
 /* ------------------------------------------------------------------ */
-/*  Streaming                                                           */
+/*  EASP header layout                                                  */
+/* ------------------------------------------------------------------ */
+
+typedef struct __attribute__((packed)) {
+    char     magic[4];   /**< Must be 'E','A','S','P'. */
+    uint8_t  direction;  /**< 0 = input (pre-STFT), 1 = output (post-ISTFT). */
+    uint32_t rate;       /**< Sample rate, little-endian (always 16000). */
+    uint32_t bytes;      /**< Payload length in bytes, little-endian. */
+} easp_header_t;
+
+/* ------------------------------------------------------------------ */
+/*  Signal handling                                                     */
 /* ------------------------------------------------------------------ */
 
 static volatile int g_running = 1;
 
-/**
- * @brief Signal handler — clears g_running to stop the stream loop cleanly.
- * @param sig  Received signal number.
- */
 static void signal_handler(int sig)
 {
     (void)sig;
     g_running = 0;
 }
 
+/* ------------------------------------------------------------------ */
+/*  I/O helpers                                                         */
+/* ------------------------------------------------------------------ */
+
 /**
- * @brief Stream PCM frames from input (and optional output) WAV files to stdout.
+ * @brief Blocking read of exactly @p n bytes from @p fd.
  *
- * Each iteration:
- *  1. Reads CHUNK_BYTES from @p fin, zero-pads short reads.
- *  2. Writes @c CHAN_INPUT + 1024 PCM bytes to stdout.
- *  3. If @p fout is non-NULL: reads CHUNK_BYTES from @p fout,
- *     writes @c CHAN_OUTPUT + 1024 PCM bytes to stdout.
- *  4. Flushes stdout so the parent process receives the frames promptly.
- *  5. Sleeps NS_PER_CHUNK ns to pace output to real-time 48 kHz.
+ * Retries on EINTR and partial reads until all bytes are received or
+ * g_running is cleared.
  *
- * Loops back to the WAV data start when the end of the file is reached.
- *
- * @param fin      Open FILE* for the input WAV, positioned at the PCM data.
- * @param fout     Open FILE* for the output WAV, or NULL if not provided.
- * @param in_off   Byte offset of the input PCM data start (for loop seek).
- * @param out_off  Byte offset of the output PCM data start (ignored if fout==NULL).
+ * @return @p n on success, 0 on clean EOF, -1 on error.
  */
-static void stream_loop(FILE *fin, FILE *fout, uint32_t in_off, uint32_t out_off)
+static ssize_t read_full(int fd, void *buf, size_t n)
 {
-    uint8_t frame[1 + CHUNK_BYTES];
-    struct timespec ts = { 0, NS_PER_CHUNK };
+    size_t done = 0;
+    while (done < n && g_running) {
+        ssize_t r = read(fd, (char *)buf + done, n - done);
+        if (r == 0) return (ssize_t)done; /* EOF */
+        if (r < 0) return -1;
+        done += (size_t)r;
+    }
+    return (ssize_t)done;
+}
+
+/**
+ * @brief Drain and discard @p n bytes from @p fd.
+ * @return 0 on success, -1 on read error.
+ */
+static int drain(int fd, size_t n)
+{
+    char tmp[256];
+    while (n > 0 && g_running) {
+        size_t chunk = n < sizeof(tmp) ? n : sizeof(tmp);
+        ssize_t r = read(fd, tmp, chunk);
+        if (r <= 0) return -1;
+        n -= (size_t)r;
+    }
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Streaming loop                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * @brief Read EASP frames from @p fd, strip zero-padded tail, write to stdout.
+ *
+ * Processing per frame:
+ *  1. Read 13-byte EASP header; validate magic bytes.
+ *  2. Read the PCM payload (header.bytes bytes).
+ *  3. Discard the last TAIL_BYTES (TAIL_FRAMES × HOP_SAMPLES × 2) bytes.
+ *     For the last inference block of a file the pipeline may pad with more
+ *     zeros; the fixed trim is still applied — any residual silence is brief
+ *     and non-repetitive.
+ *  4. Write: direction_byte (1 B) + valid_pcm (valid_bytes B) to stdout.
+ *
+ * @param fd  Connected Unix socket file descriptor.
+ */
+static void stream_loop(int fd)
+{
+    uint8_t *payload = (uint8_t *)malloc(MAX_PAYLOAD);
+    if (!payload) { perror("[spectrum] malloc"); return; }
 
     while (g_running) {
-        /* ---- input chunk ---- */
-        size_t n = fread(frame + 1, 1, CHUNK_BYTES, fin);
-        if (n == 0) {
-            fseek(fin, (long)in_off, SEEK_SET);
+
+        /* ---- read EASP header ---- */
+        easp_header_t hdr;
+        ssize_t nr = read_full(fd, &hdr, EASP_HDR_SIZE);
+        if (nr == 0) break;          /* clean EOF — pipeline finished */
+        if (nr < EASP_HDR_SIZE) break;
+
+        if (memcmp(hdr.magic, "EASP", 4) != 0) {
+            /* Out-of-sync: skip one byte and attempt resync */
+            fprintf(stderr, "[spectrum] bad EASP magic — resyncing\n");
+            char dummy;
+            read(fd, &dummy, 1);
             continue;
         }
-        if (n < CHUNK_BYTES)
-            memset(frame + 1 + n, 0, CHUNK_BYTES - n);
 
-        frame[0] = CHAN_INPUT;
-        if (fwrite(frame, 1, sizeof(frame), stdout) != sizeof(frame))
-            break;
+        /* header fields are little-endian; on ARM32/64 this is native */
+        uint32_t payload_bytes = hdr.bytes;
+        uint8_t  direction     = hdr.direction;
 
-        /* ---- output chunk (optional) ---- */
-        if (fout) {
-            size_t m = fread(frame + 1, 1, CHUNK_BYTES, fout);
-            if (m == 0) {
-                fseek(fout, (long)out_off, SEEK_SET);
-            } else {
-                if (m < CHUNK_BYTES)
-                    memset(frame + 1 + m, 0, CHUNK_BYTES - m);
-                frame[0] = CHAN_OUTPUT;
-                if (fwrite(frame, 1, sizeof(frame), stdout) != sizeof(frame))
-                    break;
-            }
+        if (payload_bytes == 0 || payload_bytes > MAX_PAYLOAD) {
+            fprintf(stderr, "[spectrum] unexpected payload size %u — skipping frame\n",
+                    payload_bytes);
+            if (payload_bytes > 0) drain(fd, payload_bytes);
+            continue;
         }
 
+        /* ---- read PCM payload ---- */
+        nr = read_full(fd, payload, payload_bytes);
+        if (nr < (ssize_t)payload_bytes) break;
+
+        /* ---- strip zero-padded tail ---- */
+        uint32_t valid_bytes = payload_bytes > TAIL_BYTES
+                               ? payload_bytes - TAIL_BYTES
+                               : 0u; /* degenerate: last micro-block */
+
+        if (valid_bytes == 0) continue;
+
+        /* ---- write stdout frame: direction + valid PCM ---- */
+        if (fwrite(&direction, 1, 1, stdout) != 1) break;
+        if (fwrite(payload, 1, valid_bytes, stdout) != valid_bytes) break;
         fflush(stdout);
-        nanosleep(&ts, NULL);
+
+        fprintf(stderr, "[spectrum] dir=%u  rate=%u  payload=%u  valid=%u\n",
+                direction, hdr.rate, payload_bytes, valid_bytes);
     }
+
+    free(payload);
 }
 
 /* ------------------------------------------------------------------ */
@@ -238,71 +248,46 @@ static void stream_loop(FILE *fin, FILE *fout, uint32_t in_off, uint32_t out_off
 /* ------------------------------------------------------------------ */
 
 /**
- * @brief Entry point — validates WAV files and starts the stream loop.
+ * @brief Connect to the edge-AI pipeline socket and stream valid PCM to stdout.
  *
- * | argv[1] | Mandatory. Path to the input (noisy) 48 kHz mono S16LE WAV file. |
- * | argv[2] | Optional.  Path to the output (enhanced) WAV file.               |
+ * Constants in effect:
+ *   SAMPLE_RATE=%d  FRAMES_PER_BATCH=%d  HOP_SAMPLES=%d
+ *   TAIL_FRAMES=%d  VALID_FRAMES=%d  CHUNK_BYTES=%d
  *
- * Validates that the input file is 48 kHz, mono, 16-bit PCM.  Exits with
- * an error message if the format is unsupported.
- *
- * @param argc  Argument count; must be 2 or 3.
- * @param argv  Argument vector.
+ * @param argc  Argument count.
+ * @param argv  argv[1] optionally overrides the socket path.
  * @return 0 on clean exit, 1 on error.
  */
 int main(int argc, char *argv[])
 {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <input.wav> [output.wav]\n", argv[0]);
-        return 1;
-    }
-
-    /* ---- input WAV ---- */
-    FILE *fin = fopen(argv[1], "rb");
-    if (!fin) { perror(argv[1]); return 1; }
-
-    wav_info_t in_info;
-    if (parse_wav_header(fin, &in_info) < 0) { fclose(fin); return 1; }
-
-    fprintf(stderr, "[spectrum] input: %u Hz, %u ch, %u bit, %u bytes\n",
-            in_info.sample_rate, in_info.channels,
-            in_info.bits_per_sample, in_info.data_size);
-
-    if (in_info.sample_rate != SAMPLE_RATE || in_info.channels != 1
-            || in_info.bits_per_sample != 16) {
-        fprintf(stderr, "[spectrum] Require 48000 Hz mono 16-bit PCM\n");
-        fclose(fin);
-        return 1;
-    }
-
-    /* ---- output WAV (optional) ---- */
-    FILE     *fout    = NULL;
-    wav_info_t out_info;
-    uint32_t  out_off = 0;
-
-    if (argc >= 3) {
-        fout = fopen(argv[2], "rb");
-        if (!fout) {
-            perror(argv[2]);
-        } else if (parse_wav_header(fout, &out_info) < 0) {
-            fclose(fout);
-            fout = NULL;
-        } else {
-            out_off = out_info.data_offset;
-            fprintf(stderr, "[spectrum] output: %u Hz, %u ch, %u bit, %u bytes\n",
-                    out_info.sample_rate, out_info.channels,
-                    out_info.bits_per_sample, out_info.data_size);
-        }
-    }
+    const char *sock_path = argc >= 2 ? argv[1] : DEFAULT_SOCKET;
 
     signal(SIGTERM, signal_handler);
     signal(SIGINT,  signal_handler);
 
-    fprintf(stderr, "[spectrum] streaming started (press Ctrl-C to stop)\n");
-    stream_loop(fin, fout, in_info.data_offset, out_off);
+    fprintf(stderr,
+            "[spectrum] SAMPLE_RATE=%d  FRAMES_PER_BATCH=%d  HOP_SAMPLES=%d\n"
+            "[spectrum] TAIL_FRAMES=%d  VALID_FRAMES=%d  CHUNK_BYTES=%d\n",
+            SAMPLE_RATE, FRAMES_PER_BATCH, HOP_SAMPLES,
+            TAIL_FRAMES, VALID_FRAMES, CHUNK_BYTES);
 
-    fclose(fin);
-    if (fout) fclose(fout);
-    fprintf(stderr, "[spectrum] stopped\n");
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) { perror("[spectrum] socket"); return 1; }
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
+
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        fprintf(stderr, "[spectrum] cannot connect to %s: %m\n", sock_path);
+        close(fd);
+        return 1;
+    }
+
+    fprintf(stderr, "[spectrum] connected to %s\n", sock_path);
+    stream_loop(fd);
+    close(fd);
+    fprintf(stderr, "[spectrum] disconnected\n");
     return 0;
 }

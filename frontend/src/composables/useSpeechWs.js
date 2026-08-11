@@ -16,6 +16,7 @@ export function useSpeechWs() {
   const outputBuffer   = []             // accumulate all output frames
   const downloadUrls = ref(null)
   const metrics      = ref([])
+  const MAX_BUFFER_SAMPLES = 16000 * 30  // 30 seconds at 16 kHz
 
   let ws = null
 
@@ -61,6 +62,14 @@ export function useSpeechWs() {
         statusMsg.value = 'Complete'
         statusColor.value = 'success'
         downloadUrls.value = { inputUrl: msg.inputUrl, outputUrl: msg.outputUrl }
+        if (msg.totalInputSamples != null && inputBuffer.length > msg.totalInputSamples) {
+          inputBuffer.splice(msg.totalInputSamples)
+          inputPcm.value = { pcm: new Int16Array(inputBuffer), sampleRate: inputPcm.value?.sampleRate || 16000 }
+        }
+        if (msg.totalOutputSamples != null && outputBuffer.length > msg.totalOutputSamples) {
+          outputBuffer.splice(msg.totalOutputSamples)
+          outputPcm.value = { pcm: new Int16Array(outputBuffer), sampleRate: outputPcm.value?.sampleRate || 16000 }
+        }
         break
       default:
         if (msg.status === 'connected') {
@@ -80,10 +89,16 @@ export function useSpeechWs() {
     if (msg.channel === 'input') {
       inputPcmFrame.value = { pcm: int16, sampleRate: msg.sampleRate }
       inputBuffer.push(...int16)
+      if (inputBuffer.length > MAX_BUFFER_SAMPLES) {
+        inputBuffer.splice(0, inputBuffer.length - MAX_BUFFER_SAMPLES)
+      }
       inputPcm.value = { pcm: new Int16Array(inputBuffer), sampleRate: msg.sampleRate }
     } else {
       outputPcmFrame.value = { pcm: int16, sampleRate: msg.sampleRate }
       outputBuffer.push(...int16)
+      if (outputBuffer.length > MAX_BUFFER_SAMPLES) {
+        outputBuffer.splice(0, outputBuffer.length - MAX_BUFFER_SAMPLES)
+      }
       outputPcm.value = { pcm: new Int16Array(outputBuffer), sampleRate: msg.sampleRate }
     }
   }

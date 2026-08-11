@@ -161,9 +161,9 @@ function computeMagnitudes(int16, numBins) {
     let end = start + step
     if (end > half) end = half
     for (let k = start; k < end; k++) {
-      sum += Math.sqrt(re[k]*re[k] + im[k]*im[k])
+      sum += re[k]*re[k] + im[k]*im[k]
     }
-    mags[b] = sum / (end - start)
+    mags[b] = Math.sqrt(sum / (end - start))
   }
   return mags
 }
