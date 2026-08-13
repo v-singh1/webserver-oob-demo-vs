@@ -116,10 +116,11 @@
           size="x-small"
           variant="tonal"
           color="primary"
-          prepend-icon="mdi-content-save-outline"
+          prepend-icon="mdi-folder-zip-outline"
           :disabled="!canSave"
+          :loading="saving"
           @click="saveArtifacts"
-        >Save</v-btn>
+        >Save ZIP</v-btn>
       </div>
 
       <!-- Spectrogram row -->
@@ -188,6 +189,7 @@ import SpectrogramCanvas from '@/components/SpectrogramCanvas.vue'
 import WaveformCanvas    from '@/components/WaveformCanvas.vue'
 import RmsTable          from '@/components/RmsTable.vue'
 import AudioPlayer       from '@/components/AudioPlayer.vue'
+import JSZip             from 'jszip'
 
 const vuetifyTheme = useTheme()
 const isLight     = computed(() => vuetifyTheme.global.name.value === 'tiLight')
@@ -218,7 +220,8 @@ const spectOutRef = ref(null)
 const waveInRef   = ref(null)
 const waveOutRef  = ref(null)
 
-const canSave = computed(() => !ws.running.value && (ws.inputPcm.value !== null || ws.chunkTimings.value.length > 0))
+const canSave = computed(() => !ws.running.value && !saving.value && (ws.inputPcm.value !== null || ws.chunkTimings.value.length > 0))
+const saving  = ref(false)
 
 function renderWaveformToCanvas(pcmData, color, bgColor, width, height, yZoom) {
   const off = document.createElement('canvas')
@@ -299,105 +302,109 @@ function useDefault() {
 }
 
 async function saveArtifacts() {
-  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  saving.value = true
+  try {
+    const now = new Date()
+    const ts  = now.toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')
+    const zip = new JSZip()
 
-  // ── Composite visualization PNG ──────────────────────────────────────────
-  const spectIn  = spectInRef.value?.getCanvas()
-  const spectOut = spectOutRef.value?.getCanvas()
-  // Fetch and decode WAV files from server for accurate full-audio waveforms
-  const saveW = waveInRef.value?.getCanvas()?.offsetWidth || 800
-  const saveH = waveInRef.value?.getCanvas()?.height || 130
-  const decodeWav = async (url) => {
-    try {
-      const resp = await fetch(url)
-      if (!resp.ok) return null
-      const buf = await resp.arrayBuffer()
-      const view = new DataView(buf)
-      // Find 'data' chunk
-      let offset = 12
-      while (offset + 8 <= buf.byteLength) {
-        const id  = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2), view.getUint8(offset+3))
-        const len = view.getUint32(offset + 4, true)
-        if (id === 'data') return new Int16Array(buf, offset + 8, len / 2)
-        offset += 8 + len + (len & 1)
-      }
-    } catch { /* fall back to streamed */ }
-    return null
-  }
-  const [inPcmRaw, outPcmRaw] = ws.downloadUrls.value
-    ? await Promise.all([decodeWav(ws.downloadUrls.value.inputUrl), decodeWav(ws.downloadUrls.value.outputUrl)])
-    : [null, null]
-  const inPcm  = inPcmRaw  ? { pcm: inPcmRaw }  : ws.inputPcm.value
-  const outPcm = outPcmRaw ? { pcm: outPcmRaw } : ws.outputPcm.value
-  const waveIn   = inPcm  ? renderWaveformToCanvas(inPcm,  inputColor.value,  canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
-  const waveOut  = outPcm ? renderWaveformToCanvas(outPcm, outputColor.value, canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
+    // ── Composite visualization PNGs ─────────────────────────────────────
+    const spectIn  = spectInRef.value?.getCanvas()
+    const spectOut = spectOutRef.value?.getCanvas()
+    const saveW = waveInRef.value?.getCanvas()?.offsetWidth || 800
+    const saveH = waveInRef.value?.getCanvas()?.height || 130
 
-  const savePng = (canvas1, label1, color1, canvas2, label2, color2, suffix, canvasH) => {
-    if (!canvas1 && !canvas2) return
-    const PAD = 16, LABEL_H = 20, HEADER_H = 36
-    const W = (canvas1?.width || canvas2?.width || 800)
-    const H = HEADER_H + PAD + (LABEL_H + canvasH + PAD) + (LABEL_H + canvasH + PAD)
-    const off = document.createElement('canvas')
-    off.width = W; off.height = H
-    const ctx = off.getContext('2d')
-    ctx.fillStyle = '#0a0f1e'
-    ctx.fillRect(0, 0, W, H)
-    ctx.fillStyle = 'rgba(29,111,232,0.12)'
-    ctx.fillRect(0, 0, W, HEADER_H)
-    ctx.fillStyle = '#e2e8f0'
-    ctx.font = 'bold 13px system-ui, sans-serif'
-    ctx.fillText(`Speech Enhancement — ${suffix}  —  ${ts.replace('T', '  ').replace(/-/g, (m, o) => o > 10 ? ':' : '-')}`, PAD, HEADER_H / 2 + 5)
-    const lbl = (text, y, color) => {
-      ctx.font = 'bold 12px system-ui, sans-serif'
-      ctx.fillStyle = color
-      ctx.fillText(text, PAD, y)
-    }
-    let y = HEADER_H + PAD
-    lbl(label1, y + LABEL_H - 4, color1)
-    y += LABEL_H
-    if (canvas1) ctx.drawImage(canvas1, 0, y, W, canvasH)
-    y += canvasH + PAD
-    lbl(label2, y + LABEL_H - 4, color2)
-    y += LABEL_H
-    if (canvas2) ctx.drawImage(canvas2, 0, y, W, canvasH)
-    const a = document.createElement('a')
-    a.download = `speech-enhancement-${suffix.toLowerCase()}-${ts}.png`
-    a.href = off.toDataURL('image/png')
-    a.click()
-  }
-
-  savePng(spectIn, 'Input (Noisy)', '#4da6ff', spectOut, 'Output (Enhanced)', '#22c55e', 'Spectrogram', spectIn?.height || 220)
-  savePng(waveIn,  'Input (Noisy)', '#4da6ff', waveOut,  'Output (Enhanced)', '#22c55e', 'Waveform',    waveIn?.height  || 130)
-
-  // ── Processing times CSV ─────────────────────────────────────────────────
-  if (ws.chunkTimings.value.length > 0) {
-    const header = 'Frames,STFT (ms),GCRN (ms),ISTFT (ms),Total (ms)'
-    const lines  = ws.chunkTimings.value.map(r =>
-      `${r.chunk}/${r.total},${r.stft.toFixed(3)},${r.tvm.toFixed(3)},${r.istft.toFixed(3)},${r.totalMs.toFixed(3)}`
-    )
-    const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })
-    const a = document.createElement('a')
-    a.download = `speech-enhancement-timings-${ts}.csv`
-    a.href = URL.createObjectURL(blob)
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-  }
-
-  // ── Audio WAV files ───────────────────────────────────────────────────────
-  if (ws.downloadUrls.value) {
-    for (const [channel, url] of [['input', ws.downloadUrls.value.inputUrl], ['output', ws.downloadUrls.value.outputUrl]]) {
+    const decodeWav = async (url) => {
       try {
         const resp = await fetch(url)
-        if (!resp.ok) continue
-        const blob = await resp.blob()
-        const a = document.createElement('a')
-        a.download = `speech-enhancement-${channel}-${ts}.wav`
-        a.href = URL.createObjectURL(blob)
-        a.click()
-        setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-        await new Promise(r => setTimeout(r, 300))  // small gap between downloads
-      } catch { /* skip if unavailable */ }
+        if (!resp.ok) return null
+        const buf  = await resp.arrayBuffer()
+        const view = new DataView(buf)
+        let offset = 12
+        while (offset + 8 <= buf.byteLength) {
+          const id  = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2), view.getUint8(offset+3))
+          const len = view.getUint32(offset + 4, true)
+          if (id === 'data') return new Int16Array(buf, offset + 8, len / 2)
+          offset += 8 + len + (len & 1)
+        }
+      } catch { /* fall back to streamed */ }
+      return null
     }
+
+    const [inPcmRaw, outPcmRaw] = ws.downloadUrls.value
+      ? await Promise.all([decodeWav(ws.downloadUrls.value.inputUrl), decodeWav(ws.downloadUrls.value.outputUrl)])
+      : [null, null]
+    const inPcm  = inPcmRaw  ? { pcm: inPcmRaw }  : ws.inputPcm.value
+    const outPcm = outPcmRaw ? { pcm: outPcmRaw } : ws.outputPcm.value
+    const waveIn  = inPcm  ? renderWaveformToCanvas(inPcm,  inputColor.value,  canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
+    const waveOut = outPcm ? renderWaveformToCanvas(outPcm, outputColor.value, canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null
+
+    const canvasToBlob = (canvas1, label1, color1, canvas2, label2, color2, suffix, canvasH) => {
+      if (!canvas1 && !canvas2) return Promise.resolve(null)
+      const PAD = 16, LABEL_H = 20, HEADER_H = 36
+      const W = canvas1?.width || canvas2?.width || 800
+      const H = HEADER_H + PAD + (LABEL_H + canvasH + PAD) * 2
+      const off = document.createElement('canvas')
+      off.width = W; off.height = H
+      const ctx = off.getContext('2d')
+      ctx.fillStyle = '#0a0f1e'
+      ctx.fillRect(0, 0, W, H)
+      ctx.fillStyle = 'rgba(29,111,232,0.12)'
+      ctx.fillRect(0, 0, W, HEADER_H)
+      ctx.fillStyle = '#e2e8f0'
+      ctx.font = 'bold 13px system-ui, sans-serif'
+      ctx.fillText(`Speech Enhancement — ${suffix}  —  ${ts.replace(/_/, '  ').replace(/-/g, (m, o) => o > 10 ? ':' : '-')}`, PAD, HEADER_H / 2 + 5)
+      const lbl = (text, y, color) => {
+        ctx.font = 'bold 12px system-ui, sans-serif'
+        ctx.fillStyle = color
+        ctx.fillText(text, PAD, y)
+      }
+      let y = HEADER_H + PAD
+      lbl(label1, y + LABEL_H - 4, color1); y += LABEL_H
+      if (canvas1) ctx.drawImage(canvas1, 0, y, W, canvasH)
+      y += canvasH + PAD
+      lbl(label2, y + LABEL_H - 4, color2); y += LABEL_H
+      if (canvas2) ctx.drawImage(canvas2, 0, y, W, canvasH)
+      return new Promise(resolve => off.toBlob(resolve, 'image/png'))
+    }
+
+    const [spectBlob, waveBlob] = await Promise.all([
+      canvasToBlob(spectIn, 'Input (Noisy)', '#4da6ff', spectOut, 'Output (Enhanced)', '#22c55e', 'Spectrogram', spectIn?.height || 220),
+      canvasToBlob(waveIn,  'Input (Noisy)', '#4da6ff', waveOut,  'Output (Enhanced)', '#22c55e', 'Waveform',    waveIn?.height  || 130),
+    ])
+    if (spectBlob) zip.file('spectrogram.png', spectBlob)
+    if (waveBlob)  zip.file('waveform.png',    waveBlob)
+
+    // ── Processing times CSV ──────────────────────────────────────────────
+    if (ws.chunkTimings.value.length > 0) {
+      const header = 'Frames,STFT (ms),GCRN (ms),ISTFT (ms),Total (ms)'
+      const lines  = ws.chunkTimings.value.map(r =>
+        `${r.frameStart}-${r.frameEnd},${r.stft.toFixed(3)},${r.tvm.toFixed(3)},${r.istft.toFixed(3)},${r.totalMs.toFixed(3)}`
+      )
+      zip.file('timings.csv', [header, ...lines].join('\n'))
+    }
+
+    // ── Audio WAV files ───────────────────────────────────────────────────
+    if (ws.downloadUrls.value) {
+      await Promise.all(
+        [['input', ws.downloadUrls.value.inputUrl], ['output', ws.downloadUrls.value.outputUrl]].map(async ([ch, url]) => {
+          try {
+            const resp = await fetch(url)
+            if (resp.ok) zip.file(`${ch}.wav`, await resp.blob(), { binary: true })
+          } catch { /* skip if unavailable */ }
+        })
+      )
+    }
+
+    // ── Generate and trigger ZIP download ─────────────────────────────────
+    const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+    const a = document.createElement('a')
+    a.download = `speech-enhancement_${ts}.zip`
+    a.href = URL.createObjectURL(zipBlob)
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+  } finally {
+    saving.value = false
   }
 }
 
