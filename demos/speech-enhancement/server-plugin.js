@@ -216,30 +216,28 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         job.process = child;
         console.log('[speech-enhancement] child process spawned, pid:', child.pid);
         connectDmaStream();
-        let frameOffset = 0;
+        let totalFrames = 401; // updated from [App] GCRN configuration: TOTAL_FRAMES=N
         const collect = data => {
             const text = data.toString();
             if (job) job.stdout += text;
             console.log('[speech-enhancement] child stdout:', text.trim());
             text.split('\n').filter(Boolean).forEach(line => {
-                // [App] Chunk N/M [F real frames + zero-pad] | STFT=Xms TVM=Xms ISTFT=Xms total=Xms
-                const chunkMatch = line.match(/\[App\]\s+Chunk\s+(\d+)\/(\d+)\s*(?:\[(\d+)\s+real\s+frames[^\]]*\])?\s*\|\s*STFT=([\d.]+)ms\s+TVM=([\d.]+)ms\s+ISTFT=([\d.]+)ms\s+total=([\d.]+)ms/i);
+                const configMatch = line.match(/TOTAL_FRAMES=(\d+)/);
+                if (configMatch) totalFrames = parseInt(configMatch[1]);
+                // [App] Chunk N/M | STFT=Xms TVM=Xms ISTFT=Xms total=Xms
+                const chunkMatch = line.match(/\[App\]\s+Chunk\s+(\d+)\/(\d+)\s*(?:\[[^\]]*\])?\s*\|\s*STFT=([\d.]+)ms\s+TVM=([\d.]+)ms\s+ISTFT=([\d.]+)ms\s+total=([\d.]+)ms/i);
                 if (chunkMatch) {
                     const chunk = parseInt(chunkMatch[1]);
-                    const framesThisChunk = chunkMatch[3] ? parseInt(chunkMatch[3]) : 0;
-                    const frameStart = framesThisChunk > 0 ? frameOffset : null;
-                    const frameEnd   = framesThisChunk > 0 ? frameOffset + framesThisChunk - 1 : null;
-                    if (framesThisChunk > 0) frameOffset += framesThisChunk;
                     send({
                         type:       'chunk_timing',
                         chunk,
                         total:      parseInt(chunkMatch[2]),
-                        frameStart,
-                        frameEnd,
-                        stft:       parseFloat(chunkMatch[4]),
-                        tvm:        parseFloat(chunkMatch[5]),
-                        istft:      parseFloat(chunkMatch[6]),
-                        totalMs:    parseFloat(chunkMatch[7]),
+                        frameStart: (chunk - 1) * totalFrames,
+                        frameEnd:   chunk * totalFrames - 1,
+                        stft:       parseFloat(chunkMatch[3]),
+                        tvm:        parseFloat(chunkMatch[4]),
+                        istft:      parseFloat(chunkMatch[5]),
+                        totalMs:    parseFloat(chunkMatch[6]),
                     });
                 }
                 if (/Pipeline completed successfully/i.test(line)) { send({ type: 'metric', label: 'Pipeline completed successfully' }); }

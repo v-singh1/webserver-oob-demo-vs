@@ -113,10 +113,21 @@ if (fs.existsSync(deviceAppDir)) {
 }
 app.use(express.static(appDir));
 
+const serverStarted = new Date().toISOString();
+const serverBuildDate = new Date(fs.statSync(__filename).mtime).toISOString();
+
 if (isAm62d) {
     /* Health check — used by the Vue portal to detect disconnects and reconnect. */
     app.get('/ping', (req, res) => res.json({ ok: true }));
 }
+
+app.get('/version', (req, res) => {
+    res.json({
+        version:       process.env.WEBSERVER_VERSION   || '0.0.3',
+        buildDate:     process.env.WEBSERVER_BUILD_DATE || serverBuildDate,
+        serverStarted,
+    });
+});
 
 /* Device info endpoint — frontend calls this on load */
 app.get('/device-info', (req, res) => {

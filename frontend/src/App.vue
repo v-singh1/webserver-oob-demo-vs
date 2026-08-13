@@ -117,6 +117,7 @@
             RAM: <span class="sb-ram">{{ stats.ramUsed.value }} / {{ stats.ramFree.value }}</span>
           </div>
           <div class="sb-spacer" />
+          <span class="sb-version">v{{ appVersion }}&ensp;&middot;&ensp;{{ buildDate }}</span>
           <span class="sb-copy">&copy; 2026 Texas Instruments Incorporated</span>
           <a
             href="https://software-dl.ti.com/processor-sdk-linux/esd/AM62DX/latest/exports/docs/devices/AM62DX/index.html"
@@ -181,6 +182,11 @@ const theme = ref(saved === 'tiLight' ? 'tiLight' : 'tiDark')
 vuetifyTheme.global.name.value = theme.value
 const stats = useCpuStats()
 const hostname = window.location.hostname
+
+/* eslint-disable no-undef */
+const appVersion = __APP_VERSION__
+const buildDate  = new Date(__BUILD_DATE__).toISOString().slice(0, 10)
+/* eslint-enable no-undef */
 
 /* ── Connection health ── */
 const isConnected    = ref(true)
@@ -306,6 +312,7 @@ async function openDeviceInfo() {
 .bar-f.g { background:linear-gradient(90deg,#16a34a,#4ade80); }
 .sb-ram    { color:#c084fc; font-weight:600; }
 .sb-spacer { flex:1; }
+.sb-version { color:#475569; font-size:11px; font-family:monospace; white-space:nowrap; }
 .sb-copy   { color:#475569; font-size:12px; }
 .sb-doc    { color:#4da6ff; text-decoration:none; display:flex; align-items:center; gap:4px; font-size:12px; }
 .sb-doc:hover { color:#93c5fd; }

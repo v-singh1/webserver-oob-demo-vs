@@ -2,10 +2,16 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 import { fileURLToPath, URL } from 'node:url'
+import { readFileSync } from 'node:fs'
 
 const BACKEND = 'http://localhost:3000'
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUILD_DATE__:  JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     vue({ template: { transformAssetUrls } }),
     vuetify({ autoImport: true }),
@@ -29,6 +35,7 @@ export default defineConfig({
       '/speech-output-devices':           BACKEND,
       '/tvm-inference':                   BACKEND,
       '/cpu-stats':                       BACKEND,
+      '/version':                         BACKEND,
       '/ws':     { target: 'ws://localhost:3000', ws: true },
       '/speech': { target: 'ws://localhost:3000', ws: true },
     },

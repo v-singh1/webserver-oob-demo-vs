@@ -13,7 +13,7 @@
       </div>
       <div class="timing-rows">
         <div v-for="r in rows" :key="r.chunk" class="timing-row">
-          <span>{{ r.chunk }}/{{ r.total }}</span>
+          <span>{{ r.frameStart }}&ndash;{{ r.frameEnd }}</span>
           <span>{{ r.stft.toFixed(1) }} ms</span>
           <span class="col-tvm">{{ r.tvm.toFixed(1) }} ms</span>
           <span>{{ r.istft.toFixed(1) }} ms</span>
@@ -45,7 +45,7 @@ defineProps({ rows: { type: Array, default: () => [] } })
 }
 .timing-header, .timing-row {
   display: grid;
-  grid-template-columns: 50px 1fr 1fr 1fr 80px;
+  grid-template-columns: 80px 1fr 1fr 1fr 80px;
   padding: 4px 10px;
   gap: 8px;
   align-items: center;
