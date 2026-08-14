@@ -25,6 +25,7 @@
 const fs        = require('fs');
 const net       = require('net');
 const { spawn, exec } = require('child_process');
+const demoCoordinator = require('../demo-coordinator');
 
 const UENV_PATH   = '/run/media/boot-mmcblk1p1/uEnv.txt';
 const OVERLAY_DTB = 'ti/k3-am62d2-evm-dsp-controlled-audio.dtbo';
@@ -213,6 +214,10 @@ module.exports = function registerSigchainBiquad(app, wss, device) {
             }
             return res.send('rpmsg_sigchain_biquad_example already running');
         }
+
+        const dspError = demoCoordinator.acquireDsp('sigchain-biquad');
+        if (dspError) return res.status(409).send(dspError);
+
         if (autoStopTimer) clearTimeout(autoStopTimer);
         broadcast({ type: 'status', state: 'connecting', message: 'Starting rpmsg_sigchain_biquad_example…' });
         proc = spawn(BIN_PATH, [], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -226,6 +231,8 @@ module.exports = function registerSigchainBiquad(app, wss, device) {
             proc = null;
             if (autoStopTimer) clearTimeout(autoStopTimer);
             if (tcpConnected) disconnectTcp();
+            demoCoordinator.invalidateTvmCache();
+            demoCoordinator.releaseDsp('sigchain-biquad');
             broadcast({ type: 'status', state: 'stopped', message: `Process exited (code=${code})` });
         });
         _connectWithRetry('127.0.0.1');

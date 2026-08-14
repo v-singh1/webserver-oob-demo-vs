@@ -12,6 +12,8 @@ export function useSpeechWs() {
   const outputPcmFrame = shallowRef(null)
   const inputPcm       = shallowRef(null)  // accumulated signal → waveform
   const outputPcm      = shallowRef(null)
+  const inputPcmFull   = shallowRef(null)  // full WAV PCM after completion → spectrogram rebuild
+  const outputPcmFull  = shallowRef(null)
   const inputBuffer    = []              // accumulate all input frames for continuous waveform
   const outputBuffer   = []             // accumulate all output frames
   const downloadUrls = ref(null)
@@ -62,14 +64,7 @@ export function useSpeechWs() {
         statusMsg.value = 'Complete'
         statusColor.value = 'success'
         downloadUrls.value = { inputUrl: msg.inputUrl, outputUrl: msg.outputUrl }
-        if (msg.totalInputSamples != null && inputBuffer.length > msg.totalInputSamples) {
-          inputBuffer.splice(msg.totalInputSamples)
-          inputPcm.value = { pcm: new Int16Array(inputBuffer), sampleRate: inputPcm.value?.sampleRate || 16000 }
-        }
-        if (msg.totalOutputSamples != null && outputBuffer.length > msg.totalOutputSamples) {
-          outputBuffer.splice(msg.totalOutputSamples)
-          outputPcm.value = { pcm: new Int16Array(outputBuffer), sampleRate: outputPcm.value?.sampleRate || 16000 }
-        }
+        fetchAndRebuild(msg.inputUrl, msg.outputUrl)
         break
       default:
         if (msg.status === 'connected') {
@@ -103,6 +98,34 @@ export function useSpeechWs() {
     }
   }
 
+  async function fetchAndRebuild(inputUrl, outputUrl) {
+    const decodeWav = async (url) => {
+      try {
+        const resp = await fetch(url)
+        if (!resp.ok) return null
+        const buf  = await resp.arrayBuffer()
+        const view = new DataView(buf)
+        let offset = 12
+        while (offset + 8 <= buf.byteLength) {
+          const id  = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2), view.getUint8(offset+3))
+          const len = view.getUint32(offset + 4, true)
+          if (id === 'data') return new Int16Array(buf, offset + 8, len / 2)
+          offset += 8 + len + (len & 1)
+        }
+      } catch { /* ignore */ }
+      return null
+    }
+    const [inPcm, outPcm] = await Promise.all([decodeWav(inputUrl), decodeWav(outputUrl)])
+    if (inPcm) {
+      inputPcm.value     = { pcm: inPcm,  sampleRate: 16000 }
+      inputPcmFull.value = { pcm: inPcm,  sampleRate: 16000 }
+    }
+    if (outPcm) {
+      outputPcm.value     = { pcm: outPcm, sampleRate: 16000 }
+      outputPcmFull.value = { pcm: outPcm, sampleRate: 16000 }
+    }
+  }
+
   function reset() {
     runKey.value++
     chunkTimings.value   = []
@@ -113,6 +136,8 @@ export function useSpeechWs() {
     outputPcmFrame.value = null
     inputPcm.value       = null
     outputPcm.value      = null
+    inputPcmFull.value   = null
+    outputPcmFull.value  = null
     inputBuffer.length   = 0
     outputBuffer.length  = 0
     statusMsg.value      = 'Starting…'
@@ -143,5 +168,5 @@ export function useSpeechWs() {
   onUnmounted(() => { if (ws) ws.close() })
   connect()
 
-  return { connected, running, statusMsg, statusColor, error, chunkTimings, runKey, inputPcmFrame, outputPcmFrame, inputPcm, outputPcm, downloadUrls, metrics, start, stop }
+  return { connected, running, statusMsg, statusColor, error, chunkTimings, runKey, inputPcmFrame, outputPcmFrame, inputPcm, outputPcm, inputPcmFull, outputPcmFull, downloadUrls, metrics, start, stop }
 }

@@ -46,6 +46,7 @@
 
 const net            = require('net');
 const { spawn }      = require('child_process');
+const demoCoordinator = require('../demo-coordinator');
 
 const WS_OPEN = 1;
 const MOCK    = process.env.MOCK === '1';
@@ -384,6 +385,10 @@ module.exports = function registerAudioOffload(app, wss, device) {
             if (!tcpConnected) connectTcp(DEF_HOST);
             return res.send('rpmsg_audio_offload_example already running');
         }
+
+        const dspError = demoCoordinator.acquireDsp('audio-offload');
+        if (dspError) return res.status(409).send(dspError);
+
         console.log(`[audio-offload] Spawning ${BIN_PATH}`);
         broadcast({ type: 'status', state: 'connecting', message: 'Starting rpmsg_audio_offload_example…' });
         /* detached: true gives the binary its own process group so that
@@ -398,6 +403,8 @@ module.exports = function registerAudioOffload(app, wss, device) {
             retryCount = 0;
             if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
             if (tcpConnected) disconnectTcp();
+            demoCoordinator.invalidateTvmCache();
+            demoCoordinator.releaseDsp('audio-offload');
         });
         /* Wait for binary to open TCP ports before connecting */
         setTimeout(() => connectTcp(DEF_HOST), 2000);

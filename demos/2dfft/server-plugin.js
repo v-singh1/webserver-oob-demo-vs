@@ -19,6 +19,7 @@
 'use strict';
 
 const { spawn } = require('child_process');
+const demoCoordinator = require('../demo-coordinator');
 
 const WS_OPEN = 1;
 const MOCK    = process.env.MOCK === '1';
@@ -44,6 +45,9 @@ module.exports = function register2dFft(app, wss, device) {
         if (MOCK) { _startMock(); return res.send('2dfft started (MOCK)'); }
         if (proc)  return res.send('rpmsg_2dfft_example already running');
 
+        const dspError = demoCoordinator.acquireDsp('2dfft');
+        if (dspError) return res.status(409).send(dspError);
+
         broadcast({ type: 'status', state: 'running', message: 'Starting rpmsg_2dfft_example…' });
 
         const startTime = Date.now();
@@ -62,6 +66,8 @@ module.exports = function register2dFft(app, wss, device) {
         proc.on('exit', code => {
             const elapsed = Date.now() - startTime;
             proc = null;
+            demoCoordinator.invalidateTvmCache();
+            demoCoordinator.releaseDsp('2dfft');
             const status = code === 0 ? 'PASSED' : 'FAILED';
             broadcast({ type: 'done', exitCode: code, elapsed, status });
             console.log(`[2dfft] exited code=${code} in ${elapsed}ms`);
