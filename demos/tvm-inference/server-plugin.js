@@ -11,6 +11,7 @@
 'use strict';
 
 const { spawn } = require('child_process');
+const demoCoordinator = require('../demo-coordinator');
 
 const MOCK = process.env.MOCK === '1';
 
@@ -34,8 +35,19 @@ module.exports = function registerTvmInference(app, wss, device) {
             return res.json({ status: 'error', message: 'TVM inference requires real hardware - MOCK mode not supported' });
         }
 
+        const dspError = demoCoordinator.acquireDsp('tvm-inference');
+        if (dspError) return res.status(409).json({ error: dspError });
+
         isRunning = true;
         inferenceResults = null;
+
+        try {
+            demoCoordinator.ensurePreloaded(binary);
+        } catch (err) {
+            isRunning = false;
+            demoCoordinator.releaseDsp('tvm-inference');
+            return res.status(500).json({ error: 'TVM preload failed: ' + err.message });
+        }
 
         console.log('[tvm-inference] spawning:', binary, jsonFile);
         inferenceProcess = spawn(binary, [jsonFile]);
@@ -58,6 +70,7 @@ module.exports = function registerTvmInference(app, wss, device) {
         inferenceProcess.on('close', code => {
             isRunning = false;
             inferenceProcess = null;
+            demoCoordinator.releaseDsp('tvm-inference');
             console.log('[tvm-inference] process exited with code:', code);
 
             if (code === 0) {
@@ -81,6 +94,7 @@ module.exports = function registerTvmInference(app, wss, device) {
         inferenceProcess.on('error', error => {
             isRunning = false;
             inferenceProcess = null;
+            demoCoordinator.releaseDsp('tvm-inference');
             console.error('[tvm-inference] spawn error:', error.message);
             inferenceResults = { error: error.message, stdout, stderr };
         });
@@ -99,6 +113,7 @@ module.exports = function registerTvmInference(app, wss, device) {
             inferenceProcess.kill('SIGTERM');
             inferenceProcess = null;
             isRunning = false;
+            demoCoordinator.releaseDsp('tvm-inference');
             res.json({ status: 'stopped', message: 'Inference stopped' });
         } else {
             res.json({ status: 'not_running', message: 'No inference process running' });

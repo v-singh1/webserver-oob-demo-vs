@@ -204,6 +204,10 @@ const ws = useSpeechWs()
 
 // Emit running-change whenever ws.running changes (not just on manual start/stop)
 watch(() => ws.running.value, (v) => emit('running-change', v))
+
+// Rebuild spectrograms from full WAV PCM once processing completes
+watch(() => ws.inputPcmFull.value,  (v) => { if (v?.pcm) spectInRef.value?.rebuildFromPcm(v.pcm) })
+watch(() => ws.outputPcmFull.value, (v) => { if (v?.pcm) spectOutRef.value?.rebuildFromPcm(v.pcm) })
 const fileInfo     = ref(null)
 const uploadedPath = ref(null)
 const uploadError  = ref(null)
@@ -309,11 +313,6 @@ async function saveArtifacts() {
     const zip = new JSZip()
 
     // ── Composite visualization PNGs ─────────────────────────────────────
-    const spectIn  = spectInRef.value?.getCanvas()
-    const spectOut = spectOutRef.value?.getCanvas()
-    const saveW = waveInRef.value?.getCanvas()?.offsetWidth || 800
-    const saveH = waveInRef.value?.getCanvas()?.height || 130
-
     const decodeWav = async (url) => {
       try {
         const resp = await fetch(url)
@@ -331,9 +330,18 @@ async function saveArtifacts() {
       return null
     }
 
+    // Decode WAVs before capturing canvases so rebuildFromPcm renders the full audio first
     const [inPcmRaw, outPcmRaw] = ws.downloadUrls.value
       ? await Promise.all([decodeWav(ws.downloadUrls.value.inputUrl), decodeWav(ws.downloadUrls.value.outputUrl)])
       : [null, null]
+    if (inPcmRaw)  spectInRef.value?.rebuildFromPcm(inPcmRaw)
+    if (outPcmRaw) spectOutRef.value?.rebuildFromPcm(outPcmRaw)
+
+    const spectIn  = spectInRef.value?.getCanvas()
+    const spectOut = spectOutRef.value?.getCanvas()
+    const saveW = waveInRef.value?.getCanvas()?.offsetWidth || 800
+    const saveH = waveInRef.value?.getCanvas()?.height || 130
+
     const inPcm  = inPcmRaw  ? { pcm: inPcmRaw }  : ws.inputPcm.value
     const outPcm = outPcmRaw ? { pcm: outPcmRaw } : ws.outputPcm.value
     const waveIn  = inPcm  ? renderWaveformToCanvas(inPcm,  inputColor.value,  canvasBg.value, saveW, saveH, waveZoomLevels[waveZoomIdx.value]) : null

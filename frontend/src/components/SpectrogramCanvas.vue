@@ -17,8 +17,9 @@ const props = defineProps({
 const canvasEl = ref(null)
 const history  = []      // Float32Array[] — one entry per received frame
 const NUM_BINS = 96      // more frequency bins → finer resolution
+let overrideMaxCols = null   // set by rebuildFromPcm; overrides props.maxCols for render
 
-watch(() => props.runKey, () => { history.length = 0; drawEmpty() })
+watch(() => props.runKey, () => { history.length = 0; overrideMaxCols = null; drawEmpty() })
 
 watch(() => props.pcmFrame, (frame) => {
   if (!frame?.pcm) return
@@ -28,6 +29,7 @@ watch(() => props.pcmFrame, (frame) => {
 })
 
 watch(() => props.maxCols, (newCols) => {
+  overrideMaxCols = null   // user changed zoom → exit full-rebuild view
   while (history.length > newCols) history.shift()
   history.length === 0 ? drawEmpty() : render()
 })
@@ -38,7 +40,17 @@ watch(() => [props.bgColor, props.colorMap], () => {
 
 onMounted(() => drawEmpty())
 
-defineExpose({ getCanvas: () => canvasEl.value })
+defineExpose({
+  getCanvas: () => canvasEl.value,
+  rebuildFromPcm(int16Array) {
+    history.length = 0
+    const FRAME = 1024
+    for (let off = 0; off + FRAME <= int16Array.length; off += FRAME)
+      history.push(computeMagnitudes(int16Array.subarray(off, off + FRAME), NUM_BINS))
+    overrideMaxCols = history.length
+    render()
+  },
+})
 
 /* ── render ────────────────────────────────────────────────────────────── */
 function render() {
@@ -60,6 +72,8 @@ function render() {
 
   if (history.length === 0) { ctx.putImageData(img, 0, 0); return }
 
+  const maxCols = overrideMaxCols ?? props.maxCols
+
   // use 95th-percentile as ceiling so bright bins always show full color
   const all = []
   for (const col of history) for (const v of col) all.push(v)
@@ -68,8 +82,8 @@ function render() {
 
   for (let t = 0; t < history.length; t++) {
     const mags = history[t]
-    const x0 = Math.floor((t + props.maxCols - history.length) * w / props.maxCols)
-    const x1 = Math.min(w, Math.floor((t + props.maxCols - history.length + 1) * w / props.maxCols))
+    const x0 = Math.floor((t + maxCols - history.length) * w / maxCols)
+    const x1 = Math.min(w, Math.floor((t + maxCols - history.length + 1) * w / maxCols))
     if (x0 >= x1) continue
 
     for (let i = 0; i < NUM_BINS; i++) {

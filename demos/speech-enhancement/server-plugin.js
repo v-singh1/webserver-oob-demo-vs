@@ -12,6 +12,7 @@ const { exec, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
+const demoCoordinator = require('../demo-coordinator');
 
 const MOCK = process.env.MOCK === '1';
 const WS_OPEN = 1;
@@ -101,6 +102,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     let streamTimers = [];
     let dmaSocket = null;
     let dmaBuffer = Buffer.alloc(0);
+    let inputWavCancel = null;   // fallback WAV stream cancel ref
 
     function send(message) {
         const encoded = JSON.stringify(message);
@@ -118,7 +120,10 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         const retry = () => {
             if (!job || MOCK || dmaSocket) return;
             const socket = net.createConnection(streamSocket);
-            socket.on('connect', () => { dmaSocket = socket; send({ type: 'metric', label: 'Speech Enhancement Running' }); });
+            socket.on('connect', () => {
+                dmaSocket = socket;
+                send({ type: 'metric', label: 'Speech Enhancement Running' });
+            });
             socket.on('data', chunk => {
                 dmaBuffer = Buffer.concat([dmaBuffer, chunk]);
                 while (dmaBuffer.length >= 13) {
@@ -127,6 +132,10 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
                     if (dmaBuffer.length < 13 + bytes) return;
                     const pcm = dmaBuffer.subarray(13, 13 + bytes); dmaBuffer = dmaBuffer.subarray(13 + bytes);
                     if (job) job.dmaFrames = true;
+                    // Cancel WAV fallback on first real DMA input frame to avoid duplicate input frames.
+                    // Deferring cancellation until here (vs. socket connect) means the fallback keeps
+                    // streaming when the binary finishes before Node.js connects and DMA sends nothing.
+                    if (direction === 0 && inputWavCancel) { inputWavCancel.cancelled = true; inputWavCancel = null; }
                     send({ type: 'spectrum', channel: direction ? 'output' : 'input', pcm: pcm.toString('base64'), sampleRate, source: 'rpmsg-dma' });
                 }
             });
@@ -162,15 +171,18 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         if (error) {
             send({ type: 'error', message: error.message || String(error) });
             job = null;
+            demoCoordinator.releaseDsp('speech-enhancement');
             return;
         }
         if (!fs.existsSync(finished.outputPath)) {
             send({ type: 'error', message: 'Edge-AI client completed without processed_output.wav' });
             job = null;
+            demoCoordinator.releaseDsp('speech-enhancement');
             return;
         }
         lastCompletedJob = finished;
         job = null;
+        demoCoordinator.releaseDsp('speech-enhancement');
         // Read exact sample counts from both WAVs so the frontend can trim
         // zero-padded tails from the accumulated PCM buffers.
         const inInfo  = readPcmWavInfo(finished.inputPath);
@@ -187,6 +199,8 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     function startEdgeAi(inputPath) {
         console.log('[speech-enhancement] startEdgeAi called with inputPath:', inputPath);
         if (job) throw new Error('Speech enhancement is already running');
+        const dspError = demoCoordinator.acquireDsp('speech-enhancement');
+        if (dspError) throw new Error(dspError);
         lastCompletedJob = null;
         fs.mkdirSync(JOB_ROOT, { recursive: true });
         const jobDir = fs.mkdtempSync(path.join(JOB_ROOT, 'job-'));
@@ -211,10 +225,15 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         fs.writeFileSync(jobJsonPath, JSON.stringify(jobJson));
         console.log('[speech-enhancement] wrote per-job JSON:', jobJsonPath);
 
+        demoCoordinator.ensurePreloaded(binary);
         console.log('[speech-enhancement] spawning binary with args:', [jobJsonPath]);
         const child = spawn(binary, [jobJsonPath], { cwd: jobDir, stdio: ['pipe', 'pipe', 'pipe'] });
         job.process = child;
         console.log('[speech-enhancement] child process spawned, pid:', child.pid);
+        // Stream input WAV immediately so the first batch is always visible.
+        // The fallback is cancelled as soon as the DMA socket connects.
+        inputWavCancel = { cancelled: false };
+        streamWav('input', inputPath, null, inputWavCancel);
         connectDmaStream();
         let totalFrames = 401; // updated from [App] GCRN configuration: TOTAL_FRAMES=N
         const collect = data => {
@@ -262,6 +281,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
 
     function stopJob() {
         stopStreams();
+        if (inputWavCancel) { inputWavCancel.cancelled = true; inputWavCancel = null; }
         if (job) {
             job.cancelled = true;
             if (job.process) {
@@ -270,6 +290,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
                 }
             }
             job = null;
+            demoCoordinator.releaseDsp('speech-enhancement');
         }
         if (dmaSocket) { dmaSocket.destroy(); dmaSocket = null; }
         dmaBuffer = Buffer.alloc(0);
@@ -303,6 +324,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     });
     app.get('/stop-speech-enhancement', (req, res) => { stopJob(); res.json({ status: 'stopped' }); });
     app.get('/speech-enhancement/status', (req, res) => res.json({ running: Boolean(job), backend: MOCK ? 'mock' : 'edge-ai-rpmsg' }));
+    app.get('/tvm-daemon/status', (req, res) => res.json({ state: demoCoordinator.tvmDaemonState() }));
 
     app.get('/speech-enhancement/wav', (req, res) => {
         const active = job || lastCompletedJob;

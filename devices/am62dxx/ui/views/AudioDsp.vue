@@ -23,6 +23,21 @@
       >{{ demoRunning ? 'Stop Demo' : 'Run Demo' }}</v-btn>
     </div>
 
+    <!-- TVM daemon preparing banner -->
+    <v-alert
+      v-if="tvmPreparing"
+      type="info"
+      variant="tonal"
+      density="compact"
+      class="preparing-alert"
+      icon="mdi-loading"
+    >
+      <span class="preparing-txt">
+        <span class="preparing-spinner">&#9696;</span>
+        Preparing TVM model daemon — AI demos will be available in a moment&hellip;
+      </span>
+    </v-alert>
+
     <!-- Two-column content grid -->
     <div class="content-grid">
 
@@ -61,7 +76,7 @@
 </template>
 
 <script setup>
-import { ref, computed, shallowRef, onUnmounted } from 'vue'
+import { ref, computed, shallowRef, onMounted, onUnmounted } from 'vue'
 import SpeechEnhancement  from '../demos/SpeechEnhancement.vue'
 import TvmInference        from '../demos/TvmInference.vue'
 import AudioClassification from '@/demos/AudioClassification.vue'
@@ -99,6 +114,25 @@ const currentComponent = shallowRef(demos[0].component)
 const demoRunning      = ref(false)
 const canRun = computed(() => demos[activeIdx.value].canRun)
 
+const tvmPreparing = ref(false)
+let _tvmPollTimer  = null
+
+async function pollTvmDaemon() {
+  try {
+    const r = await fetch('/tvm-daemon/status')
+    if (!r.ok) return
+    const { state } = await r.json()
+    tvmPreparing.value = (state === 'restarting')
+    if (tvmPreparing.value) {
+      _tvmPollTimer = setTimeout(pollTvmDaemon, 2000)
+    } else {
+      _tvmPollTimer = null
+    }
+  } catch (_) {}
+}
+
+onMounted(pollTvmDaemon)
+
 function selectDemo(i) {
   if (demoRunning.value) return
   activeIdx.value        = i
@@ -115,6 +149,7 @@ function triggerRun() {
 
 onUnmounted(() => {
   if (demoRunning.value) activeDemo.value?.stop()
+  if (_tvmPollTimer) clearTimeout(_tvmPollTimer)
 })
 </script>
 
@@ -171,4 +206,15 @@ onUnmounted(() => {
 /* Demo panel */
 .demo-panel { min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 .demo-panel > * { flex: 1; min-height: 0; }
+
+/* TVM preparing banner */
+.preparing-alert { flex-shrink: 0; }
+.preparing-txt   { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.preparing-spinner {
+  display: inline-block;
+  animation: spin 1.2s linear infinite;
+  font-size: 16px;
+  line-height: 1;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

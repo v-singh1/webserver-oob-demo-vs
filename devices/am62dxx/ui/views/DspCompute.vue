@@ -53,7 +53,7 @@
 <script setup>
 import { ref, shallowRef, onUnmounted } from 'vue'
 import AudioOffload   from '../demos/AudioOffload.vue'
-import TwoDeeFft      from '../demos/TwoDeeFft.vue'
+import TwoDeeFft      from '../demos/2DFft.vue'
 import SigchainBiquad from '../demos/SigchainBiquad.vue'
 
 const demoList = [
