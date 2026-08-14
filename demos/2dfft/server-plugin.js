@@ -131,7 +131,17 @@ module.exports = function register2dFft(app, wss, device) {
             type: 'status', state: proc ? 'running' : 'idle',
             message: proc ? 'Running' : 'Idle', mock: MOCK
         }));
-        ws.on('close', () => clients.delete(ws));
+        ws.on('close', () => {
+            clients.delete(ws);
+            if (clients.size === 0 && proc) {
+                console.log('[2dfft] Last client left — sending SIGINT to process');
+                try { process.kill(-proc.pid, 'SIGINT'); } catch (_) {
+                    try { proc.kill('SIGINT'); } catch (_) {}
+                }
+                proc = null;
+                broadcast({ type: 'status', state: 'stopped', message: 'Stopped (client disconnected)' });
+            }
+        });
         ws.on('error', () => clients.delete(ws));
     });
 

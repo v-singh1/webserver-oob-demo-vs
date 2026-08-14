@@ -232,8 +232,7 @@ module.exports = function registerSigchainBiquad(app, wss, device) {
         res.send('rpmsg_sigchain_biquad_example started');
     });
 
-    app.get('/sigchain-biquad/stop', (req, res) => {
-        if (MOCK) { _stopMock(); return res.send('sigchain-biquad stopped (MOCK)'); }
+    function _stopProc() {
         if (autoStopTimer) clearTimeout(autoStopTimer);
         sendCmd('STOP');
         setTimeout(() => {
@@ -243,6 +242,11 @@ module.exports = function registerSigchainBiquad(app, wss, device) {
                 if (proc) { try { proc.kill('SIGINT'); } catch (_) {} proc = null; }
             }, 500);
         }, 100);
+    }
+
+    app.get('/sigchain-biquad/stop', (req, res) => {
+        if (MOCK) { _stopMock(); return res.send('sigchain-biquad stopped (MOCK)'); }
+        _stopProc();
         res.send('sigchain-biquad stopped');
     });
 
@@ -387,7 +391,13 @@ module.exports = function registerSigchainBiquad(app, wss, device) {
             message: tcpConnected ? 'Connected' : 'Idle',
             mock: MOCK
         }));
-        ws.on('close', () => clients.delete(ws));
+        ws.on('close', () => {
+            clients.delete(ws);
+            if (clients.size === 0 && proc) {
+                console.log('[sigchain-biquad] Last client left — stopping process');
+                _stopProc();
+            }
+        });
         ws.on('error', () => clients.delete(ws));
     });
 
