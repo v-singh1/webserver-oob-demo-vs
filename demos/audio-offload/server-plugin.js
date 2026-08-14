@@ -453,6 +453,11 @@ module.exports = function registerAudioOffload(app, wss, device) {
         ws.on('close', () => {
             console.log('[audio-offload] WebSocket client disconnected');
             connectedClients.delete(ws);
+            if (connectedClients.size === 0 && offloadProc) {
+                console.log('[audio-offload] Last client left — sending SIGINT to process');
+                disconnectTcp();
+                killOffloadProc();
+            }
         });
 
         ws.on('error', err => {
