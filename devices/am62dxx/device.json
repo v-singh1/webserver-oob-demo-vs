@@ -1,5 +1,6 @@
 {
   "id": "am62dxx",
+  "ui": "vue",
   "displayName": "AM62D",
   "boards": [
     {

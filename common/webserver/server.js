@@ -67,7 +67,6 @@ if (!fs.existsSync(deviceConfigPath)) {
 }
 
 const device = JSON.parse(fs.readFileSync(deviceConfigPath, 'utf8'));
-const isAm62d = device.id === 'am62dxx';
 console.log(`[Server] Loaded device config: ${device.id} (${device.displayName})`);
 console.log(`[Server] Active demos: ${device.demos.join(', ')}`);
 
@@ -86,19 +85,17 @@ const wss    = new WebSocket.Server({ server });
  * common/app/index.html would be returned instead of vue-dist/index.html. */
 const deviceAppDir = path.join(path.dirname(deviceConfigPath), 'app');
 
-const vueIndex = isAm62d && [
+const vueIndex = device.ui === 'vue' && [
     path.join(deviceAppDir, 'vue-dist', 'index.html'),
     path.join(appDir,       'vue-dist', 'index.html'),
 ].find(p => fs.existsSync(p));
 
-if (isAm62d) {
-    /* Dedicated health-check socket — used only by the AM62D Vue portal. */
+if (device.ui === 'vue') {
+    /* Dedicated health-check socket — used only by the Vue portal. */
     wss.on('connection', (ws, req) => {
         if (req.url !== '/health') return;
         ws.on('error', () => {});
     });
-
-    app.use(express.json({ limit: '512kb' }));
 
     if (vueIndex) {
         app.get('/', (req, res) => res.sendFile(vueIndex));
@@ -116,7 +113,7 @@ app.use(express.static(appDir));
 const serverStarted = new Date().toISOString();
 const serverBuildDate = new Date(fs.statSync(__filename).mtime).toISOString();
 
-if (isAm62d) {
+if (device.ui === 'vue') {
     /* Health check — used by the Vue portal to detect disconnects and reconnect. */
     app.get('/ping', (req, res) => res.json({ ok: true }));
 }
@@ -141,67 +138,16 @@ app.get('/device-info', (req, res) => {
     });
 });
 
-/* AM62D portal management APIs.  Keep legacy devices on their pre-AM62D
- * request surface and static UI flow. */
-if (isAm62d) {
-/* Update device config — merges body into in-memory device and writes to disk */
-app.post('/device-config', (req, res) => {
+/* Load device-level plugin if present (device-specific API routes) */
+const devicePluginPath = path.join(path.dirname(deviceConfigPath), 'server-plugin.js');
+if (fs.existsSync(devicePluginPath)) {
     try {
-        const updates = req.body || {};
-        if (!updates || typeof updates !== 'object') return res.status(400).json({ error: 'Invalid body' });
-        /* Shallow-merge top-level keys; deep-merge boards and demoConfig */
-        Object.keys(updates).forEach(k => {
-            if (k === 'boards' && Array.isArray(updates.boards)) {
-                device.boards = updates.boards;
-            } else if (k === 'demoConfig' && typeof updates.demoConfig === 'object') {
-                device.demoConfig = Object.assign({}, device.demoConfig || {}, updates.demoConfig);
-            } else {
-                device[k] = updates[k];
-            }
-        });
-        fs.writeFileSync(deviceConfigPath, JSON.stringify(device, null, 2), 'utf8');
-        console.log('[Server] device.json updated via /device-config');
-        res.json({ success: true });
-    } catch (e) {
-        console.error('[Server] /device-config error:', e);
-        res.status(500).json({ error: e.message });
+        const devicePlugin = require(devicePluginPath);
+        devicePlugin(app, wss, device, { appDir, deviceConfigPath });
+        console.log(`[Server] Loaded device plugin: ${device.id}`);
+    } catch (err) {
+        console.error(`[Server] Failed to load device plugin ${device.id}:`, err);
     }
-});
-
-/* List HTML files in Model-Inspector folder for the AI Model Inspector page */
-app.get('/model-inspector-list', (req, res) => {
-    const miDir = path.join(appDir, 'Model-Inspector');
-    try {
-        if (!fs.existsSync(miDir)) return res.json({ files: [] });
-        const files = fs.readdirSync(miDir)
-            .filter(f => /\.html?$/i.test(f))
-            .sort();
-        res.json({ files });
-    } catch (e) {
-        console.error('[Server] /model-inspector-list error:', e);
-        res.status(500).json({ error: e.message });
-    }
-});
-
-/* Upload a model HTML file into the Model-Inspector folder */
-app.post('/upload-model-file',
-    express.raw({ type: '*/*', limit: '100mb' }),
-    (req, res) => {
-        const raw = ((req.query.filename || '') + '').replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.+/g, '.').slice(0, 120);
-        const filename = raw || 'uploaded_model.html';
-        const miDir = path.join(appDir, 'Model-Inspector');
-        try {
-            if (!fs.existsSync(miDir)) fs.mkdirSync(miDir, { recursive: true });
-            const dest = path.join(miDir, filename);
-            fs.writeFileSync(dest, req.body);
-            console.log(`[Server] Model uploaded: ${dest} (${req.body.length} bytes)`);
-            res.json({ success: true, filename });
-        } catch (e) {
-            console.error('[Server] /upload-model-file error:', e);
-            res.status(500).json({ error: e.message });
-        }
-    }
-);
 }
 
 /* Active demo manifests — merged list of manifest.json for each active demo */
@@ -244,7 +190,7 @@ for (const demoId of device.demos) {
 
 /* Must come after all API routes and plugin registrations so API paths
  * are never caught here. Only fires when vue-dist/index.html exists. */
-if (isAm62d && vueIndex) {
+if (device.ui === 'vue' && vueIndex) {
     app.get('*', (req, res) => res.sendFile(vueIndex));
 }
 

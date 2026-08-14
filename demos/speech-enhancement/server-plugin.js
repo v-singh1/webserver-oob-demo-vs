@@ -89,7 +89,7 @@ function readPcmWavInfo(filename) {
 
 module.exports = function registerSpeechEnhancement(app, wss, device) {
     const config = (device.demoConfig || {})['speech-enhancement'] || {};
-    const binary = config.edgeAiBinary || '/usr/bin/rpmsg_inference_example /usr/bin/rpmsg_inference_example';
+    const binary = config.edgeAiBinary || '/usr/bin/rpmsg_inference_example';
     const tvmDir = config.tvmDir || '/usr/share/tvm_inference';
     const inputPath = config.inputPath || '/usr/share/tvm_inference/input/input_audio.wav';
     const jsonFile = config.jsonFile || 'pipeline_stft_istft.json';

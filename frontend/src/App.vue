@@ -22,29 +22,17 @@
             class="nav-item"
           />
 
-          <v-list-subheader class="nav-lbl">Demos</v-list-subheader>
-
-          <v-list-item
-            prepend-icon="mdi-waveform"
-            title="DSP with Audio Analytics"
-            to="/audio-dsp"
-            class="nav-item"
-          />
-          <v-list-item
-            prepend-icon="mdi-chart-bar"
-            title="DSP Compute"
-            to="/dsp-compute"
-            class="nav-item"
-          />
-
-          <v-list-subheader class="nav-lbl">Tools</v-list-subheader>
-
-          <v-list-item
-            prepend-icon="mdi-magnify"
-            title="AI Model Inspector"
-            to="/model-inspector"
-            class="nav-item"
-          />
+          <template v-for="group in navItems" :key="group.section">
+            <v-list-subheader class="nav-lbl">{{ group.section }}</v-list-subheader>
+            <v-list-item
+              v-for="item in group.items"
+              :key="item.to"
+              :prepend-icon="item.icon"
+              :title="item.title"
+              :to="item.to"
+              class="nav-item"
+            />
+          </template>
 
           <v-list-subheader class="nav-lbl">System</v-list-subheader>
 
@@ -78,7 +66,7 @@
         <div class="conn-block">
           <div class="conn-row">
             <span class="conn-dot" :class="isConnected ? 'conn-dot-ok' : 'conn-dot-err'" />
-            <span class="conn-txt">{{ isConnected ? 'Connected to AM62D EVM' : 'Disconnected' }}</span>
+            <span class="conn-txt">{{ isConnected ? `Connected to ${connectedLabel}` : 'Disconnected' }}</span>
           </div>
           <div class="conn-ip">{{ hostname }}</div>
         </div>
@@ -160,7 +148,7 @@
           <v-icon size="36" color="error">mdi-lan-disconnect</v-icon>
         </div>
         <div class="disc-title">Connection Lost</div>
-        <div class="disc-msg">Lost connection to the AM62D EVM.<br>Attempting to reconnect…</div>
+        <div class="disc-msg">Lost connection to the {{ connectedLabel }}.<br>Attempting to reconnect…</div>
         <div class="disc-spin">
           <v-progress-circular indeterminate color="primary" size="28" width="2" />
           <span class="disc-sec">Retrying in {{ reconnectSec }}s</span>
@@ -175,6 +163,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTheme } from 'vuetify'
 import { useCpuStats } from '@/composables/useCpuStats'
+import { navItems, connectedLabel } from '@device/index.js'
 
 const vuetifyTheme = useTheme()
 const saved = localStorage.getItem('theme')

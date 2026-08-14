@@ -12,7 +12,7 @@ TARGETS = audio_utils speech_utils spectrum_utils
 all: $(TARGETS)
 
 audio_utils: ../../../common/linux_app/audio_utils.c
-	$(CC) $(CFLAGS) ../../../common/linux_app/audio_utils.c -o audio_utils -pthread $(LDFLAGS)
+	$(CC) $(CFLAGS) -DAM62DXX ../../../common/linux_app/audio_utils.c -o audio_utils -pthread $(LDFLAGS)
 
 speech_utils: speech_utils.c
 	$(CC) $(CFLAGS) speech_utils.c -o speech_utils -pthread $(LDFLAGS)
