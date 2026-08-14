@@ -62,8 +62,8 @@
 
 <script setup>
 import { ref, computed, shallowRef, onUnmounted } from 'vue'
-import SpeechEnhancement  from '@/demos/SpeechEnhancement.vue'
-import TvmInference        from '@/demos/TvmInference.vue'
+import SpeechEnhancement  from '../demos/SpeechEnhancement.vue'
+import TvmInference        from '../demos/TvmInference.vue'
 import AudioClassification from '@/demos/AudioClassification.vue'
 
 const demos = [

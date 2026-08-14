@@ -7,6 +7,8 @@ import { readFileSync } from 'node:fs'
 const BACKEND = 'http://localhost:3000'
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
+const DEVICE = process.env.VITE_DEVICE || 'am62dxx'
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -17,11 +19,14 @@ export default defineConfig({
     vuetify({ autoImport: true }),
   ],
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: {
+      '@':      fileURLToPath(new URL('./src', import.meta.url)),
+      '@device': fileURLToPath(new URL(`../devices/${DEVICE}/ui`, import.meta.url)),
+    },
   },
   base: '/vue-dist/',
   build: {
-    outDir: '../devices/am62dxx/app/vue-dist',
+    outDir: `../devices/${DEVICE}/app/vue-dist`,
     emptyOutDir: true,
   },
   server: {

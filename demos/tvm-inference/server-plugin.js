@@ -21,7 +21,7 @@ let isRunning = false;
 module.exports = function registerTvmInference(app, wss, device) {
     const config = (device.demoConfig || {})['tvm-inference'] || {};
     const binary  = config.edgeAiBinary || '/usr/bin/rpmsg_inference_example';
-    const jsonFile = config.jsonFile    || '/usr/share/tvm_inference/json_files/pipeline_tvm_inference.json';
+    const jsonFile = config.jsonFile    || '/usr/share/tvm_inference/json/pipeline_tvm_inference.json';
 
     /* Start TVM inference */
     app.get('/tvm-inference/run', (req, res) => {

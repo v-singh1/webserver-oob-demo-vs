@@ -50,11 +50,11 @@ const { spawn }      = require('child_process');
 const WS_OPEN = 1;
 const MOCK    = process.env.MOCK === '1';
 
-/* TCP ports used by rpmsg_audio_offload_example */
-const LOG_PORT     = 8888;
-const CMD_PORT     = 8889;
-const INDATA_PORT  = 8890;
-const OUTDATA_PORT = 8891;
+/* TCP ports used by rpmsg_audio_offload_example — override via device.demoConfig['audio-offload'] */
+let LOG_PORT     = 8888;
+let CMD_PORT     = 8889;
+let INDATA_PORT  = 8890;
+let OUTDATA_PORT = 8891;
 
 /* Audio frame geometry — must match DATA_SIZE / num_channels / sizeof(int16)
  * in dsp_offload.cfg (default: 4096 / 8 / 2 = 256 samples per channel).    */
@@ -71,6 +71,11 @@ const LOG_RE = /Frame\s+(\d+):\s+AvgAmp=([\d.]+),\s+Latency=([\d.]+)ms,\s+Mode=(
 /* ------------------------------------------------------------------ */
 
 module.exports = function registerAudioOffload(app, wss, device) {
+    const portCfg = (device.demoConfig || {})['audio-offload'] || {};
+    if (portCfg.logPort)     LOG_PORT     = portCfg.logPort;
+    if (portCfg.cmdPort)     CMD_PORT     = portCfg.cmdPort;
+    if (portCfg.inDataPort)  INDATA_PORT  = portCfg.inDataPort;
+    if (portCfg.outDataPort) OUTDATA_PORT = portCfg.outDataPort;
 
     const connectedClients = new Set();
 

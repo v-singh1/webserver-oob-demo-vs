@@ -6,17 +6,15 @@
       <div class="hero-content">
         <div class="hero-welcome">Welcome to</div>
         <h1 class="hero-title">
-          <span class="t-white">SITARA AM62D </span><span class="t-blue">Edge AI Portal</span>
+          <span class="t-white">{{ deviceTitle.white }}</span><span class="t-blue">{{ deviceTitle.blue }}</span>
         </h1>
-        <p class="hero-desc">
-          Explore real-time audio analytics and AI demos showcasing the power of the TI AM62D platform with C7x DSP acceleration.
-        </p>
-        <v-btn color="primary" variant="flat" size="large" to="/audio-dsp" append-icon="mdi-chevron-right">
-          Get Started
+        <p class="hero-desc">{{ heroDesc }}</p>
+        <v-btn color="primary" variant="flat" size="large" :to="heroButton.to" append-icon="mdi-chevron-right">
+          {{ heroButton.label }}
         </v-btn>
       </div>
       <div class="hero-chip">
-        <img :src="chipSrc" alt="AM62D SoC" />
+        <img :src="isLight ? chipImages.light : chipImages.dark" alt="SoC" />
       </div>
     </div>
 
@@ -28,7 +26,7 @@
         <div class="card-ttl">Explore Demos And Tools</div>
 
         <div
-          v-for="demo in demos" :key="demo.to"
+          v-for="demo in demoCards" :key="demo.to"
           class="demo-item"
           @click="$router.push(demo.to)"
         >
@@ -60,9 +58,7 @@
             <v-icon size="15" color="primary">mdi-information-outline</v-icon>
             About This Demo
           </div>
-          <p class="about-body">
-            This portal runs on the AM62D EVM. Use the sidebar to navigate demos and monitor system status in real time.
-          </p>
+          <p class="about-body">{{ aboutText }}</p>
         </div>
       </v-card>
 
@@ -105,41 +101,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTheme } from 'vuetify'
+import { deviceTitle, heroDesc, heroButton, demoCards, sdkInfo, chipImages, aboutText } from '@device/index.js'
 
 const vuetifyTheme = useTheme()
 const isLight = computed(() => vuetifyTheme.global.name.value === 'tiLight')
-const chipSrc = computed(() => isLight.value ? '/am62d-chip-light.png' : '/am62d-chip-dark.png')
 const heroStyle = computed(() => isLight.value
   ? { background: 'linear-gradient(135deg, #f0f8ff 0%, #dbeafe 55%, #eff6ff 100%)', border: '1px solid #bfdbfe' }
   : { background: 'linear-gradient(135deg, #04070f 0%, #07122a 55%, #040c18 100%)', border: '1px solid #1e3a5f' }
 )
-
-const demos = [
-  {
-    to: '/audio-dsp', name: 'DSP with Audio Analytics',
-    desc: 'Real-time audio analytics powered by the C7x DSP — AI-enabled noise reduction, speech enhancement, and acoustic event detection.',
-    icon: 'mdi-waveform',
-    iconBg: 'radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540)', iconBorder: '#1d4ed8', iconColor: '#60a5fa',
-  },
-  {
-    to: '/dsp-compute', name: 'DSP Compute',
-    desc: 'High-performance C7x DSP compute demos — 2D FFT, biquad filter chain, and workload offload via RPMsg-DMA.',
-    icon: 'mdi-chart-bar',
-    iconBg: 'radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00)', iconBorder: '#d97706', iconColor: '#fbbf24',
-  },
-  {
-    to: '/model-inspector', name: 'AI Model Inspector',
-    desc: 'Browse and inspect AI models deployed on AM62D — ResNet-18, NanoDet, YOLOv9c — via TIDL inference engine.',
-    icon: 'mdi-magnify',
-    iconBg: 'radial-gradient(circle at 40% 40%,#3b1c68,#1e0d40)', iconBorder: '#7c3aed', iconColor: '#c084fc',
-  },
-]
-
-const sdkInfo = [
-  { label: 'SDK Version',     version: '12.01.00.04', icon: 'mdi-application-brackets-outline', iconBg: 'rgba(37,99,235,0.2)',   iconBd: '1px solid rgba(37,99,235,0.4)',   iconColor: '#60a5fa' },
-  { label: 'MCU+ SDK Version',version: '12.01.00.20', icon: 'mdi-chip',                         iconBg: 'rgba(5,150,105,0.2)',   iconBd: '1px solid rgba(5,150,105,0.4)',   iconColor: '#34d399' },
-  { label: 'TIDL Version',    version: '11.02.16.00', icon: 'mdi-code-braces',                  iconBg: 'rgba(124,58,237,0.2)',  iconBd: '1px solid rgba(124,58,237,0.4)',  iconColor: '#c084fc' },
-]
 
 const devInfo = ref({ displayName: '', board: '', soc: '' })
 const ip      = ref(window.location.hostname || '—')
