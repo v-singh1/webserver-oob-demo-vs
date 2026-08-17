@@ -143,7 +143,7 @@ const devicePluginPath = path.join(path.dirname(deviceConfigPath), 'server-plugi
 if (fs.existsSync(devicePluginPath)) {
     try {
         const devicePlugin = require(devicePluginPath);
-        devicePlugin(app, wss, device, { appDir, deviceConfigPath });
+        devicePlugin(app, wss, device, { appDir, deviceConfigPath, express });
         console.log(`[Server] Loaded device plugin: ${device.id}`);
     } catch (err) {
         console.error(`[Server] Failed to load device plugin ${device.id}:`, err);

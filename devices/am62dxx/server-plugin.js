@@ -38,14 +38,11 @@
 
 'use strict';
 
-const fs      = require('fs');
-const path    = require('path');
-// Resolve express from the server's own node_modules so this plugin works
-// when deployed outside the source tree (e.g. /usr/share/webserver-oob/).
-const express = require(require.resolve('express', { paths: [process.env.WEBSERVER_DIR || __dirname] }));
+const fs   = require('fs');
+const path = require('path');
 
 module.exports = function(app, wss, device, ctx) {
-    const { appDir, deviceConfigPath } = ctx;
+    const { appDir, deviceConfigPath, express } = ctx;
 
     app.use(express.json({ limit: '512kb' }));
 
