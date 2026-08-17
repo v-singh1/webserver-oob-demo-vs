@@ -158,6 +158,9 @@ const ICON_YOLO = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" s
 const ICON_UPL  = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>`
 
 const MODELS_STATIC = [
+  { name: 'GCRN Speech Enhancement', type: 'Speech Enhancement', quant: 'INT8', badge: 'TIDL',
+    iconBg: 'radial-gradient(circle at 40% 40%,#1a2a4a,#0a1530)', iconBorder: '#2563eb', iconColor: '#93c5fd',
+    file: '/Model-Inspector/GCRN.html', _icon: ICON_GRID },
   { name: 'ResNet-18', type: 'Image Classification', quant: 'INT8', badge: '~9.7 ms',
     iconBg: 'radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540)', iconBorder: '#1d4ed8', iconColor: '#60a5fa',
     file: '/Model-Inspector/modelinspector.html', _icon: ICON_GRID },
@@ -253,7 +256,8 @@ async function loadModelList() {
     })
     models.value = result
   } else {
-    models.value = MODELS_STATIC.map(m => ({ ...m }))
+    // Server endpoint unavailable — show nothing rather than phantom models
+    models.value = []
   }
 
   if (models.value.length > 0 && selectedIdx.value === null) selectModel(0)

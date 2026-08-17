@@ -107,6 +107,9 @@ deploy-app:
 	        ssh $(BOARD_HOST) "tar -C $(INSTALL_DIR)/app -xf -"; \
 	fi
 	scp devices/$(DEVICE)/device.json $(BOARD_HOST):$(INSTALL_DIR)/app/device.json
+	@if [ -f devices/$(DEVICE)/server-plugin.js ]; then \
+	    scp devices/$(DEVICE)/server-plugin.js $(BOARD_HOST):$(INSTALL_DIR)/app/server-plugin.js; \
+	fi
 
 deploy-restart:
 	ssh $(BOARD_HOST) "systemctl restart webserver-oob"
