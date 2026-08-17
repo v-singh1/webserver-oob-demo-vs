@@ -99,19 +99,12 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     const clients = new Set();
     let job = null;
     let lastCompletedJob = null;
-    let streamTimers = [];
     let dmaSocket = null;
     let dmaBuffer = Buffer.alloc(0);
-    let inputWavCancel = null;   // fallback WAV stream cancel ref
 
     function send(message) {
         const encoded = JSON.stringify(message);
         clients.forEach(ws => { if (ws.readyState === WS_OPEN) ws.send(encoded); });
-    }
-
-    function stopStreams() {
-        streamTimers.forEach(clearTimeout);
-        streamTimers = [];
     }
 
     // The RPMsg client owns this Unix socket and sends EASP binary frames at
@@ -132,10 +125,6 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
                     if (dmaBuffer.length < 13 + bytes) return;
                     const pcm = dmaBuffer.subarray(13, 13 + bytes); dmaBuffer = dmaBuffer.subarray(13 + bytes);
                     if (job) job.dmaFrames = true;
-                    // Cancel WAV fallback on first real DMA input frame to avoid duplicate input frames.
-                    // Deferring cancellation until here (vs. socket connect) means the fallback keeps
-                    // streaming when the binary finishes before Node.js connects and DMA sends nothing.
-                    if (direction === 0 && inputWavCancel) { inputWavCancel.cancelled = true; inputWavCancel = null; }
                     send({ type: 'spectrum', channel: direction ? 'output' : 'input', pcm: pcm.toString('base64'), sampleRate, source: 'rpmsg-dma' });
                 }
             });
@@ -143,26 +132,6 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
             socket.on('close', () => { if (dmaSocket === socket) dmaSocket = null; });
         };
         retry();
-    }
-
-    function streamWav(channel, filename, done, cancelRef) {
-        let source;
-        try { source = readPcmWav(filename); }
-        catch (error) { send({ type: 'error', message: error.message }); return done && done(error); }
-
-        const frameBytes = 1024; // 512 samples: exactly one Edge-AI STFT input block.
-        let offset = 0;
-        const periodMs = Math.max(1, Math.round(frameBytes / 2 / source.sampleRate * 1000));
-        const emit = () => {
-            if (cancelRef ? cancelRef.cancelled : (!job || job.cancelled)) return;
-            if (offset >= source.pcm.length) return done && done();
-            const pcm = source.pcm.subarray(offset, Math.min(offset + frameBytes, source.pcm.length));
-            offset += pcm.length;
-            send({ type: 'spectrum', channel, pcm: pcm.toString('base64'), sampleRate: source.sampleRate });
-            const timer = setTimeout(emit, periodMs);
-            streamTimers.push(timer);
-        };
-        emit();
     }
 
     function finishJob(error) {
@@ -230,10 +199,6 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         const child = spawn(binary, [jobJsonPath], { cwd: jobDir, stdio: ['pipe', 'pipe', 'pipe'] });
         job.process = child;
         console.log('[speech-enhancement] child process spawned, pid:', child.pid);
-        // Stream input WAV immediately so the first batch is always visible.
-        // The fallback is cancelled as soon as the DMA socket connects.
-        inputWavCancel = { cancelled: false };
-        streamWav('input', inputPath, null, inputWavCancel);
         connectDmaStream();
         let totalFrames = 401; // updated from [App] GCRN configuration: TOTAL_FRAMES=N
         const collect = data => {
@@ -280,8 +245,6 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     }
 
     function stopJob() {
-        stopStreams();
-        if (inputWavCancel) { inputWavCancel.cancelled = true; inputWavCancel = null; }
         if (job) {
             job.cancelled = true;
             if (job.process) {
