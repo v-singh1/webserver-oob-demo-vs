@@ -10,7 +10,7 @@
 
 'use strict';
 
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const demoCoordinator = require('../demo-coordinator');
 
 const MOCK = process.env.MOCK === '1';
@@ -74,7 +74,12 @@ module.exports = function registerTvmInference(app, wss, device) {
             console.log('[tvm-inference] process exited with code:', code);
 
             if (code === 0) {
-                inferenceResults = parseInferenceOutput(stdout, stderr);
+                let daemonLog = '';
+                try {
+                    daemonLog = execFileSync('journalctl', ['-u', 'tvm-model-daemon', '--no-pager', '-n', '20'],
+                        { timeout: 3000 }).toString();
+                } catch (_) {}
+                inferenceResults = parseInferenceOutput(stdout, stderr, daemonLog);
             } else {
                 inferenceResults = {
                     error: `Inference failed with exit code ${code}`,
@@ -125,19 +130,21 @@ module.exports = function registerTvmInference(app, wss, device) {
 
 /*
  * Parse rpmsg_inference_example output.
- * stdout lines like:
- *   [TVM] Inference done in 18064.2 ms, output: 129122 floats
- *   [App] Pipeline completed successfully
- * stderr lines like:
+ * Timing and float count come from tvm_model_daemon syslog (daemonLog), e.g.:
+ *   [TVM] Inference done in 12356.5 ms, output: 129122 floats
+ * Cycles (if present) come from stderr:
  *   TVM AM62D: infer graph=0 cycles=15330081237 outputs=1
+ * Success is detected from binary stdout or daemon log.
  */
-function parseInferenceOutput(stdout, stderr) {
+function parseInferenceOutput(stdout, stderr, daemonLog) {
     const results = { timestamp: new Date().toISOString() };
+    const combined = stdout + '\n' + (stderr || '') + '\n' + (daemonLog || '');
 
-    const inferenceTimeMatch = stdout.match(/Inference done in\s+([\d.]+)\s*ms/i);
-    const outputFloatsMatch  = stdout.match(/output:\s*(\d+)\s*floats/i);
-    const cyclesMatch        = (stderr || '').match(/cycles=(\d+)/);
-    const successMatch       = /Pipeline completed successfully/i.test(stdout);
+    const inferenceTimeMatch = combined.match(/Inference done in\s+([\d.]+)\s*ms/i);
+    const outputFloatsMatch  = combined.match(/output:\s*(\d+)\s*floats/i);
+    const cyclesMatch        = combined.match(/cycles=(\d+)/);
+    const successMatch       = /Pipeline completed successfully/i.test(combined) ||
+                               /Application exited with code 0/i.test(stdout);
 
     if (inferenceTimeMatch) results.inferenceTimeMs = parseFloat(inferenceTimeMatch[1]);
     if (outputFloatsMatch)  results.outputFloats    = parseInt(outputFloatsMatch[1]);

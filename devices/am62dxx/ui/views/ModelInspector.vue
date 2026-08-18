@@ -161,18 +161,6 @@ const MODELS_STATIC = [
   { name: 'GCRN Speech Enhancement', type: 'Speech Enhancement', quant: 'INT8', badge: 'TIDL',
     iconBg: 'radial-gradient(circle at 40% 40%,#1a2a4a,#0a1530)', iconBorder: '#2563eb', iconColor: '#93c5fd',
     file: '/Model-Inspector/GCRN.html', _icon: ICON_GRID },
-  { name: 'ResNet-18', type: 'Image Classification', quant: 'INT8', badge: '~9.7 ms',
-    iconBg: 'radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540)', iconBorder: '#1d4ed8', iconColor: '#60a5fa',
-    file: '/Model-Inspector/modelinspector.html', _icon: ICON_GRID },
-  { name: 'ResNet-18 (Detailed)', type: 'Image Classification', quant: 'INT8', badge: 'TIDL',
-    iconBg: 'radial-gradient(circle at 40% 40%,#0d3a2e,#062018)', iconBorder: '#059669', iconColor: '#34d399',
-    file: '/Model-Inspector/modelinspector_resnet.html', _icon: ICON_GRID },
-  { name: 'NanoDet RepVGG A1.2', type: 'Object Detection', quant: 'INT8', badge: 'TIDL',
-    iconBg: 'radial-gradient(circle at 40% 40%,#3a2000,#1e0e00)', iconBorder: '#d97706', iconColor: '#fbbf24',
-    file: '/Model-Inspector/modelinspector_nano_dat.html', _icon: ICON_BOX },
-  { name: 'YOLOv9c', type: 'Object Detection', quant: 'INT8', badge: 'TIDL',
-    iconBg: 'radial-gradient(circle at 40% 40%,#3a0a0a,#1e0505)', iconBorder: '#dc2626', iconColor: '#f87171',
-    file: '/Model-Inspector/modelinspector_yolo9c.html', _icon: ICON_YOLO },
 ]
 
 const STATIC_BY_FILE = {}
