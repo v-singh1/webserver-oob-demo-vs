@@ -52,7 +52,7 @@ clean:
 # Built only when DEVICE=am62dxx (see the conditional build dependency above).
 
 build-frontend:
-	cd frontend && npm install && npm run build
+	cd frontend && npm install && VITE_DEVICE=$(DEVICE) npm run build
 
 
 # ── Local development ────────────────────────────────────────────────

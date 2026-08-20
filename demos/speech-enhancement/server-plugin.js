@@ -18,6 +18,25 @@ const MOCK = process.env.MOCK === '1';
 const WS_OPEN = 1;
 const JOB_ROOT = '/tmp/webserver-oob-speech';
 
+/*
+ * Return the next source-WAV block for the live input visualisation.
+ *
+ * The DMA input buffer is a fixed-size, reusable pipeline buffer.  On batches
+ * after the first it can contain zero padding before the final file batch,
+ * which makes a full 401-frame input block appear to end in a flat line.  The
+ * source WAV is the authoritative input, so advance through it by exactly one
+ * advertised DMA payload per input message.  Only the true final short block
+ * is padded when the source data runs out.
+ */
+function nextInputVisualizationBlock(state, payloadBytes) {
+    const block = Buffer.alloc(payloadBytes);
+    const start = state.inputPcmOffset;
+    const end = Math.min(start + payloadBytes, state.inputPcm.length);
+    if (end > start) state.inputPcm.copy(block, 0, start, end);
+    state.inputPcmOffset = end;
+    return block;
+}
+
 
 function rawBody(limitBytes) {
     return (req, res, next) => {
@@ -123,7 +142,12 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
                     if (dmaBuffer.toString('ascii', 0, 4) !== 'EASP') { dmaBuffer = Buffer.alloc(0); return; }
                     const direction = dmaBuffer[4], sampleRate = dmaBuffer.readUInt32LE(5), bytes = dmaBuffer.readUInt32LE(9);
                     if (dmaBuffer.length < 13 + bytes) return;
-                    const pcm = dmaBuffer.subarray(13, 13 + bytes); dmaBuffer = dmaBuffer.subarray(13 + bytes);
+                    const dmaPcm = dmaBuffer.subarray(13, 13 + bytes); dmaBuffer = dmaBuffer.subarray(13 + bytes);
+                    const useSourceInput = direction === 0 && job &&
+                        job.inputPcm && job.inputSampleRate === sampleRate;
+                    const pcm = useSourceInput
+                        ? nextInputVisualizationBlock(job, bytes)
+                        : dmaPcm;
                     if (job) job.dmaFrames = true;
                     send({ type: 'spectrum', channel: direction ? 'output' : 'input', pcm: pcm.toString('base64'), sampleRate, source: 'rpmsg-dma' });
                 }
@@ -177,8 +201,18 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         console.log('[speech-enhancement] jobDir:', jobDir, 'outputPath:', outputPath);
 
         console.log('[speech-enhancement] validating WAV file');
-        readPcmWav(inputPath); // Validate WAV before switching C7x firmware.
-        job = { inputPath, outputPath, process: null, cancelled: false, stdout: '', dmaFrames: false };
+        const inputWav = readPcmWav(inputPath); // Validate WAV before switching C7x firmware.
+        job = {
+            inputPath,
+            outputPath,
+            inputPcm: inputWav.pcm,
+            inputSampleRate: inputWav.sampleRate,
+            inputPcmOffset: 0,
+            process: null,
+            cancelled: false,
+            stdout: '',
+            dmaFrames: false,
+        };
         send({ type: 'metric', label: 'Waiting for RPMsg DMA input/output buffers' });
         console.log('[speech-enhancement] checking binary:', binary);
         if (!fs.existsSync(binary)) throw new Error(`Edge-AI client not installed: ${binary}`);
@@ -309,3 +343,5 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     process.on('SIGINT', stopJob);
     console.log(`[speech-enhancement] Edge-AI RPMsg plugin registered${MOCK ? ' (MOCK)' : ''}`);
 };
+
+module.exports.nextInputVisualizationBlock = nextInputVisualizationBlock;
