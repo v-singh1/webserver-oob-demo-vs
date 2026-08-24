@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /*
- * Copyright (C) 2024 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2026 Texas Instruments Incorporated - http://www.ti.com/
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -79,13 +79,52 @@ const server = http.createServer(app);
 const port   = process.env.PORT || 3000;
 const wss    = new WebSocket.Server({ server });
 
-/* Serve device-specific static files first (images, overrides), then common app */
+/* Determine device app directory and Vue entry point before registering any middleware.
+ * app.get('/') must be registered before express.static() so it wins over the automatic
+ * index.html serving that express.static does for GET / — otherwise the legacy
+ * common/app/index.html would be returned instead of vue-dist/index.html. */
 const deviceAppDir = path.join(path.dirname(deviceConfigPath), 'app');
+
+const vueIndex = device.ui === 'vue' && [
+    path.join(deviceAppDir, 'vue-dist', 'index.html'),
+    path.join(appDir,       'vue-dist', 'index.html'),
+].find(p => fs.existsSync(p));
+
+if (device.ui === 'vue') {
+    /* Dedicated health-check socket — used only by the Vue portal. */
+    wss.on('connection', (ws, req) => {
+        if (req.url !== '/health') return;
+        ws.on('error', () => {});
+    });
+
+    if (vueIndex) {
+        app.get('/', (req, res) => res.sendFile(vueIndex));
+        console.log('[Server] Vue app root: ' + vueIndex);
+    }
+}
+
+/* Serve device-specific static files first (images, overrides), then common app */
 if (fs.existsSync(deviceAppDir)) {
     app.use(express.static(deviceAppDir));
     console.log(`[Server] Device app overlay: ${deviceAppDir}`);
 }
 app.use(express.static(appDir));
+
+const serverStarted = new Date().toISOString();
+const serverBuildDate = new Date(fs.statSync(__filename).mtime).toISOString();
+
+if (device.ui === 'vue') {
+    /* Health check — used by the Vue portal to detect disconnects and reconnect. */
+    app.get('/ping', (req, res) => res.json({ ok: true }));
+}
+
+app.get('/version', (req, res) => {
+    res.json({
+        version:       process.env.WEBSERVER_VERSION   || '0.0.3',
+        buildDate:     process.env.WEBSERVER_BUILD_DATE || serverBuildDate,
+        serverStarted,
+    });
+});
 
 /* Device info endpoint — frontend calls this on load */
 app.get('/device-info', (req, res) => {
@@ -98,6 +137,18 @@ app.get('/device-info', (req, res) => {
         docs:        device.docs   || null
     });
 });
+
+/* Load device-level plugin if present (device-specific API routes) */
+const devicePluginPath = path.join(path.dirname(deviceConfigPath), 'server-plugin.js');
+if (fs.existsSync(devicePluginPath)) {
+    try {
+        const devicePlugin = require(devicePluginPath);
+        devicePlugin(app, wss, device, { appDir, deviceConfigPath, express });
+        console.log(`[Server] Loaded device plugin: ${device.id}`);
+    } catch (err) {
+        console.error(`[Server] Failed to load device plugin ${device.id}:`, err);
+    }
+}
 
 /* Active demo manifests — merged list of manifest.json for each active demo */
 app.get('/demo-manifests', (req, res) => {
@@ -131,6 +182,16 @@ for (const demoId of device.demos) {
     } catch (err) {
         console.error(`[Server] Failed to load demo plugin ${demoId}:`, err);
     }
+}
+
+/* ------------------------------------------------------------------ */
+/* SPA fallback — serve Vue app for any unmatched GET                  */
+/* ------------------------------------------------------------------ */
+
+/* Must come after all API routes and plugin registrations so API paths
+ * are never caught here. Only fires when vue-dist/index.html exists. */
+if (device.ui === 'vue' && vueIndex) {
+    app.get('*', (req, res) => res.sendFile(vueIndex));
 }
 
 /* ------------------------------------------------------------------ */

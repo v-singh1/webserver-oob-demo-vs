@@ -1,0 +1,9 @@
+{
+  "id": "sigchain-biquad",
+  "name": "Sigchain Biquad EQ",
+  "icon": "av:equalizer",
+  "description": "Real-time 3-stage parametric equalizer (biquad cascade) on C7x DSP with live C7x load, cycles and throughput monitoring via multi-port TCP server.",
+  "devices": ["am62dxx"],
+  "routes": ["/sigchain-biquad/run", "/sigchain-biquad/stop", "/sigchain-biquad/start-audio", "/sigchain-biquad/stop-audio", "/sigchain-biquad/check-overlay", "/sigchain-biquad/enable-overlay", "/sigchain-biquad/disable-overlay"],
+  "websocket": "/sigchain-biquad"
+}

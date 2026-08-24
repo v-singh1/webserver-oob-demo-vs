@@ -1,21 +1,41 @@
 {
   "id": "am62dxx",
+  "ui": "vue",
   "displayName": "AM62D",
   "boards": [
     {
       "name": "SK-AM62D",
-      "description": "Starter Kit for AM62D processors — display-optimized quad Cortex-A53 with dual DSS, designed for multi-display HMI.",
-      "image": "images/audio-am62d-evm-angled.png"
+      "description": "Starter Kit for AM62D processors — expandable audio platform with quad Cortex-A53 and C7x DSP, optimized for premium audio processing, noise reduction, and AI-powered speech enhancement.",
+      "image": "images/sk-am62d-angled.png"
     }
   ],
-  "soc": "AM62Dx quad Cortex-A53 @ 1.4GHz + dual DSS",
-  "demos": ["cpu-monitor", "audio-classification"],
+  "soc": "AM62Dx quad Cortex-A53 @ 1.4GHz + C7x DSP",
+  "demos": ["cpu-monitor", "tvm-inference", "audio-classification", "speech-enhancement", "audio-offload", "2dfft", "sigchain-biquad"],
   "demoConfig": {
-    "audio-classification": {
-      "model":    "/usr/share/oob-demo-assets/models/yamnet_audio_classification.tflite",
-      "labels":   "/usr/share/oob-demo-assets/labels/yamnet_label_list.txt",
-      "delegate": "XNNPACK",
-      "threads":  4
+    "2dfft": {
+      "binPath": "/usr/bin/rpmsg_2dfft_example"
+    },
+    "audio-offload": {
+      "binPath": "/usr/bin/rpmsg_audio_offload_example",
+      "host": "127.0.0.1"
+    },
+    "sigchain-biquad": {
+      "binPath": "/usr/bin/rpmsg_sigchain_biquad_example"
+    },
+    "speech-enhancement": {
+      "edgeAiBinary": "/usr/bin/rpmsg_inference_example",
+      "tvmDir": "/usr/share/tvm_inference",
+      "jsonFile": "json/pipeline_audio_enhancement.json",
+      "artifactsPath": "artifacts",
+      "inputPath": "/usr/share/tvm_inference/input/input_audio.wav",
+      "streamSocket": "/tmp/edge-ai-speech.sock",
+      "outputName": "processed_output.wav"
+    },
+    "tvm-inference": {
+      "edgeAiBinary": "/usr/bin/rpmsg_inference_example",
+      "jsonFile": "/usr/share/tvm_inference/json/pipeline_tvm_inference.json",
+      "modelName": "GCRN",
+      "description": "Hardware-accelerated inference using TVM+TIDL on C7x DSP"
     }
   },
   "docs": {
@@ -28,6 +48,14 @@
         "linkText": "View Product",
         "badge": "Official",
         "icon": "hardware:developer_board"
+      },
+      {
+        "title": "Processor SDK",
+        "description": "Linux development kit with drivers, libraries, and ready-to-run example applications",
+        "url": "https://www.ti.com/tool/PROCESSOR-SDK-AM62DX",
+        "linkText": "Get SDK",
+        "badge": "Latest",
+        "icon": "file:folder"
       },
       {
         "title": "Getting Started Guide",

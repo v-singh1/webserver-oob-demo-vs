@@ -2,6 +2,7 @@
 #
 # Usage:
 #   make                           Build for default device (am335x) on native host
+#   make DEVICE=am62dxx            Build for am62dxx (includes Vue/Vuetify frontend)
 #   make DEVICE=am62x              Build for am62x
 #   make CC=arm-linux-gnueabihf-gcc Cross-compile for ARM target
 #   make dev                       Run server locally (no cross-compile)
@@ -16,12 +17,19 @@ INSTALL_DIR = /usr/share/webserver-oob
 
 export CC CFLAGS LDFLAGS
 
-.PHONY: all build deps build-native clean dev deploy \
+.PHONY: all build deps build-native build-frontend clean dev deploy \
         deploy-bins deploy-server deploy-app deploy-restart
 
 all: build
 
 build: deps build-native
+
+# The Vue/Vuetify portal and spectrum helper are AM62D-only.  Keep the
+# existing build graph for every other device so their Yocto/native builds do
+# not acquire an npm frontend dependency.
+ifeq ($(DEVICE),am62dxx)
+build: build-frontend
+endif
 
 deps:
 	cd common/webserver && npm install
@@ -37,6 +45,14 @@ clean:
 	@if [ -d devices/$(DEVICE)/linux_app ]; then \
 	    $(MAKE) -C devices/$(DEVICE)/linux_app clean; \
 	fi
+	@if [ "$(DEVICE)" = "am62dxx" ] && [ -d frontend ]; then rm -rf frontend/dist frontend/.vite; fi
+
+
+# ── AM62D: Vue/Vuetify frontend ──────────────────────────────────────
+# Built only when DEVICE=am62dxx (see the conditional build dependency above).
+
+build-frontend:
+	cd frontend && npm install && VITE_DEVICE=$(DEVICE) npm run build
 
 
 # ── Local development ────────────────────────────────────────────────
@@ -69,6 +85,9 @@ deploy-bins:
 	@if [ -f devices/$(DEVICE)/linux_app/rpmsg_json ]; then \
 	    scp devices/$(DEVICE)/linux_app/rpmsg_json $(BOARD_HOST):/usr/bin/rpmsg_json; \
 	fi
+	@if [ -f devices/$(DEVICE)/linux_app/spectrum_utils ]; then \
+	    scp devices/$(DEVICE)/linux_app/spectrum_utils $(BOARD_HOST):/usr/bin/spectrum_utils; \
+	fi
 
 deploy-server:
 	ssh $(BOARD_HOST) "rm -rf $(INSTALL_DIR)/server $(INSTALL_DIR)/demos && \
@@ -91,6 +110,9 @@ deploy-app:
 	        ssh $(BOARD_HOST) "tar -C $(INSTALL_DIR)/app -xf -"; \
 	fi
 	scp devices/$(DEVICE)/device.json $(BOARD_HOST):$(INSTALL_DIR)/app/device.json
+	@if [ -f devices/$(DEVICE)/server-plugin.js ]; then \
+	    scp devices/$(DEVICE)/server-plugin.js $(BOARD_HOST):$(INSTALL_DIR)/app/server-plugin.js; \
+	fi
 
 deploy-restart:
 	ssh $(BOARD_HOST) "systemctl restart webserver-oob"

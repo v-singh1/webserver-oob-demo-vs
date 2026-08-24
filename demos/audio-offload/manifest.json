@@ -1,0 +1,9 @@
+{
+  "id": "audio-offload",
+  "name": "Audio DSP Offload",
+  "icon": "av:equalizer",
+  "description": "Real-time 8-channel audio processing offloaded to C7x DSP via RPMsg-DMA with FFT bandpass filtering, input/output spectrum visualization, and live performance metrics.",
+  "devices": ["am62dxx"],
+  "routes": ["/audio-offload/connect", "/audio-offload/disconnect", "/audio-offload/filter", "/audio-offload/run", "/audio-offload/stop"],
+  "websocket": "/audio-offload"
+}

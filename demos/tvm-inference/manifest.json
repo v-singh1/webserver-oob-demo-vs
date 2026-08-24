@@ -1,0 +1,8 @@
+{
+  "id": "tvm-inference",
+  "name": "TVM Inference",
+  "icon": "icons:build",
+  "description": "TVM+TIDL GCRN speech enhancement inference on AM62D C7x DSP",
+  "devices": ["am62dxx"],
+  "routes": ["/tvm-inference/run", "/tvm-inference/status"]
+}
