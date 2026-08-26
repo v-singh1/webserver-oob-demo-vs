@@ -8,8 +8,8 @@
           <v-icon size="22" color="blue-lighten-2">mdi-waveform</v-icon>
         </div>
         <div>
-          <div class="ph-title">DSP with Audio Analytics</div>
-          <div class="ph-sub">Real-time audio analytics powered by the C7x DSP — AI-enabled noise reduction, speech enhancement, and acoustic event detection on AM62D.</div>
+          <div class="ph-title">Audio Intelligence</div>
+          <div class="ph-sub">Real-time audio intelligence powered by the C7x DSP — AI-enabled noise reduction, speech enhancement, and acoustic event detection on AM62D.</div>
         </div>
       </div>
       <v-btn

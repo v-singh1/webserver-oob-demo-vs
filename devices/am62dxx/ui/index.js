@@ -12,8 +12,8 @@ export const navItems = [
   {
     section: 'Demos',
     items: [
-      { icon: 'mdi-waveform',   title: 'DSP with Audio Analytics', to: '/audio-dsp'   },
-      { icon: 'mdi-chart-bar',  title: 'DSP Compute',              to: '/dsp-compute' },
+      { icon: 'mdi-waveform',   title: 'Audio Intelligence', to: '/audio-dsp'   },
+      { icon: 'mdi-chart-bar',  title: 'DSP Acceleration',              to: '/dsp-compute' },
     ],
   },
   {
@@ -26,7 +26,7 @@ export const navItems = [
 
 export const connectedLabel = 'AM62D EVM'
 
-export const deviceTitle = { white: 'SITARA AM62D ', blue: 'Edge AI Portal' }
+export const deviceTitle = { white: 'SITARA AM62D ', blue: 'DSP + Edge AI Experience Portal' }
 
 export const heroDesc = 'Explore real-time audio analytics and AI demos showcasing the power of the TI AM62D platform with C7x DSP acceleration.'
 
@@ -34,13 +34,13 @@ export const heroButton = { label: 'Get Started', to: '/audio-dsp' }
 
 export const demoCards = [
   {
-    to: '/audio-dsp', name: 'DSP with Audio Analytics',
+    to: '/audio-dsp', name: 'Audio Intelligence',
     desc: 'Real-time audio analytics powered by the C7x DSP — AI-enabled noise reduction, speech enhancement, and acoustic event detection.',
     icon: 'mdi-waveform',
     iconBg: 'radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540)', iconBorder: '#1d4ed8', iconColor: '#60a5fa',
   },
   {
-    to: '/dsp-compute', name: 'DSP Compute',
+    to: '/dsp-compute', name: 'DSP Acceleration',
     desc: 'High-performance C7x DSP compute demos — 2D FFT, biquad filter chain, and workload offload via RPMsg-DMA.',
     icon: 'mdi-chart-bar',
     iconBg: 'radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00)', iconBorder: '#d97706', iconColor: '#fbbf24',
