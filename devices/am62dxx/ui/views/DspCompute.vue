@@ -55,6 +55,7 @@ import { ref, shallowRef, onUnmounted } from 'vue'
 import AudioOffload   from '../demos/AudioOffload.vue'
 import TwoDeeFft      from '../demos/2DFft.vue'
 import SigchainBiquad from '../demos/SigchainBiquad.vue'
+import { registerRunningDemo, clearRunningDemo } from '@/composables/useDemoSession'
 
 const demoList = [
   { name: 'Audio DSP Offload',  sub: '8-ch RPMsg-DMA on C7x DSP',       icon: 'mdi-chart-bar', icBg: 'radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00)', icBd: '#d97706', icColor: '#fbbf24', component: AudioOffload   },
@@ -69,13 +70,25 @@ const topRunning       = ref(false)
 
 function selectDemo(i) {
   if (i === activeIdx.value) return
-  if (topRunning.value) activeDemoRef.value?.stop()
+  if (topRunning.value) {
+    const confirmed = window.confirm(
+      `“${demoList[activeIdx.value].name}” is currently running. Switching demos will stop it. Continue?`
+    )
+    if (!confirmed) return
+    activeDemoRef.value?.stop()
+    clearRunningDemo(demoList[activeIdx.value].name)
+  }
   activeIdx.value        = i
   currentComponent.value = demoList[i].component
   topRunning.value       = false
 }
 
-function onRunningChange(v) { topRunning.value = v }
+function onRunningChange(v) {
+  topRunning.value = v
+  const name = demoList[activeIdx.value].name
+  if (v) registerRunningDemo(name, () => activeDemoRef.value?.stop())
+  else clearRunningDemo(name)
+}
 
 function triggerRun() {
   if (topRunning.value) activeDemoRef.value?.stop()
@@ -84,6 +97,7 @@ function triggerRun() {
 
 onUnmounted(() => {
   if (topRunning.value) activeDemoRef.value?.stop()
+  clearRunningDemo(demoList[activeIdx.value].name)
 })
 </script>
 

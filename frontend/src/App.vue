@@ -164,6 +164,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTheme } from 'vuetify'
 import { useCpuStats } from '@/composables/useCpuStats'
 import { navItems, connectedLabel } from '@device/index.js'
+import { runningDemoSnapshot } from '@/composables/useDemoSession'
 
 const vuetifyTheme = useTheme()
 const saved = localStorage.getItem('theme')
@@ -219,8 +220,18 @@ function initHealth() {
   ws.onerror = () => {}
 }
 
-onMounted(initHealth)
+function confirmBrowserExit(event) {
+  if (!runningDemoSnapshot()) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+onMounted(() => {
+  initHealth()
+  window.addEventListener('beforeunload', confirmBrowserExit)
+})
 onUnmounted(() => {
+  window.removeEventListener('beforeunload', confirmBrowserExit)
   clearTimeout(_reconnectTimer)
   clearInterval(_countdownTimer)
   if (_healthWs) { try { _healthWs.close() } catch (_) {} }

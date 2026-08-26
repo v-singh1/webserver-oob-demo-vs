@@ -17,24 +17,25 @@
         variant="flat"
         size="small"
         :disabled="!canRun && !demoRunning"
-        :prepend-icon="demoRunning ? 'mdi-stop' : 'mdi-play'"
+        :prepend-icon="demoRunning ? 'mdi-stop' : (!tvmReady && !tvmWasReady) ? 'mdi-loading' : 'mdi-play'"
         class="run-btn"
         @click="triggerRun"
-      >{{ demoRunning ? 'Stop Demo' : 'Run Demo' }}</v-btn>
+      >{{ demoRunning ? 'Stop Demo' : (!tvmReady && !tvmWasReady) ? 'Preparing Demo…' : 'Run Demo' }}</v-btn>
     </div>
 
-    <!-- TVM daemon preparing banner -->
+    <!-- C7x / TVM readiness banner — shown only during initial preload or on error -->
     <v-alert
-      v-if="tvmPreparing"
-      type="info"
+      v-if="showPreparingBanner"
+      :type="tvmState === 'error' ? 'error' : 'info'"
       variant="tonal"
       density="compact"
       class="preparing-alert"
       icon="mdi-loading"
+      aria-live="polite"
     >
       <span class="preparing-txt">
         <span class="preparing-spinner">&#9696;</span>
-        Preparing TVM model daemon — AI demos will be available in a moment&hellip;
+        <span><strong>Preparing analytics demos:</strong> {{ tvmStatusMessage }}</span>
       </span>
     </v-alert>
 
@@ -76,10 +77,11 @@
 </template>
 
 <script setup>
-import { ref, computed, shallowRef, onMounted, onUnmounted } from 'vue'
+import { ref, computed, shallowRef, watch, onMounted, onUnmounted } from 'vue'
 import SpeechEnhancement  from '../demos/SpeechEnhancement.vue'
 import TvmInference        from '../demos/TvmInference.vue'
 import AudioClassification from '@/demos/AudioClassification.vue'
+import { registerRunningDemo, clearRunningDemo } from '@/composables/useDemoSession'
 
 const demos = [
   {
@@ -112,43 +114,85 @@ const activeIdx        = ref(0)
 const activeDemo       = ref(null)
 const currentComponent = shallowRef(demos[0].component)
 const demoRunning      = ref(false)
-const canRun = computed(() => demos[activeIdx.value].canRun)
+const canRun = computed(() => demos[activeIdx.value].canRun && (tvmReady.value || tvmWasReady.value))
 
-const tvmPreparing = ref(false)
+const tvmReady      = ref(false)
+const tvmWasReady   = ref(false)   // latched true once tvmReady ever becomes true
+const tvmState      = ref('checking')
+const tvmDetails    = ref(null)
 let _tvmPollTimer  = null
+let _tvmPollStopped = false
+
+/* Show the preload banner only during the initial boot sequence, or on hard
+ * error. Once the daemon has been ready at least once, transient drops (e.g.
+ * C7x firmware switch during a demo run) must not re-show the banner. */
+const showPreparingBanner = computed(() =>
+  tvmState.value === 'error' || (!tvmReady.value && !tvmWasReady.value)
+)
+
+watch(tvmReady, val => { if (val) tvmWasReady.value = true })
+
+const tvmStatusMessage = computed(() => {
+  if (tvmState.value === 'error')
+    return `C7x/TVM initialization failed${tvmDetails.value?.error ? ': ' + tvmDetails.value.error : ''}`
+  if (tvmDetails.value?.c7xState !== 'running')
+    return `Waiting for C7x DSP to boot (state: ${tvmDetails.value?.c7xState || 'checking'})…`
+  if (!tvmDetails.value?.daemonReady)
+    return 'C7x is running; loading the TVM model daemon…'
+  if (!tvmDetails.value?.modelReady)
+    return 'TVM daemon is ready; preloading model artifacts…'
+  return 'Checking C7x and TVM readiness…'
+})
 
 async function pollTvmDaemon() {
   try {
     const r = await fetch('/tvm-daemon/status')
-    if (!r.ok) return
-    const { state } = await r.json()
-    tvmPreparing.value = (state === 'restarting')
-    if (tvmPreparing.value) {
-      _tvmPollTimer = setTimeout(pollTvmDaemon, 2000)
-    } else {
-      _tvmPollTimer = null
-    }
-  } catch (_) {}
+    const status = await r.json()
+    tvmDetails.value = status
+    tvmState.value = status.state || (r.ok ? 'checking' : 'error')
+    tvmReady.value = r.ok && status.ready === true
+  } catch (error) {
+    tvmReady.value = false
+    tvmState.value = 'error'
+    tvmDetails.value = { error: error.message, c7xState: 'unavailable' }
+  } finally {
+    if (!_tvmPollStopped) _tvmPollTimer = setTimeout(pollTvmDaemon, 2000)
+  }
 }
 
 onMounted(pollTvmDaemon)
 
 function selectDemo(i) {
-  if (demoRunning.value) return
+  if (i === activeIdx.value) return
+  if (demoRunning.value) {
+    const confirmed = window.confirm(
+      `“${demos[activeIdx.value].name}” is currently running. Switching demos will stop it. Continue?`
+    )
+    if (!confirmed) return
+    activeDemo.value?.stop()
+    clearRunningDemo(demos[activeIdx.value].name)
+  }
   activeIdx.value        = i
   currentComponent.value = demos[i].component
   demoRunning.value      = false
 }
 
-function onRunningChange(v) { demoRunning.value = v }
+function onRunningChange(v) {
+  demoRunning.value = v
+  const name = demos[activeIdx.value].name
+  if (v) registerRunningDemo(name, () => activeDemo.value?.stop())
+  else clearRunningDemo(name)
+}
 
 function triggerRun() {
   if (demoRunning.value) activeDemo.value?.stop()
-  else activeDemo.value?.run()
+  else if (tvmReady.value) activeDemo.value?.run()
 }
 
 onUnmounted(() => {
+  _tvmPollStopped = true
   if (demoRunning.value) activeDemo.value?.stop()
+  clearRunningDemo(demos[activeIdx.value].name)
   if (_tvmPollTimer) clearTimeout(_tvmPollTimer)
 })
 </script>

@@ -484,8 +484,10 @@ module.exports = function registerAudioOffload(app, wss, device) {
         if (!offloadProc) return;
         try {
             process.kill(-offloadProc.pid, 'SIGINT');
+            offloadProc = null;
         } catch (_) {
             try { offloadProc.kill('SIGINT'); } catch (_) {}
+            offloadProc = null;
         }
         /* offloadProc is nulled by the 'exit' handler once the process terminates */
     }

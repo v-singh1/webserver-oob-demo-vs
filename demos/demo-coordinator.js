@@ -19,18 +19,124 @@
  */
 
 const fs                         = require('fs');
+const net                        = require('net');
 const { execFileSync, execFile } = require('child_process');
 
 const TVM_DAEMON_SERVICE = 'tvm-model-daemon';
 
 const TVM_CACHE   = '/var/lib/tvm_inference/loaded_model';
 const PRELOAD_BIN = '/usr/bin/rpmsg_inference_example';
+const TVM_SOCKET  = '/var/run/tvm-inference.sock';
+const C7X_STATE   = '/sys/class/remoteproc/remoteproc0/state';
+const TVM_MAGIC   = 0x544D5644;
+const TVM_PING    = 0;
+const TVM_PONG    = 1;
+const READY_TIMEOUT_MS = 10000;
 
 // Name of the demo that currently owns the C7x DSP, or null.
 let _activeDemoName = null;
 
-// 'ready' | 'restarting' — tracks tvm-model-daemon lifecycle
-let _tvmDaemonState = 'ready';
+// Never assume readiness at process startup.  It is established from the C7x
+// remoteproc state, daemon PING/PONG, and model-cache marker.
+let _tvmDaemonState = 'checking';
+let _tvmLastError   = null;
+let _preloadInProgress = false;
+
+function c7xState() {
+    try { return fs.readFileSync(C7X_STATE, 'utf8').trim(); }
+    catch (_) { return 'unavailable'; }
+}
+
+function pingTvmDaemon(timeoutMs = 200) {
+    return new Promise(resolve => {
+        let settled = false;
+        let received = Buffer.alloc(0);
+        const socket = net.createConnection(TVM_SOCKET);
+        const finish = ready => {
+            if (settled) return;
+            settled = true;
+            socket.destroy();
+            resolve(ready);
+        };
+        socket.setTimeout(timeoutMs);
+        socket.on('connect', () => {
+            const ping = Buffer.alloc(12);
+            ping.writeUInt32LE(TVM_MAGIC, 0);
+            ping.writeUInt32LE(TVM_PING, 4);
+            ping.writeUInt32LE(0, 8);
+            socket.write(ping);
+        });
+        socket.on('data', data => {
+            received = Buffer.concat([received, data]);
+            if (received.length >= 12) {
+                finish(received.readUInt32LE(0) === TVM_MAGIC &&
+                       received.readUInt32LE(4) === TVM_PONG);
+            }
+        });
+        socket.on('timeout', () => finish(false));
+        socket.on('error', () => finish(false));
+        socket.on('close', () => finish(false));
+    });
+}
+
+function preloadTvmModel(binaryPath = PRELOAD_BIN) {
+    if (_preloadInProgress) return;
+    _preloadInProgress = true;
+    _tvmDaemonState = 'preloading';
+    execFile(binaryPath, ['--preload'], { timeout: READY_TIMEOUT_MS }, err => {
+        _preloadInProgress = false;
+        if (err) {
+            _tvmDaemonState = 'error';
+            _tvmLastError = err.message;
+            console.warn('[demo-coordinator] TVM preload failed:', err.message);
+            return;
+        }
+        _tvmDaemonState = fs.existsSync(TVM_CACHE) ? 'ready' : 'error';
+        _tvmLastError = _tvmDaemonState === 'ready' ? null :
+            'TVM preload completed without creating the model cache marker';
+        if (_tvmDaemonState === 'ready')
+            console.log('[demo-coordinator] C7x and TVM model are ready');
+    });
+}
+
+async function probeTvmReadiness(updateState = true) {
+    const remoteproc = c7xState();
+    const daemonReady = remoteproc === 'running' && await pingTvmDaemon();
+    const modelReady = fs.existsSync(TVM_CACHE);
+    const ready = remoteproc === 'running' && daemonReady && modelReady;
+
+    /* This also covers systems where tvm-model-preload.service was not enabled.
+     * The daemon socket is created only after its artifacts are initialized. */
+    if (!ready && daemonReady && !modelReady && !_activeDemoName)
+        preloadTvmModel();
+
+    if (updateState && _tvmDaemonState !== 'restarting' && !_preloadInProgress) {
+        _tvmDaemonState = ready ? 'ready' :
+            remoteproc !== 'running' ? 'waiting-c7x' :
+            !daemonReady ? 'loading' : 'preloading';
+    }
+    return {
+        state: _tvmDaemonState,
+        ready,
+        c7xState: remoteproc,
+        daemonReady,
+        modelReady,
+        error: _tvmLastError
+    };
+}
+
+function waitForDaemonReady(timeoutMs = READY_TIMEOUT_MS) {
+    const deadline = Date.now() + timeoutMs;
+    return new Promise((resolve, reject) => {
+        const poll = async () => {
+            if (c7xState() === 'running' && await pingTvmDaemon()) return resolve();
+            if (Date.now() >= deadline)
+                return reject(new Error('timed out waiting for C7x and TVM daemon'));
+            setTimeout(poll, 1000);
+        };
+        poll();
+    });
+}
 
 module.exports = {
 
@@ -61,6 +167,10 @@ module.exports = {
      * @param {string} [binaryPath]  Override path to rpmsg_inference_example.
      */
     ensurePreloaded(binaryPath) {
+        if (c7xState() !== 'running')
+            throw new Error('C7x remoteproc is not running');
+        if (!fs.existsSync(TVM_SOCKET))
+            throw new Error('TVM model daemon is not ready');
         if (fs.existsSync(TVM_CACHE)) return;
         const bin = binaryPath || PRELOAD_BIN;
         console.log(`[demo-coordinator] TVM cache absent — running preload via ${bin}`);
@@ -91,19 +201,30 @@ module.exports = {
             console.warn('[demo-coordinator] Could not remove TVM cache:', err.message);
         }
         _tvmDaemonState = 'restarting';
+        _tvmLastError = null;
         execFile('systemctl', ['restart', TVM_DAEMON_SERVICE], (err) => {
             if (err) {
                 console.warn(`[demo-coordinator] Could not restart ${TVM_DAEMON_SERVICE}:`, err.message);
-            } else {
-                console.log(`[demo-coordinator] ${TVM_DAEMON_SERVICE} restarted`);
+                _tvmDaemonState = 'error';
+                _tvmLastError = err.message;
+                return;
             }
-            _tvmDaemonState = 'ready';
+            console.log(`[demo-coordinator] ${TVM_DAEMON_SERVICE} restart requested; waiting for readiness`);
+            waitForDaemonReady()
+                .then(() => {
+                    preloadTvmModel();
+                })
+                .catch(readyErr => {
+                    _tvmDaemonState = 'error';
+                    _tvmLastError = readyErr.message;
+                    console.warn('[demo-coordinator] TVM readiness failed:', readyErr.message);
+                });
         });
     },
 
     /** Returns true if the TVM model cache file exists on disk. */
     tvmCacheExists() { return fs.existsSync(TVM_CACHE); },
 
-    /** Returns current tvm-model-daemon state: 'ready' | 'restarting' */
-    tvmDaemonState() { return _tvmDaemonState; },
+    /** Return measured C7x, daemon, and model readiness. */
+    tvmStatus() { return probeTvmReadiness(); },
 };
