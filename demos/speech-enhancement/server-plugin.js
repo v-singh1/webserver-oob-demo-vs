@@ -321,7 +321,10 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     });
     app.get('/stop-speech-enhancement', (req, res) => { stopJob(); res.json({ status: 'stopped' }); });
     app.get('/speech-enhancement/status', (req, res) => res.json({ running: Boolean(job), backend: MOCK ? 'mock' : 'edge-ai-rpmsg' }));
-    app.get('/tvm-daemon/status', (req, res) => res.json({ state: demoCoordinator.tvmDaemonState() }));
+    app.get('/tvm-daemon/status', async (req, res) => {
+        try { res.json(await demoCoordinator.tvmStatus()); }
+        catch (error) { res.status(503).json({ state: 'error', ready: false, error: error.message }); }
+    });
 
     app.get('/speech-enhancement/wav', (req, res) => {
         const active = job || lastCompletedJob;

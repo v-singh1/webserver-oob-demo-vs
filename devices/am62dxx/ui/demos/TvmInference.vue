@@ -77,6 +77,7 @@
 <script setup>
 import { ref } from 'vue'
 
+const emit = defineEmits(['running-change'])
 const running   = ref(false)
 const statusMsg = ref('Idle')
 const error     = ref(null)
@@ -86,6 +87,7 @@ let pollTimer = null
 
 async function run() {
   running.value   = true
+  emit('running-change', true)
   statusMsg.value = 'Running inference…'
   error.value     = null
   results.value   = null
@@ -94,7 +96,7 @@ async function run() {
   if (!r.ok) {
     const d = await r.json().catch(() => ({}))
     error.value = d.error || `HTTP ${r.status}`
-    running.value = false; statusMsg.value = 'Error'; return
+    running.value = false; emit('running-change', false); statusMsg.value = 'Error'; return
   }
 
   pollTimer = setInterval(async () => {
@@ -103,6 +105,7 @@ async function run() {
     if (!s.isRunning) {
       clearInterval(pollTimer)
       running.value = false
+      emit('running-change', false)
       if (s.results?.error) { error.value = s.results.error; statusMsg.value = 'Error' }
       else { results.value = s.results; statusMsg.value = 'Complete' }
     }
@@ -112,7 +115,7 @@ async function run() {
 async function stop() {
   clearInterval(pollTimer)
   await fetch('/tvm-inference/stop')
-  running.value = false; statusMsg.value = 'Stopped'
+  running.value = false; emit('running-change', false); statusMsg.value = 'Stopped'
 }
 
 defineExpose({ run, stop, isRunning: running })
