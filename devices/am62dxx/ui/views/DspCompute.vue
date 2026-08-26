@@ -6,8 +6,8 @@
       <div class="ph-left">
         <div class="ph-icon"><v-icon size="22">mdi-chart-bar</v-icon></div>
         <div>
-          <div class="ph-title">DSP Compute</div>
-          <div class="ph-sub">High-performance C7x DSP compute demos — Linux-to-C7x workload offload via RPMsg-DMA.</div>
+          <div class="ph-title">DSP Acceleration</div>
+          <div class="ph-sub">High-performance C7x DSP acceleration demos — Linux-to-C7x workload offload via RPMsg-DMA.</div>
         </div>
       </div>
       <v-btn

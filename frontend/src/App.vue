@@ -9,7 +9,7 @@
         </div>
         <div>
           <div class="brand-main">TI SITARA</div>
-          <div class="brand-sub">EDGE AI PORTAL</div>
+          <div class="brand-sub">DSP + EDGE AI<br>EXPERIENCE PORTAL</div>
         </div>
       </div>
 
@@ -282,11 +282,11 @@ async function openDeviceInfo() {
 
 <style scoped>
 /* Sidebar layout */
-.sidebar-brand { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); height:62px; flex-shrink:0; }
+.sidebar-brand { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); min-height:62px; height:auto; flex-shrink:0; }
 .ti-logo { width:38px; height:38px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; flex-shrink:0; padding:3px; }
 .ti-logo img { width:100%; height:100%; object-fit:contain; }
 .brand-main { font-size:15px; font-weight:700; color:rgb(var(--v-theme-on-surface)); line-height:1.2; }
-.brand-sub  { font-size:10px; font-weight:700; color:#4da6ff; letter-spacing:2.5px; }
+.brand-sub  { font-size:9.5px; font-weight:700; color:#4da6ff; letter-spacing:1.5px; line-height:1.5; }
 
 /* Sidebar nav */
 .sidebar-nav { padding: 8px 0; }
