@@ -25,7 +25,7 @@
     "speech-enhancement": {
       "edgeAiBinary": "/usr/bin/rpmsg_inference_example",
       "tvmDir": "/usr/share/tvm_inference",
-      "jsonFile": "json/pipeline_audio_enhancement.json",
+      "jsonFile": "json/pipeline_speech_enhancement.json",
       "artifactsPath": "artifacts",
       "inputPath": "/usr/share/tvm_inference/input/input_audio.wav",
       "streamSocket": "/tmp/edge-ai-speech.sock",
