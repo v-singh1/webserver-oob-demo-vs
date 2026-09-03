@@ -44,6 +44,11 @@ const path = require('path');
 module.exports = function(app, wss, device, ctx) {
     const { appDir, deviceConfigPath, express } = ctx;
 
+    /* Prefer device-specific app dir (exists in local dev); fall back to appDir on EVM
+     * where both resolve to the same deployed /usr/share/webserver-oob/app path. */
+    const deviceAppDir = path.join(path.dirname(deviceConfigPath), 'app');
+    const miBaseDir = fs.existsSync(deviceAppDir) ? deviceAppDir : appDir;
+
     app.use(express.json({ limit: '512kb' }));
 
     /* Update device config — merges body into in-memory device and writes to disk */
@@ -71,7 +76,7 @@ module.exports = function(app, wss, device, ctx) {
 
     /* List HTML files in Model-Inspector folder for the AI Model Inspector page */
     app.get('/model-inspector-list', (req, res) => {
-        const miDir = path.join(appDir, 'Model-Inspector');
+        const miDir = path.join(miBaseDir, 'Model-Inspector');
         try {
             if (!fs.existsSync(miDir)) return res.json({ files: [] });
             const files = fs.readdirSync(miDir)
@@ -90,7 +95,7 @@ module.exports = function(app, wss, device, ctx) {
         (req, res) => {
             const raw = ((req.query.filename || '') + '').replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.+/g, '.').slice(0, 120);
             const filename = raw || 'uploaded_model.html';
-            const miDir = path.join(appDir, 'Model-Inspector');
+            const miDir = path.join(miBaseDir, 'Model-Inspector');
             try {
                 if (!fs.existsSync(miDir)) fs.mkdirSync(miDir, { recursive: true });
                 const dest = path.join(miDir, filename);
