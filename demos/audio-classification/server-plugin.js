@@ -198,7 +198,6 @@ module.exports = function registerAudioClassification(app, wss, device) {
 
     let fifoReaderProcess    = null;
     let legacyAudioProcess   = null;
-    let captureProcess       = null;
     let edgeAiProcess        = null;
     let mockInterval         = null;
     let audioSourceMode      = 'device'; /* 'device' | 'file' */
@@ -352,7 +351,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
         const filepath = req.query.filepath || req.query.file ||
             (fileSelection ? device_param.slice('file:'.length) : '');
 
-        if (legacyAudioProcess || captureProcess || edgeAiProcess || mockInterval) {
+        if (legacyAudioProcess || edgeAiProcess || mockInterval) {
             return res.status(400).send('Audio classification already running');
         }
 
@@ -409,7 +408,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
 
     app.get('/audio-classification/status', (req, res) => {
         res.json({
-            running: Boolean(legacyAudioProcess || captureProcess || edgeAiProcess || mockInterval),
+            running: Boolean(legacyAudioProcess || edgeAiProcess || mockInterval),
             backend: isAm62d ? 'edge-ai-rpmsg' : 'gstreamer',
             result: lastResult,
         });
@@ -419,7 +418,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
     /* Pipeline helpers                                             */
     /* ------------------------------------------------------------ */
 
-    /** Start the AM62D JSON pipeline once a WAV input is available. */
+    /** Start the AM62D JSON pipeline for WAV file input. */
     function runAm62dInference(inputPath, generation, jsonPath) {
         if (generation !== runGeneration) return;
         if (!fs.existsSync(inputPath)) throw new Error(`Audio input file not found: ${inputPath}`);
@@ -431,18 +430,9 @@ module.exports = function registerAudioClassification(app, wss, device) {
         try {
             if (config.preloadTvm !== false) demoCoordinator.ensurePreloaded(edgeAiBinary);
 
-            fs.mkdirSync(JOB_ROOT, { recursive: true });
-            const jobDir = fs.mkdtempSync(path.join(JOB_ROOT, 'job-'));
-            const baseJson = JSON.parse(fs.readFileSync(resolvedJson, 'utf8'));
-            const jobJson = Object.assign({}, baseJson, { input_file: inputPath });
-            const jobJsonPath = path.join(jobDir, 'pipeline.json');
-            fs.writeFileSync(jobJsonPath, JSON.stringify(jobJson));
-
             activeJob = {
                 generation,
-                jobDir,
                 inputPath,
-                jobJsonPath,
                 stdout: '',
                 stderr: '',
                 classes: [],
@@ -451,8 +441,10 @@ module.exports = function registerAudioClassification(app, wss, device) {
             lastResult = null;
             send({ type: 'status', status: 'running', backend: 'edge-ai-rpmsg', message: 'Running Audio Classification' });
 
-            console.log('[audio] Starting AM62D Edge-AI pipeline:', edgeAiBinary, jobJsonPath);
-            const child = spawn(edgeAiBinary, [jobJsonPath], { cwd: jobDir });
+            /* Pass the file path directly via --input-file — no temp JSON needed. */
+            console.log('[audio] Starting AM62D Edge-AI pipeline:', edgeAiBinary, resolvedJson,
+                        '--input-file', inputPath);
+            const child = spawn(edgeAiBinary, [resolvedJson, '--input-file', inputPath]);
             edgeAiProcess = child;
             let stdoutRemainder = '';
 
@@ -524,12 +516,11 @@ module.exports = function registerAudioClassification(app, wss, device) {
     }
 
     /**
-     * Start the AM62D streaming pipeline for live microphone input.
+     * Start the AM62D live-capture pipeline.
      *
-     * Spawns rpmsg_inference_example with --stream so it reads raw S16LE PCM from
-     * stdin indefinitely, running STFT+TVM on each window and printing top-N results.
-     * arecord is spawned separately and its stdout piped directly to the inference
-     * process stdin — no WAV files, no per-chunk process restarts.
+     * Spawns rpmsg_inference_example with --device so the binary opens the ALSA
+     * device directly, captures raw PCM, runs STFT+TVM on each window, and prints
+     * top-N results to stdout.  No arecord process — the binary owns the device.
      */
     function startStreamingPipeline(device, generation, jsonPath) {
         if (generation !== runGeneration) return;
@@ -540,20 +531,13 @@ module.exports = function registerAudioClassification(app, wss, device) {
         activeJob = { generation }; /* DSP ownership marker */
 
         try {
-            const arecordArgs = ['-q', '-D', device, '-t', 'raw', '-f', 'S16_LE',
-                                 '-c', '1', '-r', String(sampleRate)];
-            const arecord = spawn('arecord', arecordArgs);
-            captureProcess = arecord;
-
-            const edgeAi = spawn(edgeAiBinary, [jsonPath, '--stream']);
+            const edgeAi = spawn(edgeAiBinary, [jsonPath, '--device', device]);
             edgeAiProcess = edgeAi;
-
-            /* Pipe raw PCM directly into rpmsg_inference_example stdin — no WAV files. */
-            arecord.stdout.pipe(edgeAi.stdin);
 
             send({ type: 'status', status: 'running', backend: 'edge-ai-rpmsg',
                    message: 'Running Audio Classification' });
-            console.log('[audio] Streaming pipeline started:', edgeAiBinary, jsonPath, '--stream');
+            console.log('[audio] Live pipeline started:', edgeAiBinary, jsonPath,
+                        '--device', device);
 
             let stdoutRemainder = '';
             edgeAi.stdout.on('data', data => {
@@ -571,16 +555,6 @@ module.exports = function registerAudioClassification(app, wss, device) {
 
             edgeAi.stderr.on('data', data =>
                 console.error('[audio] Edge-AI stderr:', data.toString().trim()));
-            arecord.stderr.on('data', data =>
-                console.error('[audio] arecord:', data.toString().trim()));
-
-            arecord.on('error', err => {
-                if (generation !== runGeneration) return;
-                captureProcess = null;
-                send({ type: 'error', message: `Audio capture failed: ${err.message}`,
-                       backend: 'edge-ai-rpmsg' });
-            });
-            arecord.on('close', () => { captureProcess = null; });
 
             edgeAi.on('error', err => {
                 if (!activeJob || activeJob.generation !== generation) return;
@@ -707,10 +681,6 @@ module.exports = function registerAudioClassification(app, wss, device) {
         if (mockInterval) {
             clearInterval(mockInterval);
             mockInterval = null;
-        }
-        if (captureProcess) {
-            captureProcess.kill('SIGTERM');
-            captureProcess = null;
         }
         if (edgeAiProcess) {
             edgeAiProcess.kill('SIGTERM');
