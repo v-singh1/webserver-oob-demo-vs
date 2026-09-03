@@ -13,16 +13,21 @@
             Real-time audio event classification using YAMNet model on C7x DSP via TIDL.
             Predicts 521 audio event classes from the AudioSet ontology with low latency.
           </p>
+
+          <!-- Signal flow image -->
+          <img src="/images/audio-classification-flow.png" alt="Audio Classification Pipeline" class="flow-img" />
+
+          <!-- Features -->
           <ul class="feat-list">
-            <li><v-icon size="14" color="success" class="mr-1">mdi-check</v-icon>521 audio event classes</li>
-            <li><v-icon size="14" color="success" class="mr-1">mdi-check</v-icon>MobileNet v1 architecture</li>
-            <li><v-icon size="14" color="success" class="mr-1">mdi-check</v-icon>TIDL-accelerated inference</li>
-            <li><v-icon size="14" color="success" class="mr-1">mdi-check</v-icon>Real-time audio processing</li>
+            <li v-for="f in features" :key="f">
+              <v-icon size="14" color="success" class="mr-1">mdi-check</v-icon>
+              {{ f }}
+            </li>
           </ul>
+
+          <!-- Tags -->
           <div class="tags">
-            <v-chip size="x-small" color="primary" variant="tonal">Audio Classification</v-chip>
-            <v-chip size="x-small" color="info" variant="tonal">TIDL</v-chip>
-            <v-chip size="x-small" color="success" variant="tonal">C7x DSP</v-chip>
+            <v-chip v-for="t in tags" :key="t" size="x-small" color="primary" variant="tonal">{{ t }}</v-chip>
           </div>
         </v-expansion-panel-text>
       </v-expansion-panel>
@@ -36,44 +41,82 @@
           Model Info
         </v-expansion-panel-title>
         <v-expansion-panel-text>
-          <div class="model-row"><span class="model-lbl">Architecture</span><span class="model-val">YAMNet (MobileNet v1)</span></div>
-          <div class="model-row"><span class="model-lbl">Quantization</span><span class="model-val">INT8</span></div>
-          <div class="model-row"><span class="model-lbl">Runtime</span><span class="model-val">TIDL</span></div>
-          <div class="model-row"><span class="model-lbl">Target</span><span class="model-val">C7x DSP</span></div>
-          <div class="model-row"><span class="model-lbl">Classes</span><span class="model-val">521 (AudioSet)</span></div>
+          <div class="model-row"><span class="model-lbl">Architecture</span><span class="model-val">{{ currentModelMeta.architecture }}</span></div>
+          <div class="model-row"><span class="model-lbl">Runtime</span>      <span class="model-val">TVM + TIDL</span></div>
+          <div class="model-row"><span class="model-lbl">Target</span>       <span class="model-val">C7x DSP</span></div>
+          <div class="model-row"><span class="model-lbl">Input</span>        <span class="model-val">16kHz mono PCM</span></div>
+          <div class="model-row"><span class="model-lbl">Classes</span>      <span class="model-val">{{ currentModelMeta.classes }}</span></div>
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>
 
-    <!-- Controls + status row -->
-    <v-card flat class="ti-card ctrl-card">
-      <div class="ctrl-row">
-        <!-- Input device selector -->
+    <!-- Model selector -->
+    <v-card class="ti-card" flat>
+      <div class="card-ttl">Model</div>
+      <div class="source-actions">
         <div class="field-wrap">
-          <label class="field-lbl">Input Device</label>
+          <label class="field-lbl">Classification Model</label>
+          <select v-model="selectedModel" class="field-select" :disabled="isRunning">
+            <option v-for="(m, key) in modelMap" :key="key" :value="key">{{ m.label }}</option>
+          </select>
+        </div>
+      </div>
+      <div v-if="modelMap[selectedModel]?.description" class="model-desc">
+        {{ modelMap[selectedModel].description }}
+      </div>
+    </v-card>
+
+    <!-- Audio source card -->
+    <v-card class="ti-card" flat>
+      <div class="card-ttl">Audio Source</div>
+
+      <div class="file-card">
+        <div class="file-card-icon">
+          <v-icon size="20" color="primary">{{ selectedSourceIsFile ? 'mdi-file-music' : 'mdi-microphone' }}</v-icon>
+        </div>
+        <div class="file-card-info">
+          <div class="file-card-name">{{ selectedSource?.label || 'No audio source available' }}</div>
+          <div class="file-card-meta">{{ sourceSummary }}</div>
+          <v-chip size="x-small" :color="selectedSourceIsFile ? 'primary' : 'success'" variant="tonal" class="mt-1">
+            {{ selectedSourceIsFile ? (uploadedPath ? 'Uploaded File' : 'Default File') : 'Live Microphone' }}
+          </v-chip>
+        </div>
+      </div>
+
+      <div class="source-actions">
+        <div class="field-wrap">
+          <label class="field-lbl">Input Source</label>
           <select v-model="selectedDevice" class="field-select" :disabled="isRunning">
             <option v-if="devices.length === 0" value="">Loading...</option>
             <option v-for="d in devices" :key="d.value" :value="d.value">{{ d.label }}</option>
           </select>
         </div>
-
-        <!-- Status indicator -->
-        <div class="status-wrap">
-          <div class="status-dot" :class="isRunning ? 'dot-run' : 'dot-idle'" />
-          <span class="status-txt">{{ isRunning ? 'Running' : 'Idle' }}</span>
-        </div>
-      </div>
-
-      <div v-if="errorMsg" class="err-banner">
-        <v-icon size="14" color="error">mdi-alert-circle</v-icon>
-        {{ errorMsg }}
+        <v-btn size="small" variant="outlined" color="primary" prepend-icon="mdi-refresh" :disabled="isRunning" @click="loadDevices">
+          Refresh
+        </v-btn>
+        <v-btn size="small" variant="outlined" color="primary" prepend-icon="mdi-upload" :disabled="isRunning" @click="chooseUpload">
+          Upload WAV File
+        </v-btn>
+        <input ref="uploadInput" type="file" accept=".wav,audio/wav" hidden @change="uploadFile" />
       </div>
     </v-card>
 
-    <!-- Signal flow image -->
-    <div class="flow-wrap">
-      <img src="/images/audio-classification-flow.png" alt="Audio Classification Signal Flow" class="flow-img" @error="flowImgError = true" v-if="!flowImgError" />
-    </div>
+    <!-- Status -->
+    <v-card class="ti-card" flat>
+      <div class="status-row">
+        <div class="status-dot-wrap">
+          <span class="status-dot" :class="dotClass" />
+          <span class="status-bars" :class="{ active: isRunning }">
+            <span v-for="i in 5" :key="i" :style="barStyle(i)" />
+          </span>
+        </div>
+        <span class="status-lbl">{{ statusMessage }}</span>
+      </div>
+
+      <v-alert v-if="errorMsg" type="error" density="compact" variant="tonal" closable @click:close="errorMsg = ''">
+        {{ errorMsg }}
+      </v-alert>
+    </v-card>
 
     <!-- Results panel -->
     <v-card flat class="ti-card results-card">
@@ -99,40 +142,83 @@
       </div>
     </v-card>
 
-    <!-- Not Supported Dialog -->
-    <v-dialog v-model="notSupportedDialog" max-width="420">
-      <v-card>
-        <v-card-title class="d-flex align-center gap-2 pa-4">
-          <v-icon color="warning" size="24">mdi-alert-circle-outline</v-icon>
-          Demo Not Supported
-        </v-card-title>
-        <v-card-text class="pa-4 pt-0">
-          This demo is not currently supported on this board configuration.
-        </v-card-text>
-        <v-card-actions class="pa-4 pt-0">
-          <v-spacer />
-          <v-btn color="primary" variant="flat" @click="notSupportedDialog = false">OK</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import {
+  getAudioClassificationInfo,
+  getAudioClassificationModels,
+  getAudioDevices,
+  startAudioClassification,
+  stopAudioClassification,
+  uploadAudioClassificationFile,
+} from '@/utils/audioClassificationApi'
 
-const isRunning     = ref(false)
-const devices       = ref([])
+const emit = defineEmits(['running-change'])
+
+const isRunning      = ref(false)
+const devices        = ref([])
 const selectedDevice = ref('')
-const results       = ref([])
-const errorMsg      = ref('')
-const flowImgError  = ref(false)
-const resultsEl     = ref(null)
-const notSupportedDialog = ref(false)
+const results        = ref([])
+const errorMsg       = ref('')
+const statusMessage  = ref('Idle')
+const fileInfo       = ref(null)
+const uploadedPath   = ref('')
+const uploadedName   = ref('')
+const uploadInput    = ref(null)
+const resultsEl      = ref(null)
+const modelMap       = ref({})         /* { yamnet: {label, description}, vggish: ... } */
+const selectedModel  = ref('yamnet')
 let ws = null
+let reconnectTimer = null
+let mounted = false
+
+/* Static per-model metadata shown in the Model Info expansion panel */
+const MODEL_META = {
+  yamnet: { architecture: 'YAMNet (MobileNet v1)', classes: '521 (AudioSet)' },
+  vggish: { architecture: 'VGGish',                classes: '10 (UrbanSound8K)' },
+}
 
 const MAX_RESULTS = 50
+const features = [
+  '521 AudioSet event classes',
+  'STFT, Mel filtering, and log features on C7x DSP',
+  'TVM + TIDL accelerated YAMNet inference',
+  'Live ALSA microphone and WAV file input',
+]
+const tags = ['Audio Classification', 'TVM + TIDL', 'C7x DSP']
+
+const currentModelMeta = computed(() =>
+  MODEL_META[selectedModel.value] || { architecture: selectedModel.value, classes: '—' }
+)
+const selectedSource = computed(() =>
+  devices.value.find(device => device.value === selectedDevice.value) || null
+)
+const selectedSourceIsFile = computed(() => selectedDevice.value.startsWith('file:'))
+const sourceSummary = computed(() => {
+  if (!selectedSource.value) return 'Refresh to discover available audio sources'
+  if (selectedSourceIsFile.value) {
+    return uploadedPath.value && selectedDevice.value === `file:${uploadedPath.value}`
+      ? `Uploaded WAV · ${uploadedName.value}`
+      : 'Installed WAV file input'
+  }
+  const seconds = fileInfo.value?.captureSeconds || 3
+  const rate = fileInfo.value?.sampleRate || 16000
+  return `Live ALSA capture · ${rate / 1000}kHz mono PCM · ${seconds}s`
+})
+const dotClass = computed(() => ({
+  'dot-running': isRunning.value,
+  'dot-error': Boolean(errorMsg.value),
+  'dot-success': !isRunning.value && !errorMsg.value && statusMessage.value === 'Classification completed',
+  'dot-idle': !isRunning.value && !errorMsg.value && statusMessage.value !== 'Classification completed',
+}))
+
+function barStyle(i) {
+  const delays = [0, 100, 200, 300, 150]
+  return { animationDelay: `${delays[i - 1]}ms` }
+}
 
 function fmtTime(ts) {
   if (!ts) return ''
@@ -142,59 +228,193 @@ function fmtTime(ts) {
 
 async function loadDevices() {
   try {
-    const d = await fetch('/audio-devices').then(r => r.json())
-    const list = Array.isArray(d) ? d : (d.devices || [])
-    devices.value = list.map(item => {
-      if (typeof item === 'string') {
-        const [value, ...labelParts] = item.split('|')
-        return { value: value.trim(), label: (labelParts.join('|') || value).trim() }
-      }
-      return { value: item.id || item.value || item, label: item.name || item.label || item.id || item }
-    })
-    if (devices.value.length > 0 && !selectedDevice.value) {
-      selectedDevice.value = devices.value[0].value
+    const discovered = await getAudioDevices()
+    if (uploadedPath.value) {
+      discovered.unshift({ value: `file:${uploadedPath.value}`, label: uploadedName.value || 'Uploaded WAV file' })
     }
-  } catch (_) {
-    devices.value = [{ value: 'default', label: 'Default Device' }]
-    selectedDevice.value = 'default'
+    devices.value = discovered
+    if (!devices.value.some(device => device.value === selectedDevice.value)) {
+      selectedDevice.value = devices.value[0]?.value || ''
+    }
+    if (devices.value.length === 0) errorMsg.value = 'No audio sources found'
+  } catch (error) {
+    devices.value = []
+    selectedDevice.value = ''
+    errorMsg.value = error.message
   }
 }
 
-function connectWs() {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  ws = new WebSocket(`${proto}//${location.host}/audio`)
+async function loadInfo() {
+  try { fileInfo.value = await getAudioClassificationInfo() }
+  catch (_) { /* Older/non-AM62D servers do not expose this optional metadata. */ }
+}
 
-  ws.onmessage = (evt) => {
+async function loadModels() {
+  try {
+    const data = await getAudioClassificationModels()
+    if (data.models && Object.keys(data.models).length) {
+      modelMap.value = data.models
+      if (data.default && data.models[data.default]) selectedModel.value = data.default
+    }
+  } catch (_) {}
+}
+
+function chooseUpload() {
+  uploadInput.value?.click()
+}
+
+async function uploadFile(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  if (!/\.wav$/i.test(file.name)) {
+    errorMsg.value = 'Audio Classification input must be a WAV file'
+    return
+  }
+  try {
+    errorMsg.value = ''
+    statusMessage.value = 'Uploading WAV file'
+    const result = await uploadAudioClassificationFile(file)
+    uploadedPath.value = result.path
+    uploadedName.value = result.name || file.name
+    const option = { value: `file:${result.path}`, label: uploadedName.value }
+    devices.value = [option, ...devices.value.filter(device => device.value !== option.value)]
+    selectedDevice.value = option.value
+    statusMessage.value = 'Ready'
+  } catch (error) {
+    statusMessage.value = 'Idle'
+    errorMsg.value = error.message
+  }
+}
+
+function closeSocket() {
+  if (!ws) return
+  const socket = ws
+  ws = null
+  try { socket.close() } catch (_) {}
+}
+
+function connectWs() {
+  clearTimeout(reconnectTimer)
+  if (ws?.readyState === WebSocket.OPEN) return Promise.resolve()
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const socket = new WebSocket(`${proto}//${location.host}/audio`)
+  ws = socket
+
+  const opened = new Promise((resolve, reject) => {
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new Error('Timed out connecting to Audio Classification results'))
+      try { socket.close() } catch (_) {}
+    }, 5000)
+
+    socket.onopen = () => {
+      clearTimeout(timeout)
+      errorMsg.value = ''
+      if (!settled) { settled = true; resolve() }
+    }
+
+    socket.onerror = () => {
+      errorMsg.value = 'WebSocket error on /audio'
+      if (!settled) {
+        clearTimeout(timeout)
+        settled = true
+        reject(new Error(errorMsg.value))
+      }
+    }
+
+    socket.onclose = () => {
+      clearTimeout(timeout)
+      if (ws === socket) ws = null
+      if (!settled) {
+        settled = true
+        reject(new Error('Audio Classification result connection closed'))
+      } else if (mounted && isRunning.value) {
+        reconnectTimer = setTimeout(() => {
+          connectWs().catch(error => { errorMsg.value = error.message })
+        }, 2000)
+      }
+    }
+  })
+
+  socket.onmessage = (evt) => {
     try {
       const msg = JSON.parse(evt.data)
+      if (msg.type === 'error') {
+        isRunning.value = false
+        emit('running-change', false)
+        statusMessage.value = 'Classification failed'
+        errorMsg.value = msg.message || 'Audio classification failed'
+        closeSocket()
+        return
+      }
+      if (msg.type === 'complete' || (msg.type === 'status' && msg.status === 'stopped')) {
+        isRunning.value = false
+        emit('running-change', false)
+        statusMessage.value = msg.type === 'complete' ? 'Classification completed' : 'Idle'
+        closeSocket()
+        return
+      }
+      if (msg.type === 'status') {
+        statusMessage.value = msg.message || msg.status || 'Running'
+        return
+      }
       const cls = msg.class || msg.label || msg.event || ''
       if (!cls) return
       results.value.unshift({ class: cls, time: fmtTime(msg.timestamp) })
       if (results.value.length > MAX_RESULTS) results.value.length = MAX_RESULTS
     } catch (_) {}
   }
-
-  ws.onerror = () => { errorMsg.value = 'WebSocket error on /audio' }
-  ws.onclose = () => {
-    if (isRunning.value) {
-      setTimeout(connectWs, 2000)
-    }
-  }
+  return opened
 }
 
 async function run() {
-  notSupportedDialog.value = true
+  if (isRunning.value) return
+  errorMsg.value = ''
+  results.value = []
+
+  try {
+    /* Shared flow for both backends: stop a stale run, open the result socket,
+     * then start the selected source.  The server chooses GStreamer or RPMsg. */
+    await stopAudioClassification()
+    isRunning.value = true
+    emit('running-change', true)
+    statusMessage.value = 'Connecting to result stream'
+    await connectWs()
+    statusMessage.value = 'Starting classification'
+    await startAudioClassification(selectedDevice.value, selectedModel.value)
+  } catch (error) {
+    clearTimeout(reconnectTimer)
+    closeSocket()
+    isRunning.value = false
+    emit('running-change', false)
+    statusMessage.value = 'Classification failed'
+    errorMsg.value = error.message
+  }
 }
 
 async function stop() {
-  if (!isRunning.value) return
+  clearTimeout(reconnectTimer)
   isRunning.value = false
-  if (ws) { ws.close(); ws = null }
-  try { await fetch('/stop-audio-classification') } catch (_) {}
+  emit('running-change', false)
+  closeSocket()
+  statusMessage.value = 'Idle'
+  try { await stopAudioClassification() }
+  catch (error) { errorMsg.value = error.message }
 }
 
-onMounted(loadDevices)
-onUnmounted(() => { if (ws) { ws.close(); ws = null } })
+onMounted(() => {
+  mounted = true
+  Promise.all([loadInfo(), loadDevices(), loadModels()])
+})
+onUnmounted(() => {
+  mounted = false
+  clearTimeout(reconnectTimer)
+  if (isRunning.value) stop()
+  else closeSocket()
+})
 
 defineExpose({ run, stop, isRunning })
 </script>
@@ -214,6 +434,9 @@ defineExpose({ run, stop, isRunning })
   border: 1px solid rgba(var(--v-border-color),var(--v-border-opacity)) !important;
   border-radius: 12px !important;
   padding: 14px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -229,18 +452,23 @@ defineExpose({ run, stop, isRunning })
   min-height: 48px !important;
 }
 
+.card-ttl { font-size:12.5px; font-weight:700; color:rgb(var(--v-theme-on-surface)); }
 .desc-text { font-size: 13px; color: #94a3b8; line-height: 1.65; margin-bottom: 10px; }
-.feat-list { list-style:none; display:flex; flex-direction:column; gap:4px; margin-bottom: 10px; }
+.feat-list { list-style:none; display:flex; flex-direction:column; gap:4px; }
 .feat-list li { display:flex; align-items:flex-start; gap:6px; font-size:12px; color:#94a3b8; }
-.tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom: 8px; }
+.tags { display:flex; flex-wrap:wrap; gap:6px; }
 
-.model-row { display:flex; justify-content:space-between; font-size:12px; padding: 4px 0; }
+.model-row { display:flex; justify-content:space-between; font-size:12px; }
 .model-lbl { color:#64748b; }
 .model-val { color:#94a3b8; font-weight:600; }
 
-/* Controls card */
-.ctrl-card { display:flex; flex-direction:column; gap:10px; }
-.ctrl-row  { display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; }
+/* Audio source */
+.file-card       { display:flex; align-items:flex-start; gap:10px; background:rgb(var(--v-theme-surface-variant)); border:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); border-radius:8px; padding:10px; }
+.file-card-icon  { width:36px; height:36px; border-radius:8px; background:rgba(77,166,255,0.1); border:1px solid rgba(77,166,255,0.3); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.file-card-info  { min-width:0; flex:1; }
+.file-card-name  { font-size:13px; font-weight:600; color:rgb(var(--v-theme-on-surface)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.file-card-meta  { font-size:11px; color:#64748b; margin-top:2px; }
+.source-actions  { display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; }
 .field-wrap { display:flex; flex-direction:column; gap:4px; min-width:180px; flex:1; }
 .field-lbl  { font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:1px; }
 .field-select {
@@ -252,17 +480,22 @@ defineExpose({ run, stop, isRunning })
 }
 .field-select:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.status-wrap { display:flex; align-items:center; gap:8px; flex-shrink:0; padding-bottom:7px; }
-.status-dot  { width:9px; height:9px; border-radius:50%; transition:background 0.3s; }
-.dot-idle { background:#475569; }
-.dot-run  { background:#22c55e; box-shadow:0 0 8px #22c55e; animation:spulse 2s infinite; }
-@keyframes spulse { 0%,100%{box-shadow:0 0 4px #22c55e} 50%{box-shadow:0 0 12px #22c55e} }
-.status-txt  { font-size:13px; color:rgb(var(--v-theme-on-surface)); font-weight:600; }
-
-.err-banner { display:flex; align-items:center; gap:7px; font-size:12px; color:#f87171; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:7px; padding:8px 12px; }
+/* Status */
+.status-row      { display:flex; align-items:center; gap:10px; }
+.status-dot-wrap { display:flex; align-items:center; gap:6px; }
+.status-dot      { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.dot-running { background:#4da6ff; box-shadow:0 0 8px #4da6ff; animation:pulse 1.2s infinite; }
+.dot-success { background:#22c55e; box-shadow:0 0 8px #22c55e; }
+.dot-error   { background:#ef4444; box-shadow:0 0 8px #ef4444; }
+.dot-idle    { background:#475569; }
+.status-lbl  { font-size:13px; }
+.status-bars { display:none; align-items:flex-end; gap:2px; height:16px; }
+.status-bars.active { display:inline-flex; }
+.status-bars span { display:inline-block; width:3px; border-radius:1px; height:3px; background:#4da6ff; animation:bar-rise .7s ease-in-out infinite; }
+@keyframes bar-rise { 0%,100%{height:3px} 50%{height:14px} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 
 /* Signal flow */
-.flow-wrap { flex-shrink:0; }
 .flow-img  { width:100%; display:block; border-radius:8px; border:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); }
 
 /* Results */
@@ -278,4 +511,6 @@ defineExpose({ run, stop, isRunning })
 .r-idx   { font-size:11px; color:#475569; width:22px; text-align:right; flex-shrink:0; }
 .r-class { flex:1; color:rgb(var(--v-theme-on-surface)); font-weight:500; }
 .r-time  { font-size:11px; color:#64748b; flex-shrink:0; }
+
+.model-desc { font-size:11px; color:#64748b; margin-top:4px; }
 </style>

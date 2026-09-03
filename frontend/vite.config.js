@@ -48,6 +48,9 @@ export default defineConfig({
   build: {
     outDir: `../devices/${DEVICE}/app/vue-dist`,
     emptyOutDir: true,
+    // Avoid spending build time compressing the bundle only to print an
+    // informational size; deployment still serves the same optimized files.
+    reportCompressedSize: false,
   },
   server: {
     port: 5173,
@@ -58,12 +61,16 @@ export default defineConfig({
       '/upload-speech-enhancement-file':  BACKEND,
       '/speech-devices':                  BACKEND,
       '/speech-output-devices':           BACKEND,
+      '/audio-devices':                   BACKEND,
+      '/start-audio-classification':      BACKEND,
+      '/stop-audio-classification':       BACKEND,
       '/tvm-inference':                   BACKEND,
       '/tvm-daemon':                      BACKEND,
       '/cpu-stats':                       BACKEND,
       '/version':                         BACKEND,
       '/ws':     { target: 'ws://localhost:3000', ws: true },
       '/speech': { target: 'ws://localhost:3000', ws: true },
+      '/audio':  { target: 'ws://localhost:3000', ws: true },
     },
   },
 })
