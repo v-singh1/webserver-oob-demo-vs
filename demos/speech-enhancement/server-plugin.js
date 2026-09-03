@@ -161,6 +161,11 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     function finishJob(error) {
         if (!job) return;
         const finished = job;
+        // Destroy the EASP visualization socket so the next run starts clean.
+        // Without this, dmaSocket can remain non-null when connectDmaStream() is
+        // called for the next job, causing it to bail immediately and drop all frames.
+        if (dmaSocket) { dmaSocket.destroy(); dmaSocket = null; }
+        dmaBuffer = Buffer.alloc(0);
         if (error) {
             send({ type: 'error', message: error.message || String(error) });
             job = null;
@@ -190,7 +195,6 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
     }
 
     function startEdgeAi(inputPath) {
-        console.log('[speech-enhancement] startEdgeAi called with inputPath:', inputPath);
         if (job) throw new Error('Speech enhancement is already running');
         const dspError = demoCoordinator.acquireDsp('speech-enhancement');
         if (dspError) throw new Error(dspError);
@@ -198,9 +202,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         fs.mkdirSync(JOB_ROOT, { recursive: true });
         const jobDir = fs.mkdtempSync(path.join(JOB_ROOT, 'job-'));
         const outputPath = path.join(jobDir, outputName);
-        console.log('[speech-enhancement] jobDir:', jobDir, 'outputPath:', outputPath);
 
-        console.log('[speech-enhancement] validating WAV file');
         const inputWav = readPcmWav(inputPath); // Validate WAV before switching C7x firmware.
         job = {
             inputPath,
@@ -214,10 +216,8 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
             dmaFrames: false,
         };
         send({ type: 'metric', label: 'Waiting for RPMsg DMA input/output buffers' });
-        console.log('[speech-enhancement] checking binary:', binary);
         if (!fs.existsSync(binary)) throw new Error(`Edge-AI client not installed: ${binary}`);
         const baseJsonPath = path.join(tvmDir, jsonFile);
-        console.log('[speech-enhancement] checking pipeline config:', baseJsonPath);
         if (!fs.existsSync(baseJsonPath)) throw new Error(`Edge-AI pipeline config not installed: ${baseJsonPath}`);
 
         // Write a per-job JSON with the correct input_file path so the binary
@@ -226,19 +226,15 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         const jobJson = Object.assign({}, baseJson, { input_file: inputPath });
         const jobJsonPath = path.join(jobDir, 'pipeline.json');
         fs.writeFileSync(jobJsonPath, JSON.stringify(jobJson));
-        console.log('[speech-enhancement] wrote per-job JSON:', jobJsonPath);
 
         demoCoordinator.ensurePreloaded(binary);
-        console.log('[speech-enhancement] spawning binary with args:', [jobJsonPath]);
         const child = spawn(binary, [jobJsonPath], { cwd: jobDir, stdio: ['pipe', 'pipe', 'pipe'] });
         job.process = child;
-        console.log('[speech-enhancement] child process spawned, pid:', child.pid);
         connectDmaStream();
         let totalFrames = 401; // updated from [App] GCRN configuration: TOTAL_FRAMES=N
         const collect = data => {
             const text = data.toString();
             if (job) job.stdout += text;
-            console.log('[speech-enhancement] child stdout:', text.trim());
             text.split('\n').filter(Boolean).forEach(line => {
                 const configMatch = line.match(/TOTAL_FRAMES=(\d+)/);
                 if (configMatch) totalFrames = parseInt(configMatch[1]);
@@ -262,16 +258,9 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
             });
         };
         child.stdout.on('data', collect);
-        child.stderr.on('data', (data) => {
-            const text = data.toString();
-            console.log('[speech-enhancement] child stderr:', text.trim());
-        });
-        child.on('error', (error) => {
-            console.log('[speech-enhancement] child error:', error);
-            finishJob(error);
-        });
+        child.stderr.on('data', collect);
+        child.on('error', (error) => finishJob(error));
         child.on('close', (code) => {
-            console.log('[speech-enhancement] child closed with code:', code);
             if (!job || job.process !== child) return;
             if (job.cancelled) return;
             finishJob(code === 0 ? null : new Error(`Edge-AI client exited with ${code}`));
