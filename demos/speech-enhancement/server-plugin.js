@@ -228,6 +228,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         fs.writeFileSync(jobJsonPath, JSON.stringify(jobJson));
 
         demoCoordinator.ensurePreloaded(binary);
+        send({ type: 'model_loading', modelName: 'GCRN' });
         const child = spawn(binary, [jobJsonPath], { cwd: jobDir, stdio: ['pipe', 'pipe', 'pipe'] });
         job.process = child;
         connectDmaStream();

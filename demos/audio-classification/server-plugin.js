@@ -372,12 +372,14 @@ module.exports = function registerAudioClassification(app, wss, device) {
         if (isAm62d) {
             const modelKey = (req.query.model || defaultModelKey).toLowerCase();
             const jsonPath = (modelsConfig[modelKey] || {}).jsonFile || defaultClassificationJson;
+            const modelLabel = (modelsConfig[modelKey] || {}).label || modelKey;
             try {
                 startAm62dPipeline({
                     source,
                     device: device_param,
                     filepath: filepath || defaultInputPath,
                     jsonPath,
+                    modelLabel,
                 });
                 res.send(`Audio classification started (edge-ai-rpmsg, model=${modelKey})`);
             } catch (error) {
@@ -419,7 +421,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
     /* ------------------------------------------------------------ */
 
     /** Start the AM62D JSON pipeline for WAV file input. */
-    function runAm62dInference(inputPath, generation, jsonPath) {
+    function runAm62dInference(inputPath, generation, jsonPath, modelLabel) {
         if (generation !== runGeneration) return;
         if (!fs.existsSync(inputPath)) throw new Error(`Audio input file not found: ${inputPath}`);
 
@@ -439,6 +441,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
                 startedAt: Date.now(),
             };
             lastResult = null;
+            send({ type: 'model_loading', modelName: modelLabel || 'model' });
             send({ type: 'status', status: 'running', backend: 'edge-ai-rpmsg', message: 'Running Audio Classification' });
 
             /* Pass the file path directly via --input-file — no temp JSON needed. */
@@ -522,7 +525,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
      * device directly, captures raw PCM, runs STFT+TVM on each window, and prints
      * top-N results to stdout.  No arecord process — the binary owns the device.
      */
-    function startStreamingPipeline(device, generation, jsonPath) {
+    function startStreamingPipeline(device, generation, jsonPath, modelLabel) {
         if (generation !== runGeneration) return;
 
         const dspError = demoCoordinator.acquireDsp('audio-classification');
@@ -534,6 +537,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
             const edgeAi = spawn(edgeAiBinary, [jsonPath, '--device', device]);
             edgeAiProcess = edgeAi;
 
+            send({ type: 'model_loading', modelName: modelLabel || 'model' });
             send({ type: 'status', status: 'running', backend: 'edge-ai-rpmsg',
                    message: 'Running Audio Classification' });
             console.log('[audio] Live pipeline started:', edgeAiBinary, jsonPath,
@@ -584,7 +588,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
      * AM62D: live microphone uses continuous PCM buffering (no restart between
      * inferences); WAV file input remains single-shot.
      */
-    function startAm62dPipeline({ source, device, filepath, jsonPath }) {
+    function startAm62dPipeline({ source, device, filepath, jsonPath, modelLabel }) {
         if (!fs.existsSync(edgeAiBinary)) throw new Error(`Edge-AI client not installed: ${edgeAiBinary}`);
         const resolvedJson = jsonPath || defaultClassificationJson;
         if (!fs.existsSync(resolvedJson))
@@ -594,14 +598,14 @@ module.exports = function registerAudioClassification(app, wss, device) {
         onInferenceComplete = null;
 
         if (source === 'file') {
-            runAm62dInference(filepath, generation, resolvedJson);
+            runAm62dInference(filepath, generation, resolvedJson, modelLabel);
             return;
         }
 
         if (!/^(?:default|(?:plughw|hw):\d+,\d+)$/.test(device))
             throw new Error(`Invalid ALSA capture device: ${device}`);
 
-        startStreamingPipeline(device, generation, resolvedJson);
+        startStreamingPipeline(device, generation, resolvedJson, modelLabel);
     }
 
     /** @brief Create the legacy classification FIFO if it does not already exist. */

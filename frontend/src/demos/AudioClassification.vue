@@ -113,6 +113,13 @@
         <span class="status-lbl">{{ statusMessage }}</span>
       </div>
 
+      <v-alert v-if="modelLoading" type="info" variant="tonal" density="compact" icon="mdi-cog-sync-outline" class="model-loading-alert">
+        <span class="model-loading-txt">
+          <span class="ac-spinner">&#9696;</span>
+          <span><strong>{{ modelName || 'Model' }} loading</strong> — please wait, this may take up to 15 seconds</span>
+        </span>
+      </v-alert>
+
       <v-alert v-if="errorMsg" type="error" density="compact" variant="tonal" closable @click:close="errorMsg = ''">
         {{ errorMsg }}
       </v-alert>
@@ -159,6 +166,8 @@ import {
 const emit = defineEmits(['running-change'])
 
 const isRunning      = ref(false)
+const modelLoading   = ref(false)
+const modelName      = ref('')
 const devices        = ref([])
 const selectedDevice = ref('')
 const results        = ref([])
@@ -342,7 +351,14 @@ function connectWs() {
   socket.onmessage = (evt) => {
     try {
       const msg = JSON.parse(evt.data)
+      if (msg.type === 'model_loading') {
+        modelLoading.value = true
+        modelName.value    = msg.modelName || ''
+        statusMessage.value = `Loading ${msg.modelName || 'model'}…`
+        return
+      }
       if (msg.type === 'error') {
+        modelLoading.value = false
         isRunning.value = false
         emit('running-change', false)
         statusMessage.value = 'Classification failed'
@@ -351,6 +367,7 @@ function connectWs() {
         return
       }
       if (msg.type === 'complete' || (msg.type === 'status' && msg.status === 'stopped')) {
+        modelLoading.value = false
         isRunning.value = false
         emit('running-change', false)
         statusMessage.value = msg.type === 'complete' ? 'Classification completed' : 'Idle'
@@ -363,6 +380,7 @@ function connectWs() {
       }
       const cls = msg.class || msg.label || msg.event || ''
       if (!cls) return
+      modelLoading.value = false
       results.value.unshift({ class: cls, time: fmtTime(msg.timestamp) })
       if (results.value.length > MAX_RESULTS) results.value.length = MAX_RESULTS
     } catch (_) {}
@@ -397,7 +415,8 @@ async function run() {
 
 async function stop() {
   clearTimeout(reconnectTimer)
-  isRunning.value = false
+  isRunning.value    = false
+  modelLoading.value = false
   emit('running-change', false)
   closeSocket()
   statusMessage.value = 'Idle'
@@ -416,7 +435,7 @@ onUnmounted(() => {
   else closeSocket()
 })
 
-defineExpose({ run, stop, isRunning })
+defineExpose({ run, stop, isRunning, isModelLoading: modelLoading })
 </script>
 
 <style scoped>
@@ -494,6 +513,12 @@ defineExpose({ run, stop, isRunning })
 .status-bars span { display:inline-block; width:3px; border-radius:1px; height:3px; background:#4da6ff; animation:bar-rise .7s ease-in-out infinite; }
 @keyframes bar-rise { 0%,100%{height:3px} 50%{height:14px} }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+@keyframes spin   { to { transform: rotate(360deg); } }
+
+/* Model loading alert */
+.model-loading-alert { flex-shrink: 0; }
+.model-loading-txt   { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ac-spinner          { display: inline-block; animation: spin 1.2s linear infinite; font-size: 16px; line-height: 1; }
 
 /* Signal flow */
 .flow-img  { width:100%; display:block; border-radius:8px; border:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); }

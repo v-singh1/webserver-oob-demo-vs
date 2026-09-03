@@ -97,6 +97,13 @@
         <span class="status-lbl" :class="`text-${ws.statusColor.value}`">{{ ws.statusMsg.value }}</span>
       </div>
 
+      <v-alert v-if="ws.modelLoading.value" type="info" variant="tonal" density="compact" icon="mdi-cog-sync-outline" class="model-loading-alert">
+        <span class="model-loading-txt">
+          <span class="preparing-spinner">&#9696;</span>
+          <span><strong>{{ ws.modelName.value || 'Model' }} loading</strong> — please wait, this may take up to 15 seconds</span>
+        </span>
+      </v-alert>
+
       <v-alert v-if="ws.error.value" type="error" density="compact" variant="tonal" closable @click:close="ws.error.value = null">
         {{ ws.error.value }}
       </v-alert>
@@ -419,7 +426,7 @@ async function saveArtifacts() {
 async function run()  { await ws.start(uploadedPath.value || null) }
 async function stop() { await ws.stop() }
 
-defineExpose({ run, stop, isRunning: ws.running })
+defineExpose({ run, stop, isRunning: ws.running, isModelLoading: ws.modelLoading })
 </script>
 
 <style scoped>
@@ -509,6 +516,12 @@ defineExpose({ run, stop, isRunning: ws.running })
 .viz-stack       { display:flex; flex-direction:column; gap:10px; }
 .viz-row         { display:flex; flex-direction:column; gap:4px; }
 .viz-ch-label    { font-size:12px; font-weight:700; margin-bottom:2px; }
+
+/* Model loading alert */
+.model-loading-alert { flex-shrink: 0; }
+.model-loading-txt   { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.preparing-spinner   { display: inline-block; animation: spin 1.2s linear infinite; font-size: 16px; line-height: 1; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Playback */
 .playback-row { display:flex; flex-direction:column; gap:6px; }

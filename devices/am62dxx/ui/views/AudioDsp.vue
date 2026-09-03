@@ -165,8 +165,14 @@ onMounted(pollTvmDaemon)
 function selectDemo(i) {
   if (i === activeIdx.value) return
   if (demoRunning.value) {
+    if (activeDemo.value?.isModelLoading?.value) {
+      window.alert(
+        `${demos[activeIdx.value].name} model is loading — please wait for it to finish before switching demos.`
+      )
+      return
+    }
     const confirmed = window.confirm(
-      `“${demos[activeIdx.value].name}” is currently running. Switching demos will stop it. Continue?`
+      `”${demos[activeIdx.value].name}” is currently running. Switching demos will stop it. Continue?`
     )
     if (!confirmed) return
     activeDemo.value?.stop()
