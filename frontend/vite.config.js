@@ -66,11 +66,13 @@ export default defineConfig({
       '/stop-audio-classification':       BACKEND,
       '/tvm-inference':                   BACKEND,
       '/tvm-daemon':                      BACKEND,
+      '/gst':                             BACKEND,
       '/cpu-stats':                       BACKEND,
       '/version':                         BACKEND,
       '/ws':     { target: 'ws://localhost:3000', ws: true },
       '/speech': { target: 'ws://localhost:3000', ws: true },
       '/audio':  { target: 'ws://localhost:3000', ws: true },
+      '/gst':    { target: 'ws://localhost:3000', ws: true },
     },
   },
 })

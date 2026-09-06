@@ -81,6 +81,7 @@ import { ref, computed, shallowRef, watch, onMounted, onUnmounted } from 'vue'
 import SpeechEnhancement  from '../demos/SpeechEnhancement.vue'
 import TvmInference        from '../demos/TvmInference.vue'
 import AudioClassification from '@/demos/AudioClassification.vue'
+import GStreamerPipeline   from '../demos/GStreamerPipeline.vue'
 import { registerRunningDemo, clearRunningDemo } from '@/composables/useDemoSession'
 
 const demos = [
@@ -108,13 +109,26 @@ const demos = [
     component: TvmInference,
     canRun: true,
   },
+  {
+    name: 'GStreamer Pipeline',
+    sub:  'Generic gst-launch runner with artifact management',
+    icon: 'mdi-pipe',
+    iconStyle: 'background:radial-gradient(circle at 40% 40%,#1a3a1a,#0a200a);border:2px solid #16a34a;color:#4ade80',
+    component: GStreamerPipeline,
+    canRun: true,
+    skipTvmCheck: true,
+  },
 ]
 
 const activeIdx        = ref(0)
 const activeDemo       = ref(null)
 const currentComponent = shallowRef(demos[0].component)
 const demoRunning      = ref(false)
-const canRun = computed(() => demos[activeIdx.value].canRun && (tvmReady.value || tvmWasReady.value))
+const canRun = computed(() => {
+  const demo = demos[activeIdx.value]
+  if (demo.skipTvmCheck) return demo.canRun
+  return demo.canRun && (tvmReady.value || tvmWasReady.value)
+})
 
 const tvmReady      = ref(false)
 const tvmWasReady   = ref(false)   // latched true once tvmReady ever becomes true
