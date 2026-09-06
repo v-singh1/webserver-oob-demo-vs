@@ -15,7 +15,7 @@
           </p>
 
           <!-- Signal flow image -->
-          <img src="/images/audio-classification-flow.png" alt="Audio Classification Pipeline" class="flow-img" />
+          <img :src="isLight ? '/images/audio-classification-flow-light.png' : '/images/audio-classification-flow.png'" alt="Audio Classification Pipeline" class="flow-img" />
 
           <!-- Features -->
           <ul class="feat-list">
@@ -154,6 +154,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useTheme } from 'vuetify'
 import {
   getAudioClassificationInfo,
   getAudioClassificationModels,
@@ -164,6 +165,9 @@ import {
 } from '@/utils/audioClassificationApi'
 
 const emit = defineEmits(['running-change'])
+
+const vuetifyTheme = useTheme()
+const isLight = computed(() => vuetifyTheme.global.name.value === 'tiLight')
 
 const isRunning      = ref(false)
 const modelLoading   = ref(false)

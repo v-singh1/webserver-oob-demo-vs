@@ -16,7 +16,7 @@
           </p>
 
           <!-- Signal flow image -->
-          <img src="/images/speech-enhancement-flow.png" alt="Speech Enhancement Pipeline" class="flow-img" />
+          <img :src="isLight ? '/images/speech-enhancement-flow-light.png' : '/images/speech-enhancement-flow.png'" alt="Speech Enhancement Pipeline" class="flow-img" />
 
           <!-- Features -->
           <ul class="feat-list">
