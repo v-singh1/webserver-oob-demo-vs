@@ -71,18 +71,6 @@
         </div>
       </div>
 
-      <v-alert v-if="uploadError" type="error" density="compact" variant="tonal" closable @click:close="uploadError = null">
-        {{ uploadError }}
-      </v-alert>
-
-      <div class="d-flex gap-2">
-        <v-btn size="small" variant="outlined" color="primary" disabled prepend-icon="mdi-upload">
-          Upload WAV File
-        </v-btn>
-        <v-btn v-if="uploadedPath" size="small" variant="text" color="secondary" @click="useDefault">
-          Use Default
-        </v-btn>
-      </div>
     </v-card>
 
     <!-- Status -->
