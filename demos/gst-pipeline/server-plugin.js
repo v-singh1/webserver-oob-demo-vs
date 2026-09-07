@@ -8,6 +8,9 @@
  *   POST /gst/upload-artifact?name=<dir>       upload zip or tar.gz archive
  *   GET  /gst/input-files                      list files in the input directory
  *   POST /gst/upload-input?filename=<name>     upload an input audio file
+ *   GET  /gst/saved-pipelines                  list user-saved pipelines
+ *   POST /gst/save-pipeline { id?,name,cmd }   create or overwrite a saved pipeline
+ *   DELETE /gst/saved-pipeline?id=<id>         delete a saved pipeline
  *   POST /gst/run          { command: "..." }  start gst-launch-1.0 pipeline
  *   POST /gst/stop                             kill running pipeline
  *   GET  /gst/status                           { running, pid }
@@ -27,6 +30,20 @@ const path = require('path');
 
 const WS_OPEN        = 1;
 const MAX_UPLOAD_MB  = 200;
+
+const SAVED_FILE = '/var/lib/webserver-oob/gst-saved-pipelines.json';
+
+function readSaved() {
+    try {
+        if (!fs.existsSync(SAVED_FILE)) return [];
+        return JSON.parse(fs.readFileSync(SAVED_FILE, 'utf8'));
+    } catch (_) { return []; }
+}
+
+function writeSaved(arr) {
+    fs.mkdirSync(path.dirname(SAVED_FILE), { recursive: true });
+    fs.writeFileSync(SAVED_FILE, JSON.stringify(arr, null, 2));
+}
 
 module.exports = function registerGstPipeline(app, wss, device) {
     const config       = (device.demoConfig || {})['gst-pipeline'] || {};
@@ -161,6 +178,51 @@ module.exports = function registerGstPipeline(app, wss, device) {
                 res.status(400).json({ error: e.message });
             }
         });
+    });
+
+    /* ── GET /gst/saved-pipelines ──────────────────────────────── */
+
+    app.get('/gst/saved-pipelines', (req, res) => {
+        res.json({ pipelines: readSaved() });
+    });
+
+    /* ── POST /gst/save-pipeline  { id?, name, command } ───────── */
+
+    app.post('/gst/save-pipeline', (req, res) => {
+        const { id, name, command } = req.body || {};
+        if (!name || !command) return res.status(400).json({ error: 'name and command required' });
+        if (!/^gst-launch/i.test(command.trim()))
+            return res.status(400).json({ error: 'Only gst-launch commands are permitted' });
+
+        const safeName = (name + '').trim().slice(0, 80);
+        const pipelines = readSaved();
+
+        if (id) {
+            const idx = pipelines.findIndex(p => p.id === id);
+            if (idx === -1) return res.status(404).json({ error: 'Pipeline not found' });
+            pipelines[idx] = { ...pipelines[idx], name: safeName, command: command.trim(), updatedAt: new Date().toISOString() };
+            try { writeSaved(pipelines); res.json({ success: true, pipeline: pipelines[idx] }); }
+            catch (e) { res.status(500).json({ error: e.message }); }
+        } else {
+            const newId    = `saved-${Date.now()}`;
+            const pipeline = { id: newId, name: safeName, command: command.trim(), createdAt: new Date().toISOString() };
+            pipelines.push(pipeline);
+            try { writeSaved(pipelines); res.json({ success: true, pipeline }); }
+            catch (e) { res.status(500).json({ error: e.message }); }
+        }
+    });
+
+    /* ── DELETE /gst/saved-pipeline?id=<id> ────────────────────── */
+
+    app.delete('/gst/saved-pipeline', (req, res) => {
+        const id = (req.query.id || '').trim();
+        if (!id) return res.status(400).json({ error: 'id required' });
+        const pipelines = readSaved();
+        const idx = pipelines.findIndex(p => p.id === id);
+        if (idx === -1) return res.status(404).json({ error: 'Pipeline not found' });
+        pipelines.splice(idx, 1);
+        try { writeSaved(pipelines); res.json({ success: true }); }
+        catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     /* ── POST /gst/run  { command } ─────────────────────────────── */

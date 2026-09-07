@@ -8,13 +8,40 @@
         <div
           v-for="p in PRESETS" :key="p.id"
           class="preset-chip"
-          :class="{ active: selectedPreset === p.id }"
-          :style="selectedPreset === p.id ? `border-color:${p.color};background:${p.color}18` : ''"
+          :class="{ active: selectedPreset === p.id && !selectedSaved }"
+          :style="selectedPreset === p.id && !selectedSaved ? `border-color:${p.color};background:${p.color}18` : ''"
           @click="selectPreset(p)"
         >
-          <v-icon size="13" :color="selectedPreset === p.id ? p.color : '#64748b'">{{ p.icon }}</v-icon>
+          <v-icon size="13" :color="selectedPreset === p.id && !selectedSaved ? p.color : '#64748b'">{{ p.icon }}</v-icon>
           <span>{{ p.name }}</span>
         </div>
+      </div>
+
+      <!-- Saved pipelines row -->
+      <template v-if="savedPipelines.length > 0">
+        <div class="saved-divider">
+          <span>Saved Pipelines</span>
+        </div>
+        <div class="preset-grid">
+          <div
+            v-for="s in savedPipelines" :key="s.id"
+            class="preset-chip saved-chip"
+            :class="{ active: selectedSaved === s.id }"
+            :style="selectedSaved === s.id ? 'border-color:#f59e0b;background:#f59e0b18' : ''"
+            @click="selectSaved(s)"
+          >
+            <v-icon size="13" :color="selectedSaved === s.id ? '#f59e0b' : '#64748b'">mdi-bookmark-outline</v-icon>
+            <span class="saved-chip-name">{{ s.name }}</span>
+            <button
+              class="saved-del-btn"
+              :title="'Delete \'' + s.name + '\'?'"
+              @click.stop="deleteSaved(s)"
+            >×</button>
+          </div>
+        </div>
+      </template>
+      <div v-else-if="savedPipelinesLoaded" class="no-saved-hint">
+        No saved pipelines yet — write a command and click <strong>Save As</strong>
       </div>
     </v-card>
 
@@ -22,12 +49,53 @@
     <v-card class="ti-card" flat>
       <div class="card-ttl-row">
         <span class="card-ttl">GStreamer Command</span>
-        <v-btn
-          size="x-small" variant="text" color="primary"
-          prepend-icon="mdi-content-copy"
-          @click="copyCommand"
-        >Copy</v-btn>
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+          <v-btn
+            v-if="selectedSaved"
+            size="x-small" variant="text" color="success"
+            prepend-icon="mdi-content-save"
+            :loading="saveLoading"
+            :disabled="isRunning"
+            @click="saveCurrentPipeline"
+          >Save</v-btn>
+          <v-btn
+            size="x-small" variant="text" color="primary"
+            prepend-icon="mdi-content-save-plus-outline"
+            :disabled="isRunning"
+            @click="toggleSaveAs"
+          >Save As</v-btn>
+          <v-btn
+            size="x-small" variant="text" color="primary"
+            prepend-icon="mdi-content-copy"
+            @click="copyCommand"
+          >Copy</v-btn>
+        </div>
       </div>
+
+      <!-- Save As inline form -->
+      <div v-if="showSaveAs" class="save-as-row">
+        <input
+          ref="saveAsInputEl"
+          v-model="saveAsName"
+          class="save-as-input"
+          placeholder="Pipeline name…"
+          maxlength="80"
+          @keyup.enter="doSaveAs"
+          @keyup.escape="cancelSaveAs"
+        />
+        <v-btn
+          size="x-small" variant="flat" color="primary"
+          :loading="saveLoading"
+          :disabled="!saveAsName.trim()"
+          @click="doSaveAs"
+        >Save</v-btn>
+        <v-btn size="x-small" variant="text" @click="cancelSaveAs">Cancel</v-btn>
+      </div>
+
+      <v-alert v-if="saveError" type="error" density="compact" variant="tonal" class="mb-0" closable
+        @click:close="saveError = ''">{{ saveError }}</v-alert>
+      <v-alert v-if="saveSuccessMsg" type="success" density="compact" variant="tonal" class="mb-0">{{ saveSuccessMsg }}</v-alert>
+
       <textarea
         v-model="command"
         class="cmd-textarea"
@@ -35,7 +103,7 @@
         rows="5"
         spellcheck="false"
         placeholder="gst-launch-1.0 ..."
-        @input="selectedPreset = 'custom'"
+        @input="onCommandInput"
       />
       <div class="cmd-hint">
         <v-icon size="12" color="primary" class="mr-1">mdi-information-outline</v-icon>
@@ -238,6 +306,7 @@ const PRESETS = [
 /* ── State ──────────────────────────────────────────────────────── */
 
 const selectedPreset = ref('speech-enhancement')
+const selectedSaved  = ref(null)   // id of currently selected saved pipeline
 const command        = ref(PRESETS[0].command)
 const isRunning      = ref(false)
 const statusMsg      = ref('Idle')
@@ -253,13 +322,22 @@ const artifactError    = ref('')
 const uploadLoading    = ref(false)
 const uploadMsg        = ref('')
 
-const inputFiles        = ref([])
-const inputDir          = ref('/usr/share/tvm_inference/input')
-const inputFilesLoading = ref(false)
-const inputFileError    = ref('')
+const inputFiles         = ref([])
+const inputDir           = ref('/usr/share/tvm_inference/input')
+const inputFilesLoading  = ref(false)
+const inputFileError     = ref('')
 const inputUploadLoading = ref(false)
-const inputUploadMsg    = ref('')
-const inputUploadRef    = ref(null)
+const inputUploadMsg     = ref('')
+const inputUploadRef     = ref(null)
+
+const savedPipelines      = ref([])
+const savedPipelinesLoaded = ref(false)
+const saveLoading         = ref(false)
+const saveError           = ref('')
+const saveSuccessMsg      = ref('')
+const showSaveAs          = ref(false)
+const saveAsName          = ref('')
+const saveAsInputEl       = ref(null)
 
 let ws = null
 let mounted = true
@@ -272,11 +350,109 @@ const dotClass = computed(() => ({
   'dot-idle':    !isRunning.value && !errorMsg.value,
 }))
 
-/* ── Preset selection ───────────────────────────────────────────── */
+/* ── Preset / saved selection ───────────────────────────────────── */
 
 function selectPreset(p) {
   selectedPreset.value = p.id
+  selectedSaved.value  = null
   if (p.id !== 'custom') command.value = p.command
+}
+
+function selectSaved(s) {
+  selectedSaved.value  = s.id
+  selectedPreset.value = null
+  command.value        = s.command
+}
+
+function onCommandInput() {
+  selectedPreset.value = 'custom'
+  selectedSaved.value  = null
+}
+
+/* ── Saved pipelines ────────────────────────────────────────────── */
+
+async function loadSavedPipelines() {
+  try {
+    const r = await fetch('/gst/saved-pipelines')
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const d = await r.json()
+    savedPipelines.value = d.pipelines || []
+  } catch (_) {
+    savedPipelines.value = []
+  } finally {
+    savedPipelinesLoaded.value = true
+  }
+}
+
+function toggleSaveAs() {
+  showSaveAs.value = !showSaveAs.value
+  if (showSaveAs.value) {
+    saveAsName.value = ''
+    saveError.value  = ''
+    nextTick(() => saveAsInputEl.value?.focus())
+  }
+}
+
+function cancelSaveAs() {
+  showSaveAs.value = false
+  saveAsName.value = ''
+}
+
+async function doSaveAs() {
+  const name = saveAsName.value.trim()
+  if (!name) return
+  await persistPipeline(null, name)
+}
+
+async function saveCurrentPipeline() {
+  if (!selectedSaved.value) return
+  const existing = savedPipelines.value.find(p => p.id === selectedSaved.value)
+  if (!existing) return
+  await persistPipeline(selectedSaved.value, existing.name)
+}
+
+async function persistPipeline(id, name) {
+  saveLoading.value    = true
+  saveError.value      = ''
+  saveSuccessMsg.value = ''
+  try {
+    const r = await fetch('/gst/save-pipeline', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id, name, command: command.value.trim() }),
+    })
+    const d = await r.json()
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`)
+    saveSuccessMsg.value = `Saved as "${d.pipeline.name}"`
+    showSaveAs.value     = false
+    saveAsName.value     = ''
+    selectedSaved.value  = d.pipeline.id
+    selectedPreset.value = null
+    await loadSavedPipelines()
+    setTimeout(() => { saveSuccessMsg.value = '' }, 3000)
+  } catch (e) {
+    saveError.value = e.message
+  } finally {
+    saveLoading.value = false
+  }
+}
+
+async function deleteSaved(s) {
+  if (!window.confirm(`Delete saved pipeline "${s.name}"?`)) return
+  try {
+    const r = await fetch(`/gst/saved-pipeline?id=${encodeURIComponent(s.id)}`, { method: 'DELETE' })
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}))
+      throw new Error(d.error || `HTTP ${r.status}`)
+    }
+    if (selectedSaved.value === s.id) {
+      selectedSaved.value  = null
+      selectedPreset.value = 'custom'
+    }
+    await loadSavedPipelines()
+  } catch (e) {
+    saveError.value = e.message
+  }
 }
 
 /* ── WebSocket ──────────────────────────────────────────────────── */
@@ -394,7 +570,7 @@ async function loadArtifacts() {
     const r = await fetch('/gst/artifacts')
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const d = await r.json()
-    artifacts.value  = d.artifacts || []
+    artifacts.value    = d.artifacts || []
     artifactsDir.value = d.dir || artifactsDir.value
   } catch (e) {
     artifactError.value = e.message
@@ -490,6 +666,7 @@ function insertInputPath(f) {
     command.value += ` location=${f.path}`
   }
   selectedPreset.value = 'custom'
+  selectedSaved.value  = null
 }
 
 function fmtSize(bytes) {
@@ -507,6 +684,7 @@ function insertArtifactPath(artifact) {
     command.value += ` artifacts=${artifact.path}`
   }
   selectedPreset.value = 'custom'
+  selectedSaved.value  = null
 }
 
 /* ── Copy command ───────────────────────────────────────────────── */
@@ -518,6 +696,7 @@ async function copyCommand() {
 /* ── Lifecycle ──────────────────────────────────────────────────── */
 
 connectWs()
+loadSavedPipelines()
 
 onUnmounted(() => {
   mounted = false
@@ -556,7 +735,7 @@ defineExpose({ run, stop, isRunning })
 .exp-title { font-size: 12.5px; font-weight: 700; min-height: 48px !important; }
 
 .card-ttl     { font-size: 12.5px; font-weight: 700; color: rgb(var(--v-theme-on-surface)); }
-.card-ttl-row { display: flex; align-items: center; justify-content: space-between; }
+.card-ttl-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; }
 
 /* ── Presets ── */
 .preset-grid {
@@ -580,6 +759,69 @@ defineExpose({ run, stop, isRunning })
 }
 .preset-chip:hover { border-color: #4da6ff; color: #4da6ff; }
 .preset-chip.active { color: rgb(var(--v-theme-on-surface)); font-weight: 600; }
+
+/* ── Saved pipeline chips ── */
+.saved-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.saved-divider::before,
+.saved-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(var(--v-border-color), var(--v-border-opacity));
+}
+.saved-chip { padding-right: 6px; }
+.saved-chip-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-del-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  margin-left: 2px;
+  border-radius: 50%;
+  transition: color 0.1s, background 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+.saved-del-btn:hover { color: #ef4444; background: rgba(239,68,68,0.12); }
+.no-saved-hint { font-size: 11.5px; color: #64748b; text-align: center; padding: 4px 0 2px; }
+
+/* ── Save As row ── */
+.save-as-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.save-as-input {
+  flex: 1;
+  min-width: 140px;
+  background: rgb(var(--v-theme-background));
+  border: 1px solid rgba(var(--v-border-color),var(--v-border-opacity));
+  border-radius: 6px;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 12px;
+  padding: 5px 10px;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.save-as-input:focus { border-color: #4da6ff; }
+.save-as-input::placeholder { color: #64748b; }
 
 /* ── Command textarea ── */
 .cmd-textarea {
