@@ -110,7 +110,7 @@ const demos = [
     canRun: true,
   },
   {
-    name: 'GStreamer Pipeline',
+    name: 'Custom Audio Pipeline',
     sub:  'Generic gst-launch runner with artifact management',
     icon: 'mdi-pipe',
     iconStyle: 'background:radial-gradient(circle at 40% 40%,#1a3a1a,#0a200a);border:2px solid #16a34a;color:#4ade80',

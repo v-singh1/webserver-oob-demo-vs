@@ -48,7 +48,7 @@
     <!-- Command editor -->
     <v-card class="ti-card" flat>
       <div class="card-ttl-row">
-        <span class="card-ttl">GStreamer Command</span>
+        <span class="card-ttl">Pipeline Command</span>
         <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
           <v-btn
             v-if="selectedSaved"
@@ -107,7 +107,7 @@
       />
       <div class="cmd-hint">
         <v-icon size="12" color="primary" class="mr-1">mdi-information-outline</v-icon>
-        Select a preset above or write a custom <code>gst-launch-1.0</code> command
+        Select a preset above or enter a custom <code>gst-launch-1.0</code> command
       </div>
     </v-card>
 
