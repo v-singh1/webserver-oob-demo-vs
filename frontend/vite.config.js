@@ -69,6 +69,7 @@ export default defineConfig({
       '/gst':                             BACKEND,
       '/cpu-stats':                       BACKEND,
       '/version':                         BACKEND,
+      '/system/':                         BACKEND,
       '/ws':     { target: 'ws://localhost:3000', ws: true },
       '/speech': { target: 'ws://localhost:3000', ws: true },
       '/audio':  { target: 'ws://localhost:3000', ws: true },

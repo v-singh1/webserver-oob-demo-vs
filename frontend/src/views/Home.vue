@@ -92,9 +92,11 @@
             </div>
           </div>
         </v-card>
+
       </div>
 
     </div>
+
   </div>
 </template>
 
@@ -285,4 +287,5 @@ onUnmounted(() => timers.forEach(clearInterval))
 .bar-fill   { height:100%; border-radius:4px; transition:width 1.2s ease; }
 .bar-green  { background: linear-gradient(90deg,#16a34a,#4ade80); }
 .bar-purple { background: linear-gradient(90deg,#7c3aed,#c084fc); }
+
 </style>

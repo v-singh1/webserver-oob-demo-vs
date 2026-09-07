@@ -40,6 +40,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
 
 module.exports = function(app, wss, device, ctx) {
     const { appDir, deviceConfigPath, express } = ctx;
@@ -87,6 +88,19 @@ module.exports = function(app, wss, device, ctx) {
             console.error('[Server] /model-inspector-list error:', e);
             res.status(500).json({ error: e.message });
         }
+    });
+
+    /* System power control */
+    app.post('/system/reboot', (req, res) => {
+        console.log('[Server] Reboot requested');
+        res.json({ status: 'rebooting' });
+        setTimeout(() => exec('reboot'), 500);
+    });
+
+    app.post('/system/poweroff', (req, res) => {
+        console.log('[Server] Power-off requested');
+        res.json({ status: 'powering-off' });
+        setTimeout(() => exec('poweroff'), 500);
     });
 
     /* Upload a model HTML file into the Model-Inspector folder */
