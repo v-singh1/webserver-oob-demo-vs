@@ -24,7 +24,7 @@
  *     { type:'exit',      code, reason? }
  */
 
-const { spawn, execSync } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
 
@@ -32,6 +32,106 @@ const WS_OPEN        = 1;
 const MAX_UPLOAD_MB  = 200;
 
 const SAVED_FILE = '/var/lib/webserver-oob/gst-saved-pipelines.json';
+
+/**
+ * Allowed GStreamer launcher executables. Any other value in the first
+ * token position is rejected before spawn is called.
+ * @type {Set<string>}
+ */
+const ALLOWED_EXECUTABLES = new Set(['gst-launch-1.0', 'gst-launch-0.10']);
+
+/**
+ * Parse a GStreamer command string into [executable, ...args] without
+ * invoking a shell. Handles single-quoted, double-quoted, and backslash-
+ * escaped tokens so paths with spaces work correctly.
+ *
+ * Shell metacharacters (;, &&, |, $(), backticks) are treated as literal
+ * characters because the result is passed directly to spawn(), never to sh.
+ *
+ * @param {string} cmd - Raw command string from the request body.
+ * @returns {string[]} Token array where index 0 is the executable.
+ * @throws {Error} On unterminated quotes or a trailing backslash.
+ */
+function tokenizeGstCommand(cmd) {
+    const tokens = [];
+    let current = '';
+    let i = 0;
+    while (i < cmd.length) {
+        const ch = cmd[i];
+        if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+            if (current.length) { tokens.push(current); current = ''; }
+            i++;
+        } else if (ch === "'") {
+            /* single-quoted: every character is literal */
+            i++;
+            while (i < cmd.length && cmd[i] !== "'") current += cmd[i++];
+            if (i >= cmd.length) throw new Error('Unterminated single quote in command');
+            i++;
+        } else if (ch === '"') {
+            /* double-quoted: backslash escapes ", \, $, ` only */
+            i++;
+            while (i < cmd.length && cmd[i] !== '"') {
+                if (cmd[i] === '\\' && i + 1 < cmd.length) {
+                    const next = cmd[i + 1];
+                    if (next === '"' || next === '\\' || next === '$' || next === '`') {
+                        current += next; i += 2;
+                    } else {
+                        current += cmd[i++]; /* keep the backslash */
+                    }
+                } else {
+                    current += cmd[i++];
+                }
+            }
+            if (i >= cmd.length) throw new Error('Unterminated double quote in command');
+            i++;
+        } else if (ch === '\\') {
+            if (i + 1 >= cmd.length) throw new Error('Trailing backslash in command');
+            current += cmd[++i]; i++;
+        } else {
+            current += ch; i++;
+        }
+    }
+    if (current.length) tokens.push(current);
+    return tokens;
+}
+
+/**
+ * Tokenize a command and validate that the executable is on the allowlist.
+ *
+ * @param {string} command - Raw command string.
+ * @returns {string[]} Token array ready for spawn(tokens[0], tokens.slice(1)).
+ * @throws {Error} If the command is empty or the executable is not allowed.
+ */
+function validateGstCommand(command) {
+    const tokens = tokenizeGstCommand(command);
+    if (!tokens.length) throw new Error('Empty command');
+    if (!ALLOWED_EXECUTABLES.has(tokens[0]))
+        throw new Error('Only gst-launch-1.0 commands are permitted');
+    return tokens;
+}
+
+/**
+ * Simple per-IP sliding-window rate limiter (no external dependency).
+ *
+ * @param {number} maxRequests - Maximum requests allowed within windowMs.
+ * @param {number} windowMs    - Rolling time window in milliseconds.
+ * @returns {import('express').RequestHandler} Express middleware.
+ */
+function rateLimit(maxRequests, windowMs) {
+    /** @type {Map<string, number[]>} */
+    const hits = new Map();
+    return (req, res, next) => {
+        const ip  = req.ip || req.socket?.remoteAddress || 'unknown';
+        const now = Date.now();
+        const cutoff = now - windowMs;
+        const timestamps = (hits.get(ip) || []).filter(t => t > cutoff);
+        if (timestamps.length >= maxRequests)
+            return res.status(429).json({ error: 'Too many requests — please wait before retrying' });
+        timestamps.push(now);
+        hits.set(ip, timestamps);
+        next();
+    };
+}
 
 function readSaved() {
     try {
@@ -45,21 +145,67 @@ function writeSaved(arr) {
     fs.writeFileSync(SAVED_FILE, JSON.stringify(arr, null, 2));
 }
 
+const MAX_EXTRACTED_MB = 500;
+
+/**
+ * Return the total uncompressed byte count reported by the archive tool.
+ * Throws if the listing command fails or the size cannot be determined.
+ *
+ * @param {string} tmpFile - Path to the archive on disk.
+ * @param {boolean} isTar  - true for .tar.gz, false for .zip.
+ * @returns {number} Total uncompressed size in bytes.
+ */
+function archiveUncompressedSize(tmpFile, isTar) {
+    try {
+        if (isTar) {
+            /* tar --list --verbose: each line is "perms links owner group SIZE date name" */
+            const out = execFileSync('tar', ['-tzvf', tmpFile], { timeout: 30000 }).toString();
+            return out.split('\n').reduce((sum, line) => {
+                const m = line.match(/^\S+\s+\S+\s+\S+\s+\S+\s+(\d+)/);
+                return sum + (m ? parseInt(m[1], 10) : 0);
+            }, 0);
+        } else {
+            /* unzip -l: last line is "N files, TOTAL bytes uncompressed, ..." */
+            const out = execFileSync('unzip', ['-l', tmpFile], { timeout: 30000 }).toString();
+            const m = out.match(/(\d+)\s+\d+\s+files?/i) || out.match(/(\d+)\s+bytes/i);
+            return m ? parseInt(m[1], 10) : 0;
+        }
+    } catch (_) { return 0; /* listing failed; extraction will catch real errors */ }
+}
+
+/**
+ * @param {import('express').Application} app
+ * @param {import('ws').WebSocketServer} wss
+ * @param {object} device - Parsed device.json
+ */
 module.exports = function registerGstPipeline(app, wss, device) {
     const config       = (device.demoConfig || {})['gst-pipeline'] || {};
     const artifactsDir = config.artifactsDir || '/usr/share/tvm_inference/artifacts';
     const inputDir     = config.inputDir     || '/usr/share/tvm_inference/input';
+
+    /* Rate limiters: 10 pipeline starts per minute; 5 uploads per minute */
+    const runLimiter    = rateLimit(10,  60_000);
+    const uploadLimiter = rateLimit(5,  60_000);
 
     const clients  = new Set();
     let activeProc = null;
 
     /* ── helpers ────────────────────────────────────────────────── */
 
+    /**
+     * @param {object} msg - JSON-serialisable message to broadcast.
+     */
     function broadcast(msg) {
         const data = JSON.stringify(msg);
         clients.forEach(ws => { if (ws.readyState === WS_OPEN) ws.send(data); });
     }
 
+    /**
+     * @param {import('http').IncomingMessage} req
+     * @param {import('http').ServerResponse}  res
+     * @param {number}   maxBytes
+     * @param {Function} cb - Called with the accumulated Buffer on success.
+     */
     function readRawBody(req, res, maxBytes, cb) {
         const chunks = [];
         let total = 0;
@@ -103,7 +249,7 @@ module.exports = function registerGstPipeline(app, wss, device) {
 
     /* ── POST /gst/upload-artifact?name=<dir> ───────────────────── */
 
-    app.post('/gst/upload-artifact', (req, res) => {
+    app.post('/gst/upload-artifact', uploadLimiter, (req, res) => {
         readRawBody(req, res, MAX_UPLOAD_MB * 1024 * 1024, body => {
             /* sanitise artifact directory name */
             const rawName = ((req.query.name || req.query.filename || '') + '')
@@ -122,10 +268,16 @@ module.exports = function registerGstPipeline(app, wss, device) {
                 fs.mkdirSync(destDir, { recursive: true });
                 fs.writeFileSync(tmpFile, body);
 
+                /* Reject archives that would expand past the extraction limit (ZIP bomb guard) */
+                const uncompressed = archiveUncompressedSize(tmpFile, isTar);
+                if (uncompressed > MAX_EXTRACTED_MB * 1024 * 1024)
+                    throw new Error(`Archive uncompressed size (${Math.round(uncompressed / 1024 / 1024)} MB) exceeds ${MAX_EXTRACTED_MB} MB limit`);
+
+                /* Use execFileSync with an arg array — no shell, no injection surface */
                 if (isTar) {
-                    execSync(`tar -xzf "${tmpFile}" -C "${destDir}" 2>&1`, { timeout: 60000 });
+                    execFileSync('tar', ['-xzf', tmpFile, '-C', destDir], { timeout: 60000 });
                 } else {
-                    execSync(`unzip -o "${tmpFile}" -d "${destDir}" 2>&1`, { timeout: 60000 });
+                    execFileSync('unzip', ['-o', tmpFile, '-d', destDir], { timeout: 60000 });
                 }
 
                 const files = fs.readdirSync(destDir);
@@ -162,7 +314,7 @@ module.exports = function registerGstPipeline(app, wss, device) {
 
     /* ── POST /gst/upload-input?filename=<name> ─────────────────── */
 
-    app.post('/gst/upload-input', (req, res) => {
+    app.post('/gst/upload-input', uploadLimiter, (req, res) => {
         readRawBody(req, res, 50 * 1024 * 1024, body => {
             const rawName = ((req.query.filename || '') + '')
                 .replace(/\s+/g, '_')
@@ -191,8 +343,8 @@ module.exports = function registerGstPipeline(app, wss, device) {
     app.post('/gst/save-pipeline', (req, res) => {
         const { id, name, command } = req.body || {};
         if (!name || !command) return res.status(400).json({ error: 'name and command required' });
-        if (!/^gst-launch/i.test(command.trim()))
-            return res.status(400).json({ error: 'Only gst-launch commands are permitted' });
+        try { validateGstCommand(command.trim()); }
+        catch (e) { return res.status(400).json({ error: e.message }); }
 
         const safeName = (name + '').trim().slice(0, 80);
         const pipelines = readSaved();
@@ -227,16 +379,19 @@ module.exports = function registerGstPipeline(app, wss, device) {
 
     /* ── POST /gst/run  { command } ─────────────────────────────── */
 
-    app.post('/gst/run', (req, res) => {
+    app.post('/gst/run', runLimiter, (req, res) => {
         if (activeProc) return res.status(409).json({ error: 'A pipeline is already running' });
 
         const command = ((req.body || {}).command || '').trim();
-        if (!command)              return res.status(400).json({ error: 'No command provided' });
-        if (!/^gst-launch/i.test(command))
-            return res.status(400).json({ error: 'Only gst-launch commands are permitted' });
+        if (!command) return res.status(400).json({ error: 'No command provided' });
+
+        let tokens;
+        try { tokens = validateGstCommand(command); }
+        catch (e) { return res.status(400).json({ error: e.message }); }
 
         try {
-            const proc = spawn('sh', ['-c', command], { stdio: ['ignore', 'pipe', 'pipe'] });
+            /* spawn the GStreamer binary directly — no shell, no metacharacter expansion */
+            const proc = spawn(tokens[0], tokens.slice(1), { stdio: ['ignore', 'pipe', 'pipe'] });
             activeProc = proc;
             broadcast({ type: 'started', command, pid: proc.pid });
 
