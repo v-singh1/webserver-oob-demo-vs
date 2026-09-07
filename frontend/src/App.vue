@@ -3,15 +3,13 @@
 
     <!-- ── NAVIGATION DRAWER (sidebar) ── -->
     <v-navigation-drawer permanent width="222" :border="0">
-      <template #prepend>
-        <div class="sidebar-brand">
-          <div class="ti-logo">
-            <img src="/ti-logo.png" alt="TI" />
-          </div>
-          <div>
-            <div class="brand-main">TI SITARA</div>
-            <div class="brand-sub">DSP + EDGE AI<br>EXPERIENCE PORTAL</div>
-          </div>
+      <div class="sidebar-brand">
+        <div class="ti-logo">
+          <img src="/ti-logo.png" alt="TI" />
+        </div>
+        <div>
+          <div class="brand-main">TI SITARA</div>
+          <div class="brand-sub">DSP + EDGE AI<br>EXPERIENCE PORTAL</div>
         </div>
       </template>
 

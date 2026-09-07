@@ -41,7 +41,7 @@ export const demoCards = [
   },
   {
     to: '/dsp-compute', name: 'DSP Acceleration',
-    desc: 'High-performance C7x DSP acceleration demos — 2D FFT analysis, biquad filter chain, and workload offload via RPMsg-DMA.',
+    desc: 'High-performance C7x DSP compute demos — 2D FFT, biquad filter chain, and workload offload via RPMsg-DMA.',
     icon: 'mdi-chart-bar',
     iconBg: 'radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00)', iconBorder: '#d97706', iconColor: '#fbbf24',
   },
