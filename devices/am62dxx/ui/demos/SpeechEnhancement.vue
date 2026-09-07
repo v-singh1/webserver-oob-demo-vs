@@ -203,7 +203,7 @@ const isLight     = computed(() => vuetifyTheme.global.name.value === 'tiLight')
 const inputColor  = computed(() => isLight.value ? '#1d6fe8' : '#4da6ff')
 const outputColor = computed(() => isLight.value ? '#16a34a' : '#22c55e')
 const canvasBg    = computed(() => isLight.value ? '#f1f5f9' : '#05080f')
-const spectBg     = computed(() => isLight.value ? '#0f172a' : '#020408')
+const spectBg     = computed(() => isLight.value ? '#e8eef6' : '#020408')
 
 const emit = defineEmits(['running-change'])
 

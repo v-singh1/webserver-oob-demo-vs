@@ -41,13 +41,13 @@ export const demoCards = [
   },
   {
     to: '/dsp-compute', name: 'DSP Acceleration',
-    desc: 'High-performance C7x DSP compute demos — 2D FFT, biquad filter chain, and workload offload via RPMsg-DMA.',
+    desc: 'High-performance C7x DSP acceleration demos — 2D FFT analysis, biquad filter chain, and workload offload via RPMsg-DMA.',
     icon: 'mdi-chart-bar',
     iconBg: 'radial-gradient(circle at 40% 40%,#3a1a00,#1f0d00)', iconBorder: '#d97706', iconColor: '#fbbf24',
   },
   {
     to: '/model-inspector', name: 'AI Model Inspector',
-    desc: 'Browse and inspect AI models deployed on AM62D — ResNet-18, NanoDet, YOLOv9c — via TIDL inference engine.',
+    desc: 'Upload and browse AI model inspection reports — view model architecture, layer details, and performance metrics for AM62D deployments.',
     icon: 'mdi-magnify',
     iconBg: 'radial-gradient(circle at 40% 40%,#3b1c68,#1e0d40)', iconBorder: '#7c3aed', iconColor: '#c084fc',
   },
