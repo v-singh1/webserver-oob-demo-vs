@@ -52,7 +52,8 @@
       "outputName": "processed_output.wav"
     },
     "gst-pipeline": {
-      "artifactsDir": "/usr/share/tvm_inference/artifacts"
+      "artifactsDir": "/usr/share/tvm_inference/artifacts",
+      "inputDir":     "/usr/share/tvm_inference/input"
     },
     "tvm-inference": {
       "edgeAiBinary": "/usr/bin/rpmsg_inference_example",

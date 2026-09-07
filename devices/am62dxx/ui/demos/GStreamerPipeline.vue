@@ -43,6 +43,54 @@
       </div>
     </v-card>
 
+    <!-- Input Files -->
+    <v-expansion-panels variant="accordion" flat>
+      <v-expansion-panel class="ti-expansion" @group:selected="onInputPanelOpen">
+        <v-expansion-panel-title class="exp-title">
+          <v-icon size="16" color="success" class="mr-2">mdi-file-music-outline</v-icon>
+          Input Files
+          <v-chip v-if="inputFiles.length" size="x-small" color="success" variant="tonal" class="ml-2">{{ inputFiles.length }}</v-chip>
+        </v-expansion-panel-title>
+
+        <v-expansion-panel-text>
+          <div class="artifact-path-row">
+            <v-icon size="13" color="success">mdi-folder-outline</v-icon>
+            <code class="artifact-path">{{ inputDir }}</code>
+          </div>
+
+          <div class="artifact-toolbar">
+            <v-btn size="small" variant="outlined" color="success" prepend-icon="mdi-refresh"
+              :loading="inputFilesLoading" @click="loadInputFiles">Refresh</v-btn>
+            <v-btn size="small" variant="outlined" color="success" prepend-icon="mdi-upload"
+              :loading="inputUploadLoading" @click="triggerInputUpload">Upload File</v-btn>
+            <input ref="inputUploadRef" type="file" accept=".wav,.mp3,.flac,.ogg,audio/*" hidden @change="uploadInputFile" />
+          </div>
+
+          <v-alert v-if="inputFileError" type="error" density="compact" variant="tonal" class="mb-2" closable
+            @click:close="inputFileError = ''">{{ inputFileError }}</v-alert>
+          <v-alert v-if="inputUploadMsg" type="success" density="compact" variant="tonal" class="mb-2">{{ inputUploadMsg }}</v-alert>
+
+          <div v-if="inputFiles.length === 0 && !inputFilesLoading" class="no-artifacts">
+            No files found in {{ inputDir }}
+          </div>
+
+          <div v-for="f in inputFiles" :key="f.name" class="artifact-row">
+            <v-icon size="15" color="success">mdi-file-music-outline</v-icon>
+            <div class="artifact-info">
+              <span class="artifact-name">{{ f.name }}</span>
+              <span class="artifact-meta">{{ fmtSize(f.size) }}</span>
+            </div>
+            <code class="input-path">{{ f.path }}</code>
+            <v-btn
+              size="x-small" variant="tonal" color="success"
+              title="Insert file path into command"
+              @click="insertInputPath(f)"
+            >Use</v-btn>
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
+
     <!-- TVM Artifacts -->
     <v-expansion-panels variant="accordion" flat>
       <v-expansion-panel class="ti-expansion" @group:selected="onArtifactPanelOpen">
@@ -198,12 +246,20 @@ const logLines       = ref([])
 const logEl          = ref(null)
 const uploadRef      = ref(null)
 
-const artifacts      = ref([])
-const artifactsDir   = ref('/usr/share/tvm_inference/artifacts')
+const artifacts        = ref([])
+const artifactsDir     = ref('/usr/share/tvm_inference/artifacts')
 const artifactsLoading = ref(false)
-const artifactError  = ref('')
-const uploadLoading  = ref(false)
-const uploadMsg      = ref('')
+const artifactError    = ref('')
+const uploadLoading    = ref(false)
+const uploadMsg        = ref('')
+
+const inputFiles        = ref([])
+const inputDir          = ref('/usr/share/tvm_inference/input')
+const inputFilesLoading = ref(false)
+const inputFileError    = ref('')
+const inputUploadLoading = ref(false)
+const inputUploadMsg    = ref('')
+const inputUploadRef    = ref(null)
 
 let ws = null
 let mounted = true
@@ -377,6 +433,72 @@ async function uploadArtifact(ev) {
   }
 }
 
+/* ── Input Files ────────────────────────────────────────────────── */
+
+async function loadInputFiles() {
+  inputFilesLoading.value = true
+  inputFileError.value    = ''
+  try {
+    const r = await fetch('/gst/input-files')
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const d = await r.json()
+    inputFiles.value = d.files || []
+    inputDir.value   = d.dir  || inputDir.value
+  } catch (e) {
+    inputFileError.value = e.message
+  } finally {
+    inputFilesLoading.value = false
+  }
+}
+
+function onInputPanelOpen(val) {
+  if (val.value && inputFiles.value.length === 0) loadInputFiles()
+}
+
+function triggerInputUpload() { inputUploadRef.value?.click() }
+
+async function uploadInputFile(ev) {
+  const file = ev.target.files?.[0]
+  ev.target.value = ''
+  if (!file) return
+  inputUploadLoading.value = true
+  inputUploadMsg.value     = ''
+  inputFileError.value     = ''
+  try {
+    const r = await fetch(`/gst/upload-input?filename=${encodeURIComponent(file.name)}`, {
+      method: 'POST', body: file,
+    })
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}))
+      throw new Error(d.error || `HTTP ${r.status}`)
+    }
+    const d = await r.json()
+    inputUploadMsg.value = `Uploaded "${d.name}" (${fmtSize(d.size)})`
+    await loadInputFiles()
+  } catch (e) {
+    inputFileError.value = e.message
+  } finally {
+    inputUploadLoading.value = false
+  }
+}
+
+function insertInputPath(f) {
+  const placeholder = /location=\/[^\s]*/
+  if (placeholder.test(command.value)) {
+    command.value = command.value.replace(placeholder, `location=${f.path}`)
+  } else {
+    command.value += ` location=${f.path}`
+  }
+  selectedPreset.value = 'custom'
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '0 B'
+  if (bytes < 1024)        return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
 function insertArtifactPath(artifact) {
   const placeholder = /artifacts=\/[^\s]*/
   if (placeholder.test(command.value)) {
@@ -499,6 +621,7 @@ defineExpose({ run, stop, isRunning })
 .artifact-meta { font-size: 11px; color: #64748b; }
 .artifact-chips { display: flex; flex-wrap: wrap; flex: 1; min-width: 0; align-items: center; }
 .artifact-more  { font-size: 11px; color: #64748b; }
+.input-path     { font-size: 10.5px; color: #64748b; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Status ── */
 .status-row      { display: flex; align-items: center; gap: 10px; }

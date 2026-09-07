@@ -6,6 +6,8 @@
  * HTTP endpoints:
  *   GET  /gst/artifacts                        list TVM artifact directories
  *   POST /gst/upload-artifact?name=<dir>       upload zip or tar.gz archive
+ *   GET  /gst/input-files                      list files in the input directory
+ *   POST /gst/upload-input?filename=<name>     upload an input audio file
  *   POST /gst/run          { command: "..." }  start gst-launch-1.0 pipeline
  *   POST /gst/stop                             kill running pipeline
  *   GET  /gst/status                           { running, pid }
@@ -29,6 +31,7 @@ const MAX_UPLOAD_MB  = 200;
 module.exports = function registerGstPipeline(app, wss, device) {
     const config       = (device.demoConfig || {})['gst-pipeline'] || {};
     const artifactsDir = config.artifactsDir || '/usr/share/tvm_inference/artifacts';
+    const inputDir     = config.inputDir     || '/usr/share/tvm_inference/input';
 
     const clients  = new Set();
     let activeProc = null;
@@ -114,6 +117,48 @@ module.exports = function registerGstPipeline(app, wss, device) {
                 res.status(400).json({ error: e.message });
             } finally {
                 try { fs.unlinkSync(tmpFile); } catch (_) {}
+            }
+        });
+    });
+
+    /* ── GET /gst/input-files ──────────────────────────────────── */
+
+    app.get('/gst/input-files', (req, res) => {
+        try {
+            if (!fs.existsSync(inputDir))
+                return res.json({ files: [], dir: inputDir });
+
+            const entries = fs.readdirSync(inputDir, { withFileTypes: true })
+                .filter(e => e.isFile())
+                .map(e => {
+                    let size = 0;
+                    try { size = fs.statSync(path.join(inputDir, e.name)).size; } catch (_) {}
+                    return { name: e.name, path: path.join(inputDir, e.name), size };
+                })
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            res.json({ files: entries, dir: inputDir });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    /* ── POST /gst/upload-input?filename=<name> ─────────────────── */
+
+    app.post('/gst/upload-input', (req, res) => {
+        readRawBody(req, res, 50 * 1024 * 1024, body => {
+            const rawName = ((req.query.filename || '') + '')
+                .replace(/\s+/g, '_')
+                .replace(/[^a-zA-Z0-9._-]/g, '')
+                .slice(0, 128) || 'input.wav';
+            const dest = path.join(inputDir, rawName);
+            try {
+                fs.mkdirSync(inputDir, { recursive: true });
+                fs.writeFileSync(dest, body);
+                const size = fs.statSync(dest).size;
+                res.json({ success: true, name: rawName, path: dest, size });
+            } catch (e) {
+                res.status(400).json({ error: e.message });
             }
         });
     });
