@@ -129,8 +129,10 @@ const tvmReady      = ref(false)
 const tvmWasReady   = ref(false)   // latched true once tvmReady ever becomes true
 const tvmState      = ref('checking')
 const tvmDetails    = ref(null)
-let _tvmPollTimer  = null
+let _tvmPollTimer   = null
 let _tvmPollStopped = false
+let _tvmPollStart   = 0
+const TVM_INIT_TIMEOUT_MS = 90_000
 
 /* Show the preload banner only during the initial boot sequence, or on hard
  * error. Once the daemon has been ready at least once, transient drops (e.g.
@@ -165,11 +167,17 @@ async function pollTvmDaemon() {
     tvmState.value = 'error'
     tvmDetails.value = { error: error.message, c7xState: 'unavailable' }
   } finally {
-    if (!_tvmPollStopped) _tvmPollTimer = setTimeout(pollTvmDaemon, 2000)
+    if (_tvmPollStopped || tvmReady.value) return
+    if (Date.now() - _tvmPollStart >= TVM_INIT_TIMEOUT_MS) {
+      tvmState.value = 'error'
+      tvmDetails.value = { error: 'TVM initialization timed out after 90 s — check C7x remoteproc and tvm-model-daemon service', c7xState: tvmDetails.value?.c7xState || 'unknown' }
+      return
+    }
+    _tvmPollTimer = setTimeout(pollTvmDaemon, 2000)
   }
 }
 
-onMounted(pollTvmDaemon)
+onMounted(() => { _tvmPollStart = Date.now(); pollTvmDaemon() })
 
 function selectDemo(i) {
   if (i === activeIdx.value) return

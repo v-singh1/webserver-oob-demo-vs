@@ -11,7 +11,7 @@
           <div class="brand-main">TI SITARA</div>
           <div class="brand-sub">DSP + EDGE AI<br>EXPERIENCE PORTAL</div>
         </div>
-      </template>
+      </div>
 
       <v-list density="compact" nav class="sidebar-nav">
         <v-list-item

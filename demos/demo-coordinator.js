@@ -31,7 +31,10 @@ const C7X_STATE   = '/sys/class/remoteproc/remoteproc0/state';
 const TVM_MAGIC   = 0x544D5644;
 const TVM_PING    = 0;
 const TVM_PONG    = 1;
-const READY_TIMEOUT_MS = 10000;
+// How long to wait for the C7x remoteproc + daemon socket after a service restart.
+const DAEMON_READY_TIMEOUT_MS = 10_000;
+// How long to allow the preload binary to run before treating it as hung.
+const PRELOAD_TIMEOUT_MS = 60_000;
 
 // Name of the demo that currently owns the C7x DSP, or null.
 let _activeDemoName = null;
@@ -83,7 +86,7 @@ function preloadTvmModel(binaryPath = PRELOAD_BIN) {
     if (_preloadInProgress) return;
     _preloadInProgress = true;
     _tvmDaemonState = 'preloading';
-    execFile(binaryPath, ['--preload'], { timeout: READY_TIMEOUT_MS }, err => {
+    execFile(binaryPath, ['--preload'], { timeout: PRELOAD_TIMEOUT_MS }, err => {
         _preloadInProgress = false;
         if (err) {
             _tvmDaemonState = 'error';
@@ -125,7 +128,7 @@ async function probeTvmReadiness(updateState = true) {
     };
 }
 
-function waitForDaemonReady(timeoutMs = READY_TIMEOUT_MS) {
+function waitForDaemonReady(timeoutMs = DAEMON_READY_TIMEOUT_MS) {
     const deadline = Date.now() + timeoutMs;
     return new Promise((resolve, reject) => {
         const poll = async () => {
