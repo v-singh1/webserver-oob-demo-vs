@@ -68,7 +68,9 @@
 
       <!-- Active demo panel -->
       <div class="demo-panel">
-        <component :is="currentComponent" ref="activeDemo" @running-change="onRunningChange" />
+        <Transition name="demo-fade" mode="out-in">
+          <component :is="currentComponent" :key="activeIdx" ref="activeDemo" @running-change="onRunningChange" />
+        </Transition>
       </div>
 
     </div>
@@ -77,11 +79,11 @@
 </template>
 
 <script setup>
-import { ref, computed, shallowRef, watch, onMounted, onUnmounted } from 'vue'
-import SpeechEnhancement  from '../demos/SpeechEnhancement.vue'
-import TvmInference        from '../demos/TvmInference.vue'
-import AudioClassification from '@/demos/AudioClassification.vue'
-import GStreamerPipeline   from '../demos/GStreamerPipeline.vue'
+import { ref, computed, shallowRef, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+const SpeechEnhancement  = defineAsyncComponent(() => import('../demos/SpeechEnhancement.vue'))
+const TvmInference        = defineAsyncComponent(() => import('../demos/TvmInference.vue'))
+const AudioClassification = defineAsyncComponent(() => import('@/demos/AudioClassification.vue'))
+const GStreamerPipeline   = defineAsyncComponent(() => import('../demos/GStreamerPipeline.vue'))
 import { registerRunningDemo, clearRunningDemo } from '@/composables/useDemoSession'
 
 const demos = [
@@ -285,4 +287,10 @@ onUnmounted(() => {
   line-height: 1;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Demo switch transition */
+.demo-fade-enter-active,
+.demo-fade-leave-active { transition: opacity 0.12s ease; }
+.demo-fade-enter-from,
+.demo-fade-leave-to    { opacity: 0; }
 </style>

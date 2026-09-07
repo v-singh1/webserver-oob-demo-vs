@@ -115,7 +115,11 @@
     <v-main style="height:100vh;overflow:hidden;">
       <div style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
         <div style="flex:1;overflow:hidden;">
-          <router-view />
+          <router-view v-slot="{ Component }">
+            <Transition name="page-fade" mode="out-in">
+              <component :is="Component" :key="$route.path" />
+            </Transition>
+          </router-view>
         </div>
 
         <!-- ── STATUS BAR (footer) ── -->
@@ -126,7 +130,7 @@
           </div>
           <div class="sb-item">
             CPU Load: <span>{{ stats.cpu.value }}%</span>
-            <div class="bar-t"><div class="bar-f g" :style="{ width: stats.cpu.value + '%' }" /></div>
+            <div class="bar-t"><div class="bar-f g" :style="{ transform: 'scaleX(' + stats.cpu.value / 100 + ')' }" /></div>
           </div>
           <div class="sb-item">
             RAM: <span class="sb-ram">{{ stats.ramUsed.value }} / {{ stats.ramFree.value }}</span>
@@ -403,7 +407,7 @@ async function doPowerAction() {
 .statusbar { background:rgb(var(--v-theme-surface)); border-top:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); height:42px; padding:0 20px; display:flex; align-items:center; gap:20px; flex-shrink:0; font-size:12px; }
 .sb-item   { display:flex; align-items:center; gap:7px; color:#94a3b8; white-space:nowrap; }
 .bar-t { width:58px; height:5px; background:rgb(var(--v-theme-surface-variant)); border-radius:3px; overflow:hidden; }
-.bar-f { height:100%; border-radius:3px; transition:width 1s ease; }
+.bar-f { height:100%; border-radius:3px; transform-origin:left; transition:transform 1s ease; }
 .bar-f.g { background:linear-gradient(90deg,#16a34a,#4ade80); }
 .sb-ram    { color:#c084fc; font-weight:600; }
 .sb-spacer { flex:1; }
@@ -429,4 +433,10 @@ async function doPowerAction() {
 .disc-msg   { font-size:13px;color:#94a3b8;line-height:1.7; }
 .disc-spin  { display:flex;align-items:center;gap:12px;margin-top:4px; }
 .disc-sec   { font-size:13px;color:#64748b; }
+
+/* Page transition */
+.page-fade-enter-active,
+.page-fade-leave-active { transition: opacity 0.15s ease; }
+.page-fade-enter-from,
+.page-fade-leave-to    { opacity: 0; }
 </style>
