@@ -17,7 +17,7 @@
         variant="flat"
         size="small"
         :disabled="!canRun && !demoRunning"
-        :prepend-icon="demoRunning ? 'mdi-stop' : (!tvmReady && !tvmWasReady) ? 'mdi-loading' : 'mdi-play'"
+        :prepend-icon="demoRunning ? 'mdi-stop' : (!tvmReady && !tvmWasReady) ? 'mdi-cog-sync-outline' : 'mdi-play'"
         class="run-btn"
         @click="triggerRun"
       >{{ demoRunning ? 'Stop Demo' : (!tvmReady && !tvmWasReady) ? 'Preparing Demo…' : 'Run Demo' }}</v-btn>
@@ -30,7 +30,7 @@
       variant="tonal"
       density="compact"
       class="preparing-alert"
-      icon="mdi-loading"
+      icon="mdi-cog-sync-outline"
       aria-live="polite"
     >
       <span class="preparing-txt">

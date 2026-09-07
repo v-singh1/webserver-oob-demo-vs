@@ -85,10 +85,10 @@
         <span class="status-lbl" :class="`text-${ws.statusColor.value}`">{{ ws.statusMsg.value }}</span>
       </div>
 
-      <v-alert v-if="ws.modelLoading.value" type="info" variant="tonal" density="compact" icon="mdi-cog-sync-outline" class="model-loading-alert">
+      <v-alert v-if="ws.modelLoading.value" type="info" variant="tonal" density="compact" icon="mdi-cog-sync-outline" class="model-loading-alert" aria-live="polite">
         <span class="model-loading-txt">
           <span class="preparing-spinner">&#9696;</span>
-          <span><strong>{{ ws.modelName.value || 'Model' }} loading</strong> — please wait, this may take up to 15 seconds</span>
+          <span><strong>{{ ws.modelName.value || 'GCRN Model Artifacts' }} loading</strong> — {{ gcrNLoadingMsg }}</span>
         </span>
       </v-alert>
 
@@ -177,7 +177,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import { useSpeechWs }    from '@/composables/useSpeechWs'
 import SpectrogramCanvas from '@/components/SpectrogramCanvas.vue'
@@ -196,6 +196,33 @@ const spectBg     = computed(() => isLight.value ? '#e8eef6' : '#020408')
 const emit = defineEmits(['running-change'])
 
 const ws = useSpeechWs()
+
+// TVM status polling — runs while modelLoading is true to show granular messages
+const tvmDetails     = ref(null)
+let   _tvmPollTimer  = null
+
+const gcrNLoadingMsg = computed(() => {
+  const d = tvmDetails.value
+  if (!d) return 'please wait, this may take up to 15 seconds…'
+  if (d.c7xState !== 'running') return `waiting for C7x DSP (state: ${d.c7xState || 'unknown'})…`
+  if (!d.daemonReady)           return 'loading TVM model daemon…'
+  if (!d.modelReady)            return 'preloading GCRN model artifacts, this may take up to 15 seconds…'
+  return 'initialising inference pipeline…'
+})
+
+async function _pollTvmForLoading() {
+  if (!ws.modelLoading.value) return
+  try {
+    const r = await fetch('/tvm-daemon/status')
+    tvmDetails.value = r.ok ? await r.json() : null
+  } catch { tvmDetails.value = null }
+  if (ws.modelLoading.value) _tvmPollTimer = setTimeout(_pollTvmForLoading, 2000)
+}
+
+watch(() => ws.modelLoading.value, v => {
+  if (v) { tvmDetails.value = null; _pollTvmForLoading() }
+  else   { clearTimeout(_tvmPollTimer); _tvmPollTimer = null }
+})
 
 // Emit running-change whenever ws.running changes (not just on manual start/stop)
 watch(() => ws.running.value, (v) => emit('running-change', v))
@@ -281,6 +308,8 @@ onMounted(async () => {
     if (r.ok) fileInfo.value = await r.json()
   } catch { /* board not connected */ }
 })
+
+onUnmounted(() => { clearTimeout(_tvmPollTimer); _tvmPollTimer = null })
 
 const dotClass = computed(() => ({
   'dot-running': ws.running.value,

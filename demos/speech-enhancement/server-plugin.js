@@ -215,7 +215,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
             stdout: '',
             dmaFrames: false,
         };
-        send({ type: 'metric', label: 'Waiting for RPMsg DMA input/output buffers' });
+        send({ type: 'metric', label: 'Running Speech Enhancement' });
         if (!fs.existsSync(binary)) throw new Error(`Edge-AI client not installed: ${binary}`);
         const baseJsonPath = path.join(tvmDir, jsonFile);
         if (!fs.existsSync(baseJsonPath)) throw new Error(`Edge-AI pipeline config not installed: ${baseJsonPath}`);
@@ -227,8 +227,11 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         const jobJsonPath = path.join(jobDir, 'pipeline.json');
         fs.writeFileSync(jobJsonPath, JSON.stringify(jobJson));
 
+        const modelAlreadyLoaded = demoCoordinator.tvmCacheExists();
+        // Send before ensurePreloaded so the WS frame is in the OS TCP buffer
+        // and reaches the client even while Node.js is blocked on the sync preload.
+        if (!modelAlreadyLoaded) send({ type: 'model_loading', modelName: 'GCRN Model Artifacts' });
         demoCoordinator.ensurePreloaded(binary);
-        send({ type: 'model_loading', modelName: 'GCRN' });
         const child = spawn(binary, [jobJsonPath], { cwd: jobDir, stdio: ['pipe', 'pipe', 'pipe'] });
         job.process = child;
         connectDmaStream();

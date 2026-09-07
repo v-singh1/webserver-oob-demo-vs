@@ -51,6 +51,11 @@ export function useSpeechWs() {
         modelLoading.value = false
         break
       case 'chunk_timing':
+        if (modelLoading.value) {
+          modelLoading.value = false
+          statusMsg.value   = 'Running Speech Enhancement'
+          statusColor.value = 'primary'
+        }
         chunkTimings.value = [...chunkTimings.value, {
           chunk: msg.chunk, total: msg.total,
           frameStart: msg.frameStart ?? null, frameEnd: msg.frameEnd ?? null,
@@ -63,6 +68,7 @@ export function useSpeechWs() {
         statusColor.value = 'primary'
         break
       case 'error':
+        modelLoading.value = false
         error.value = msg.message
         statusMsg.value = msg.message
         statusColor.value = 'error'
@@ -162,6 +168,7 @@ export function useSpeechWs() {
     const r = await fetch(url)
     if (!r.ok) {
       const d = await r.json().catch(() => ({}))
+      modelLoading.value = false
       error.value = d.error || `HTTP ${r.status}`
       running.value = false
       statusMsg.value = error.value

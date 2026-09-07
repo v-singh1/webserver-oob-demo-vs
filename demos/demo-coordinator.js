@@ -260,6 +260,22 @@ module.exports = {
     /** Returns true if the TVM model cache file exists on disk. */
     tvmCacheExists() { return fs.existsSync(TVM_CACHE); },
 
+    /**
+     * Delete the TVM model cache marker without restarting the daemon.
+     * Call this when a demo loads a different TVM model (e.g. YAMNet) so
+     * that the next GCRN run knows it must re-preload the speech model.
+     */
+    clearModelCache() {
+        try {
+            if (fs.existsSync(TVM_CACHE)) {
+                fs.unlinkSync(TVM_CACHE);
+                console.log('[demo-coordinator] TVM model cache cleared (model switch)');
+            }
+        } catch (err) {
+            console.warn('[demo-coordinator] Could not clear model cache:', err.message);
+        }
+    },
+
     /** Return measured C7x, daemon, and model readiness plus active demo occupancy. */
     async tvmStatus() {
         const base = await probeTvmReadiness();

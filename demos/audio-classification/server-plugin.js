@@ -234,6 +234,13 @@ module.exports = function registerAudioClassification(app, wss, device) {
         });
     }
 
+    // Release DSP and clear GCRN cache so speech-enhancement knows it must
+    // re-preload after YAMNet ran on C7x.
+    function releaseAcDsp() {
+        demoCoordinator.releaseDsp('audio-classification');
+        if (isAm62d) demoCoordinator.clearModelCache();
+    }
+
     /* ------------------------------------------------------------ */
     /* REST routes                                                   */
     /* ------------------------------------------------------------ */
@@ -485,7 +492,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
                 );
             });
         } catch (error) {
-            demoCoordinator.releaseDsp('audio-classification');
+            releaseAcDsp();
             throw error;
         }
     }
@@ -495,7 +502,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
         const finished = activeJob;
         edgeAiProcess = null;
         activeJob = null;
-        demoCoordinator.releaseDsp('audio-classification');
+        releaseAcDsp();
         lastResult = {
             success: !error,
             classes: finished.classes,
@@ -567,7 +574,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
                 if (!activeJob || activeJob.generation !== generation) return;
                 edgeAiProcess = null;
                 activeJob = null;
-                demoCoordinator.releaseDsp('audio-classification');
+                releaseAcDsp();
                 send({ type: 'error', message: `Edge-AI failed: ${err.message}`,
                        backend: 'edge-ai-rpmsg' });
             });
@@ -575,14 +582,14 @@ module.exports = function registerAudioClassification(app, wss, device) {
                 if (!activeJob || activeJob.generation !== generation) return;
                 edgeAiProcess = null;
                 activeJob = null;
-                demoCoordinator.releaseDsp('audio-classification');
+                releaseAcDsp();
                 if (code !== 0 && code !== null)
                     send({ type: 'error', message: `Edge-AI exited with ${code}`,
                            backend: 'edge-ai-rpmsg' });
             });
         } catch (err) {
             activeJob = null;
-            demoCoordinator.releaseDsp('audio-classification');
+            releaseAcDsp();
             throw err;
         }
     }
@@ -696,7 +703,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
         }
         if (activeJob) {
             activeJob = null;
-            demoCoordinator.releaseDsp('audio-classification');
+            releaseAcDsp();
         }
         if (legacyAudioProcess) {
             if (audioSourceMode === 'device') {
