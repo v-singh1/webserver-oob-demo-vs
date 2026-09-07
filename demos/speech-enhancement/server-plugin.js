@@ -194,9 +194,9 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         });
     }
 
-    function startEdgeAi(inputPath) {
+    function startEdgeAi(inputPath, ownerIp) {
         if (job) throw new Error('Speech enhancement is already running');
-        const dspError = demoCoordinator.acquireDsp('speech-enhancement');
+        const dspError = demoCoordinator.acquireDsp('speech-enhancement', ownerIp);
         if (dspError) throw new Error(dspError);
         lastCompletedJob = null;
         fs.mkdirSync(JOB_ROOT, { recursive: true });
@@ -306,10 +306,14 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
 
     app.get('/start-speech-enhancement', (req, res) => {
         const fileToUse = req.query.file || inputPath;
-        try { startEdgeAi(fileToUse); res.json({ status: 'started', backend: MOCK ? 'mock' : 'edge-ai-rpmsg', inputPath: fileToUse }); }
+        try { startEdgeAi(fileToUse, req.ip); res.json({ status: 'started', backend: MOCK ? 'mock' : 'edge-ai-rpmsg', inputPath: fileToUse }); }
         catch (error) { stopJob(); res.status(400).json({ error: error.message }); }
     });
-    app.get('/stop-speech-enhancement', (req, res) => { stopJob(); res.json({ status: 'stopped' }); });
+    app.get('/stop-speech-enhancement', (req, res) => {
+        const denied = demoCoordinator.checkStopAuthorised('speech-enhancement', req.ip);
+        if (denied) return res.status(403).json({ error: denied });
+        stopJob(); res.json({ status: 'stopped' });
+    });
     app.get('/speech-enhancement/status', (req, res) => res.json({ running: Boolean(job), backend: MOCK ? 'mock' : 'edge-ai-rpmsg' }));
     app.get('/tvm-daemon/status', async (req, res) => {
         try { res.json(await demoCoordinator.tvmStatus()); }

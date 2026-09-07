@@ -187,8 +187,9 @@ module.exports = function registerGstPipeline(app, wss, device) {
     const runLimiter    = rateLimit(10,  60_000);
     const uploadLimiter = rateLimit(5,  60_000);
 
-    const clients  = new Set();
-    let activeProc = null;
+    const clients     = new Set();
+    let activeProc    = null;
+    let activeOwnerIp = null;
 
     /* ── helpers ────────────────────────────────────────────────── */
 
@@ -222,7 +223,8 @@ module.exports = function registerGstPipeline(app, wss, device) {
         if (!activeProc) return;
         try { activeProc.kill('SIGINT');  } catch (_) {}
         try { activeProc.kill('SIGTERM'); } catch (_) {}
-        activeProc = null;
+        activeProc    = null;
+        activeOwnerIp = null;
     }
 
     /* ── GET /gst/artifacts ─────────────────────────────────────── */
@@ -392,7 +394,8 @@ module.exports = function registerGstPipeline(app, wss, device) {
         try {
             /* spawn the GStreamer binary directly — no shell, no metacharacter expansion */
             const proc = spawn(tokens[0], tokens.slice(1), { stdio: ['ignore', 'pipe', 'pipe'] });
-            activeProc = proc;
+            activeProc    = proc;
+            activeOwnerIp = req.ip;
             broadcast({ type: 'started', command, pid: proc.pid });
 
             const relay = stream => chunk => broadcast({ type: 'log', stream, text: chunk.toString() });
@@ -400,17 +403,18 @@ module.exports = function registerGstPipeline(app, wss, device) {
             proc.stderr.on('data', relay('stderr'));
 
             proc.on('error', err => {
-                if (activeProc === proc) activeProc = null;
+                if (activeProc === proc) { activeProc = null; activeOwnerIp = null; }
                 broadcast({ type: 'error', message: err.message });
             });
             proc.on('close', code => {
-                if (activeProc === proc) activeProc = null;
+                if (activeProc === proc) { activeProc = null; activeOwnerIp = null; }
                 broadcast({ type: 'exit', code });
             });
 
             res.json({ status: 'started', pid: proc.pid });
         } catch (e) {
-            activeProc = null;
+            activeProc    = null;
+            activeOwnerIp = null;
             res.status(500).json({ error: e.message });
         }
     });
@@ -419,6 +423,8 @@ module.exports = function registerGstPipeline(app, wss, device) {
 
     app.post('/gst/stop', (req, res) => {
         if (!activeProc) return res.json({ status: 'not running' });
+        if (activeOwnerIp && activeOwnerIp !== req.ip)
+            return res.status(403).json({ error: `Pipeline was started from ${activeOwnerIp} — only that client may stop it` });
         killActive();
         broadcast({ type: 'exit', code: null, reason: 'user stopped' });
         res.json({ status: 'stopped' });

@@ -380,6 +380,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
                     filepath: filepath || defaultInputPath,
                     jsonPath,
                     modelLabel,
+                    ownerIp: req.ip,
                 });
                 res.send(`Audio classification started (edge-ai-rpmsg, model=${modelKey})`);
             } catch (error) {
@@ -404,6 +405,8 @@ module.exports = function registerAudioClassification(app, wss, device) {
     });
 
     app.get('/stop-audio-classification', (req, res) => {
+        const denied = demoCoordinator.checkStopAuthorised('audio-classification', req.ip);
+        if (denied) return res.status(403).json({ error: denied });
         stopAll();
         res.send('Audio classification stopped');
     });
@@ -421,12 +424,12 @@ module.exports = function registerAudioClassification(app, wss, device) {
     /* ------------------------------------------------------------ */
 
     /** Start the AM62D JSON pipeline for WAV file input. */
-    function runAm62dInference(inputPath, generation, jsonPath, modelLabel) {
+    function runAm62dInference(inputPath, generation, jsonPath, modelLabel, ownerIp) {
         if (generation !== runGeneration) return;
         if (!fs.existsSync(inputPath)) throw new Error(`Audio input file not found: ${inputPath}`);
 
         const resolvedJson = jsonPath || defaultClassificationJson;
-        const dspError = demoCoordinator.acquireDsp('audio-classification');
+        const dspError = demoCoordinator.acquireDsp('audio-classification', ownerIp || null);
         if (dspError) throw new Error(dspError);
 
         try {
@@ -525,10 +528,10 @@ module.exports = function registerAudioClassification(app, wss, device) {
      * device directly, captures raw PCM, runs STFT+TVM on each window, and prints
      * top-N results to stdout.  No arecord process — the binary owns the device.
      */
-    function startStreamingPipeline(device, generation, jsonPath, modelLabel) {
+    function startStreamingPipeline(device, generation, jsonPath, modelLabel, ownerIp) {
         if (generation !== runGeneration) return;
 
-        const dspError = demoCoordinator.acquireDsp('audio-classification');
+        const dspError = demoCoordinator.acquireDsp('audio-classification', ownerIp);
         if (dspError) throw new Error(dspError);
 
         activeJob = { generation }; /* DSP ownership marker */
@@ -588,7 +591,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
      * AM62D: live microphone uses continuous PCM buffering (no restart between
      * inferences); WAV file input remains single-shot.
      */
-    function startAm62dPipeline({ source, device, filepath, jsonPath, modelLabel }) {
+    function startAm62dPipeline({ source, device, filepath, jsonPath, modelLabel, ownerIp }) {
         if (!fs.existsSync(edgeAiBinary)) throw new Error(`Edge-AI client not installed: ${edgeAiBinary}`);
         const resolvedJson = jsonPath || defaultClassificationJson;
         if (!fs.existsSync(resolvedJson))
@@ -598,14 +601,14 @@ module.exports = function registerAudioClassification(app, wss, device) {
         onInferenceComplete = null;
 
         if (source === 'file') {
-            runAm62dInference(filepath, generation, resolvedJson, modelLabel);
+            runAm62dInference(filepath, generation, resolvedJson, modelLabel, ownerIp);
             return;
         }
 
         if (!/^(?:default|(?:plughw|hw):\d+,\d+)$/.test(device))
             throw new Error(`Invalid ALSA capture device: ${device}`);
 
-        startStreamingPipeline(device, generation, resolvedJson, modelLabel);
+        startStreamingPipeline(device, generation, resolvedJson, modelLabel, ownerIp);
     }
 
     /** @brief Create the legacy classification FIFO if it does not already exist. */
@@ -629,6 +632,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
     function startFifoReader() {
         if (fifoReaderProcess) return;
 
+        ensureFifo();
         console.log('[audio] Starting FIFO reader child process');
         fifoReaderProcess = spawn('node', [FIFO_READER]);
 

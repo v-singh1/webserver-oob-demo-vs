@@ -37,7 +37,9 @@ const DAEMON_READY_TIMEOUT_MS = 10_000;
 const PRELOAD_TIMEOUT_MS = 60_000;
 
 // Name of the demo that currently owns the C7x DSP, or null.
-let _activeDemoName = null;
+let _activeDemoName  = null;
+// IP address of the HTTP client that started the current demo, or null.
+let _activeOwnerIp   = null;
 
 // Never assume readiness at process startup.  It is established from the C7x
 // remoteproc state, daemon PING/PONG, and model-cache marker.
@@ -145,22 +147,52 @@ module.exports = {
 
     /**
      * Try to acquire the C7x DSP for the named demo.
-     * @returns {string|null} null on success, or an error message if busy.
+     *
+     * @param {string}      demoName  - Identifier of the requesting demo.
+     * @param {string|null} [ownerIp] - IP address of the HTTP client starting the demo.
+     * @returns {string|null} null on success, or a human-readable error message if busy.
      */
-    acquireDsp(demoName) {
+    acquireDsp(demoName, ownerIp = null) {
         if (_activeDemoName)
-            return `C7x DSP is busy: '${_activeDemoName}' is already running`;
+            return `C7x DSP is busy: '${_activeDemoName}' is already running` +
+                   (_activeOwnerIp ? ` (started from ${_activeOwnerIp})` : '');
         _activeDemoName = demoName;
+        _activeOwnerIp  = ownerIp || null;
         return null;
     },
 
-    /** Release the DSP.  No-op if this demo does not currently own it. */
+    /**
+     * Release the DSP.  No-op if this demo does not currently own it.
+     *
+     * @param {string} demoName
+     */
     releaseDsp(demoName) {
-        if (_activeDemoName === demoName) _activeDemoName = null;
+        if (_activeDemoName === demoName) { _activeDemoName = null; _activeOwnerIp = null; }
+    },
+
+    /**
+     * Check whether a stop request from requesterIp is authorised.
+     * Allows the request if:
+     *   - no demo is running (nothing to stop)
+     *   - the demo name matches AND the IP matches the owner
+     *   - ownerIp was never recorded (legacy path — allow for backwards compat)
+     *
+     * @param {string}      demoName     - Demo the caller wants to stop.
+     * @param {string|null} requesterIp  - IP address of the HTTP client.
+     * @returns {string|null} null if allowed, or an error message if denied.
+     */
+    checkStopAuthorised(demoName, requesterIp) {
+        if (!_activeDemoName || _activeDemoName !== demoName) return null; // not running
+        if (!_activeOwnerIp) return null; // no owner recorded — allow
+        if (_activeOwnerIp === requesterIp) return null; // correct owner
+        return `Demo '${demoName}' was started from ${_activeOwnerIp} — only that client may stop it`;
     },
 
     /** Returns the name of the demo that currently owns the DSP, or null. */
     activeDemo() { return _activeDemoName; },
+
+    /** Returns the IP that started the current demo, or null. */
+    activeOwnerIp() { return _activeOwnerIp; },
 
     /**
      * Ensure the TVM model is preloaded onto the C7x DSP.
@@ -228,6 +260,9 @@ module.exports = {
     /** Returns true if the TVM model cache file exists on disk. */
     tvmCacheExists() { return fs.existsSync(TVM_CACHE); },
 
-    /** Return measured C7x, daemon, and model readiness. */
-    tvmStatus() { return probeTvmReadiness(); },
+    /** Return measured C7x, daemon, and model readiness plus active demo occupancy. */
+    async tvmStatus() {
+        const base = await probeTvmReadiness();
+        return { ...base, activeDemo: _activeDemoName, activeOwnerIp: _activeOwnerIp };
+    },
 };

@@ -181,7 +181,7 @@ function run() {
   biquad.cycles = '--'; biquad.tput = '-- MB/s'
   if (biquadLogEl.value) biquadLogEl.value.innerHTML = ''
   fetch('/sigchain-biquad/run')
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status) })
+    .then(r => r.ok ? r : r.text().then(t => { let m = t; try { m = JSON.parse(t).error || t } catch (_) {} throw new Error(m || 'HTTP ' + r.status) }))
     .then(() => connectBiquadWs())
     .catch(err => { biquad.statusMsg = 'Error: ' + err.message; biquad.statusColor = '#ef4444'; biquad.statusPulse = false; biquad.running = false; emit('running-change', false) })
 }

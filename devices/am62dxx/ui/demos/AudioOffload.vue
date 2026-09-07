@@ -226,7 +226,7 @@ async function run() {
   clearAoCanvases()
 
   fetch('/audio-offload/run')
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status) })
+    .then(r => r.ok ? r : r.text().then(t => { let m = t; try { m = JSON.parse(t).error || t } catch (_) {} throw new Error(m || 'HTTP ' + r.status) }))
     .then(() => { ao.statusMsg = 'Connecting…'; connectAoWs() })
     .catch(err => { ao.statusMsg = 'Error: ' + err.message; ao.statusColor = '#ef4444'; ao.statusPulse = false; ao.running = false; emit('running-change', false) })
 }

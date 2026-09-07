@@ -81,6 +81,7 @@ import { ref, computed, shallowRef, watch, onMounted, onUnmounted } from 'vue'
 import SpeechEnhancement  from '../demos/SpeechEnhancement.vue'
 import TvmInference        from '../demos/TvmInference.vue'
 import AudioClassification from '@/demos/AudioClassification.vue'
+import GStreamerPipeline   from '../demos/GStreamerPipeline.vue'
 import { registerRunningDemo, clearRunningDemo } from '@/composables/useDemoSession'
 
 const demos = [
