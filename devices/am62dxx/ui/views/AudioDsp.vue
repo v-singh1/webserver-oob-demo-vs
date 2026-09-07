@@ -101,14 +101,14 @@ const demos = [
     component: AudioClassification,
     canRun: true,
   },
-  {
-    name: 'TVM Inference',
-    sub:  'GCRN on C7x DSP via TVM+TIDL',
-    icon: 'mdi-flash',
-    iconStyle: 'background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa',
-    component: TvmInference,
-    canRun: true,
-  },
+  // {
+  //   name: 'TVM Inference',
+  //   sub:  'GCRN on C7x DSP via TVM+TIDL',
+  //   icon: 'mdi-flash',
+  //   iconStyle: 'background:radial-gradient(circle at 40% 40%,#1a3a7a,#0a1540);border:2px solid #1d4ed8;color:#60a5fa',
+  //   component: TvmInference,
+  //   canRun: true,
+  // },
   {
     name: 'Custom Audio Pipeline',
     sub:  'Generic gst-launch runner with artifact management',
