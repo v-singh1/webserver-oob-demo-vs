@@ -286,14 +286,14 @@ const PRESETS = [
     command:
       'gst-launch-1.0 filesrc location=/usr/share/tvm_inference/input/input_audio.wav ! wavparse ! audioconvert ! audio/x-raw,format=S16LE,rate=16000,channels=1 ! tidlaudioclassify artifacts=/usr/share/tvm_inference/artifacts/vggish ! fakesink',
   },
-  {
-    id: 'tvm-inference',
-    name: 'TVM Inference',
-    icon: 'mdi-flash',
-    color: '#60a5fa',
-    command:
-      'gst-launch-1.0 filesrc location=/usr/share/tvm_inference/input/input_audio.wav ! wavparse ! audioconvert ! audio/x-raw,format=S16LE,rate=16000,channels=1 ! tvminfer artifacts=/usr/share/tvm_inference/artifacts/gcrn ! fakesink',
-  },
+  // {
+  //   id: 'tvm-inference',
+  //   name: 'TVM Inference',
+  //   icon: 'mdi-flash',
+  //   color: '#60a5fa',
+  //   command:
+  //     'gst-launch-1.0 filesrc location=/usr/share/tvm_inference/input/input_audio.wav ! wavparse ! audioconvert ! audio/x-raw,format=S16LE,rate=16000,channels=1 ! tvminfer artifacts=/usr/share/tvm_inference/artifacts/gcrn ! fakesink',
+  // },
   {
     id: 'custom',
     name: 'Custom',
