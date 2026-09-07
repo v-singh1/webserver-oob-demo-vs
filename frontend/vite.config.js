@@ -48,9 +48,18 @@ export default defineConfig({
   build: {
     outDir: `../devices/${DEVICE}/app/vue-dist`,
     emptyOutDir: true,
-    // Avoid spending build time compressing the bundle only to print an
-    // informational size; deployment still serves the same optimized files.
     reportCompressedSize: false,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/node_modules/vuetify/'))  return 'vuetify'
+          if (id.includes('/node_modules/vue')   ||
+              id.includes('/node_modules/@vue/')) return 'vue'
+          if (id.includes('/node_modules/'))          return 'vendor'
+        },
+      },
+    },
   },
   server: {
     port: 5173,
