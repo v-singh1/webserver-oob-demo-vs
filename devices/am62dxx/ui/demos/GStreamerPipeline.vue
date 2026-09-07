@@ -268,7 +268,7 @@ const PRESETS = [
     icon: 'mdi-microphone-outline',
     color: '#34d399',
     command:
-      'gst-launch-1.0 filesrc location=/usr/share/tvm_inference/input/input_audio.wav ! wavparse ! audioconvert ! audio/x-raw,format=S16LE,rate=16000,channels=1 ! tidlspeechenhance artifacts=/usr/share/tvm_inference/artifacts/gcrn ! wavenc ! filesink location=/tmp/gst_enhanced.wav',
+      'gst-launch-1.0 -v filesrc location=/usr/share/tvm_inference/input/input_audio.wav ! wavparse ! audio/x-raw,format=S16LE,rate=16000,channels=1 ! tidspkernel name=stft msg-type=0x1020 model-path=/usr/share/tvm_inference/artifacts/gcrn hop-size=160 fft-size=320 window-frames=401 batch-size=64 ! tidspkernel name=deinterleave msg-type=0x1040 param2=0 model-path=/usr/share/tvm_inference/artifacts/gcrn fft-size=320 window-frames=401 ! titvm model-path=/usr/share/tvm_inference/artifacts/gcrn ! tidspkernel name=interleave msg-type=0x1040 param2=1 model-path=/usr/share/tvm_inference/artifacts/gcrn fft-size=320 window-frames=401 ! tidspkernel name=istft msg-type=0x1030 model-path=/usr/share/tvm_inference/artifacts/gcrn hop-size=160 fft-size=320 window-frames=401 batch-size=64 ! audio/x-raw,format=S16LE,rate=16000,channels=1 ! tee name=t ! queue ! wavenc ! filesink location=/tmp/gst_enhanced.wav t. ! queue ! audioconvert ! audioresample ! autoaudiosink',
   },
   {
     id: 'audio-class-yamnet',
@@ -276,7 +276,7 @@ const PRESETS = [
     icon: 'mdi-chart-bar',
     color: '#c084fc',
     command:
-      'gst-launch-1.0 filesrc location=/usr/share/tvm_inference/input/input_audio.wav ! wavparse ! audioconvert ! audio/x-raw,format=S16LE,rate=16000,channels=1 ! tidlaudioclassify artifacts=/usr/share/tvm_inference/artifacts/yamnet ! fakesink',
+      'gst-launch-1.0 -v alsasrc device=hw:1,0 ! audioconvert ! audioresample ! audio/x-raw,format=S16LE,rate=16000,channels=1 ! tidspkernel name=stft msg-type=0x1020 model-path=/usr/share/tvm_inference/artifacts/yamnet hop-size=160 window-frames=96 batch-size=64 ! titvm model-path=/usr/share/tvm_inference/artifacts/yamnet class-map-path=/usr/share/tvm_inference/labels/yamnet_label_list.txt top-k=3 ! fakesink',
   },
   {
     id: 'audio-class-vggish',
