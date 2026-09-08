@@ -210,14 +210,7 @@ module.exports = {
         const bin = binaryPath || PRELOAD_BIN;
         console.log(`[demo-coordinator] TVM cache absent — running preload via ${bin}`);
         execFileSync(bin, ['--preload'], { timeout: 90000, stdio: 'inherit' });
-        try {
-            const path = require('path');
-            const dir = path.dirname(TVM_CACHE);
-            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-            fs.writeFileSync(TVM_CACHE, new Date().toISOString() + '\n');
-        } catch (err) {
-            console.warn('[demo-coordinator] Could not write TVM cache marker:', err.message);
-        }
+        // preload_default_model() in C++ already writes the artifacts path to TVM_CACHE.
         console.log('[demo-coordinator] TVM preload completed');
     },
 
@@ -259,6 +252,20 @@ module.exports = {
 
     /** Returns true if the TVM model cache file exists on disk. */
     tvmCacheExists() { return fs.existsSync(TVM_CACHE); },
+
+    /**
+     * Returns true if the cache file contains exactly the given artifacts path,
+     * meaning that specific model is already loaded in the daemon.
+     * @param {string} artifactsPath  Full path to the model artifacts directory.
+     */
+    tvmCacheMatchesPath(artifactsPath) {
+        try {
+            if (!artifactsPath || !fs.existsSync(TVM_CACHE)) return false;
+            return fs.readFileSync(TVM_CACHE, 'utf8').trim() === artifactsPath;
+        } catch {
+            return false;
+        }
+    },
 
     /**
      * Delete the TVM model cache marker without restarting the daemon.

@@ -18,12 +18,12 @@
       "models": {
         "yamnet": {
           "label": "YAMNet",
-          "jsonFile": "/usr/share/tvm_inference/json/pipeline_speech_classification_yamnet.json",
+          "jsonFile": "/usr/share/tvm_inference/json/pipeline_audio_classification_yamnet.json",
           "description": "521 AudioSet classes · MobileNet v1"
         },
         "vggish": {
           "label": "VGGish",
-          "jsonFile": "/usr/share/tvm_inference/json/pipeline_speech_classification_vggish.json",
+          "jsonFile": "/usr/share/tvm_inference/json/pipeline_audio_classification_vggish.json",
           "description": "10 UrbanSound8K classes · VGGish features"
         }
       },

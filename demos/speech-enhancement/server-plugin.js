@@ -227,7 +227,7 @@ module.exports = function registerSpeechEnhancement(app, wss, device) {
         const jobJsonPath = path.join(jobDir, 'pipeline.json');
         fs.writeFileSync(jobJsonPath, JSON.stringify(jobJson));
 
-        const modelAlreadyLoaded = demoCoordinator.tvmCacheExists();
+        const modelAlreadyLoaded = demoCoordinator.tvmCacheMatchesPath(baseJson.artifacts_path);
         // Send before ensurePreloaded so the WS frame is in the OS TCP buffer
         // and reaches the client even while Node.js is blocked on the sync preload.
         if (!modelAlreadyLoaded) send({ type: 'model_loading', modelName: 'GCRN Model Artifacts' });

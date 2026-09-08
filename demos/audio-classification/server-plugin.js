@@ -143,14 +143,24 @@ function parseClassificationLine(line) {
         } catch (_) {}
     }
 
-    // "[App]   1. 0.8234  ClassName" — top-1 line from audio_classification_pipeline
-    const topOneMatch = text.match(/\[App\]\s+1\.\s+[\d.]+\s+(.+)$/);
+    // "[App]   1. ±score  ClassName" — top-1 line from audio_classification_pipeline
+    const topOneMatch = text.match(/\[App\]\s+1\.\s+-?[\d.]+(?:[eE][+\-]?\d+)?\s+(.+)$/);
     if (topOneMatch) return topOneMatch[1].trim();
 
     const match = text.match(
         /(?:classification|predicted\s+(?:class|label)|top(?:\s*[- ]?1)?\s+(?:class|label))\s*[:=]\s*(.+)$/i
     );
     return match && match[1].trim() ? match[1].trim() : null;
+}
+
+/**
+ * Parse a ranked prediction line: "[App]   N. 0.8234  ClassName"
+ * Returns { rank, score, class } or null if the line doesn't match.
+ */
+function parseRankedLine(text) {
+    const m = String(text || '').trim().match(/\[App\]\s+(\d+)\.\s+(-?[\d.]+(?:[eE][+\-]?\d+)?)\s+(.+)$/);
+    if (!m) return null;
+    return { rank: parseInt(m[1], 10), score: parseFloat(m[2]), class: m[3].trim() };
 }
 
 function appendLogTail(current, addition) {
@@ -185,13 +195,13 @@ module.exports = function registerAudioClassification(app, wss, device) {
     const modelsConfig = config.models || {
         yamnet: {
             label: 'YAMNet',
-            jsonFile: '/usr/share/tvm_inference/json/pipeline_speech_classification_yamnet.json',
+            jsonFile: '/usr/share/tvm_inference/json/pipeline_audio_classification_yamnet.json',
             description: '521 AudioSet classes · MobileNet v1',
         },
     };
     /* Keep a plain jsonFile fallback for configs that don't use the models map */
     const fallbackJson     = config.jsonFile ||
-        '/usr/share/tvm_inference/json/pipeline_speech_classification_yamnet.json';
+        '/usr/share/tvm_inference/json/pipeline_audio_classification_yamnet.json';
     const defaultModelKey  = config.defaultModel ||
         Object.keys(modelsConfig)[0] || 'yamnet';
     const defaultClassificationJson = (modelsConfig[defaultModelKey] || {}).jsonFile || fallbackJson;
@@ -234,11 +244,8 @@ module.exports = function registerAudioClassification(app, wss, device) {
         });
     }
 
-    // Release DSP and clear GCRN cache so speech-enhancement knows it must
-    // re-preload after YAMNet ran on C7x.
     function releaseAcDsp() {
         demoCoordinator.releaseDsp('audio-classification');
-        if (isAm62d) demoCoordinator.clearModelCache();
     }
 
     /* ------------------------------------------------------------ */
@@ -460,10 +467,31 @@ module.exports = function registerAudioClassification(app, wss, device) {
             const child = spawn(edgeAiBinary, [resolvedJson, '--input-file', inputPath]);
             edgeAiProcess = child;
             let stdoutRemainder = '';
+            let patchBuf = [];
+            let patchIdx = 0;
+
+            const flushPatch = () => {
+                if (!patchBuf.length) return;
+                send({ type: 'patch_predictions', patch: patchIdx++,
+                       predictions: patchBuf.slice(), timestamp: Date.now(),
+                       backend: 'edge-ai-rpmsg' });
+                patchBuf = [];
+            };
 
             const consumeLine = line => {
                 if (!activeJob || activeJob.generation !== generation) return;
                 activeJob.stdout = appendLogTail(activeJob.stdout, line + '\n');
+
+                const ranked = parseRankedLine(line);
+                if (ranked) {
+                    if (ranked.rank === 1 && patchBuf.length > 0) flushPatch();
+                    patchBuf.push({ class: ranked.class, score: ranked.score });
+                    if (ranked.rank === 1) {
+                        activeJob.classes.push(ranked.class);
+                        send({ class: ranked.class, timestamp: Date.now(), backend: 'edge-ai-rpmsg' });
+                    }
+                    return;
+                }
                 const className = parseClassificationLine(line);
                 if (!className) return;
                 activeJob.classes.push(className);
@@ -486,6 +514,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
             child.on('error', error => finishAm62dJob(generation, error));
             child.on('close', code => {
                 if (stdoutRemainder) consumeLine(stdoutRemainder);
+                flushPatch();
                 finishAm62dJob(
                     generation,
                     code === 0 ? null : new Error(`Edge-AI classification exited with ${code}`)
@@ -554,12 +583,33 @@ module.exports = function registerAudioClassification(app, wss, device) {
                         '--device', device);
 
             let stdoutRemainder = '';
+            let patchBuf = [];
+            let patchIdx = 0;
+
+            const flushStreamPatch = () => {
+                if (!patchBuf.length) return;
+                send({ type: 'patch_predictions', patch: patchIdx++,
+                       predictions: patchBuf.slice(), timestamp: Date.now(),
+                       backend: 'edge-ai-rpmsg' });
+                patchBuf = [];
+            };
+
             edgeAi.stdout.on('data', data => {
                 if (generation !== runGeneration) return;
                 stdoutRemainder += data.toString();
                 const lines = stdoutRemainder.split(/\r?\n/);
                 stdoutRemainder = lines.pop() || '';
                 lines.forEach(line => {
+                    const ranked = parseRankedLine(line);
+                    if (ranked) {
+                        if (ranked.rank === 1 && patchBuf.length > 0) flushStreamPatch();
+                        patchBuf.push({ class: ranked.class, score: ranked.score });
+                        if (ranked.rank === 1) {
+                            lastResult = { classes: [ranked.class], timestamp: Date.now() };
+                            send({ class: ranked.class, timestamp: Date.now(), backend: 'edge-ai-rpmsg' });
+                        }
+                        return;
+                    }
                     const className = parseClassificationLine(line);
                     if (!className) return;
                     lastResult = { classes: [className], timestamp: Date.now() };

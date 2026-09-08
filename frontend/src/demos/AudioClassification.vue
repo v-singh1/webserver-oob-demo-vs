@@ -149,11 +149,25 @@
       </div>
     </v-card>
 
+    <!-- Top-K patch heatmap — YAMNet only -->
+    <v-card v-if="patchPredictions.length > 0 && selectedModel === 'yamnet'" flat class="ti-card heatmap-card">
+      <div class="heatmap-hdr">
+        <span class="results-ttl">Top-10 Predictions Over Patches</span>
+        <span class="results-count">{{ patchPredictions.length }} patch{{ patchPredictions.length !== 1 ? 'es' : '' }}</span>
+      </div>
+      <div class="heatmap-body">
+        <canvas ref="heatmapLabels" class="heatmap-labels-canvas" />
+        <div class="heatmap-scroll" ref="heatmapScroll">
+          <canvas ref="heatmapCanvas" class="heatmap-canvas" />
+        </div>
+      </div>
+    </v-card>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useTheme } from 'vuetify'
 import {
   getAudioClassificationInfo,
@@ -181,9 +195,13 @@ const fileInfo       = ref(null)
 const uploadedPath   = ref('')
 const uploadedName   = ref('')
 const uploadInput    = ref(null)
-const resultsEl      = ref(null)
-const modelMap       = ref({})         /* { yamnet: {label, description}, vggish: ... } */
-const selectedModel  = ref('yamnet')
+const resultsEl        = ref(null)
+const modelMap         = ref({})         /* { yamnet: {label, description}, vggish: ... } */
+const selectedModel    = ref('yamnet')
+const patchPredictions = ref([])         /* [{patch, predictions:[{class,score}]}] */
+const heatmapCanvas    = ref(null)
+const heatmapLabels    = ref(null)
+const heatmapScroll    = ref(null)
 let ws = null
 let reconnectTimer = null
 let mounted = false
@@ -238,6 +256,162 @@ function fmtTime(ts) {
   const d = new Date(ts)
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
+
+/* ── Heatmap (YAMNet only) ───────────────────────────────────────── */
+const HM_TOP_K   = 10
+const HM_CELL_H  = 22
+const HM_LABEL_W = 188
+
+/* Sum logits across patches per class — matches aggregate_predictions mean ranking */
+function hmTopClasses(patches) {
+  const acc = {}
+  patches.forEach(p => p.predictions.forEach(pred => {
+    acc[pred.class] = (acc[pred.class] || 0) + pred.score
+  }))
+  return Object.entries(acc)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, HM_TOP_K)
+    .map(([cls]) => cls)
+}
+
+/* Cyan-White colormap — deep navy → teal → cyan → near-white, readable on dark UI */
+const CYAN_WHITE = [
+  [0.00,   0,  30,  60],
+  [0.20,   0,  60, 100],
+  [0.40,   0, 105, 155],
+  [0.60,   0, 160, 195],
+  [0.80,   0, 205, 230],
+  [1.00, 220, 248, 255],
+]
+
+function cyanWhiteColor(t) {
+  const clamped = Math.min(1, Math.max(0, t))
+  let lo = CYAN_WHITE[0], hi = CYAN_WHITE[CYAN_WHITE.length - 1]
+  for (let i = 0; i < CYAN_WHITE.length - 1; i++) {
+    if (clamped >= CYAN_WHITE[i][0] && clamped <= CYAN_WHITE[i + 1][0]) { lo = CYAN_WHITE[i]; hi = CYAN_WHITE[i + 1]; break }
+  }
+  const span = hi[0] - lo[0] || 1
+  const f    = (clamped - lo[0]) / span
+  return `rgb(${Math.round(lo[1]+f*(hi[1]-lo[1]))},${Math.round(lo[2]+f*(hi[2]-lo[2]))},${Math.round(lo[3]+f*(hi[3]-lo[3]))})`
+}
+
+function hmCellColor(t, dark) {
+  if (dark) return cyanWhiteColor(t)
+  /* gray_r for light theme: high logit → dark, low logit → white */
+  const gray = Math.round((1 - t) * 245)
+  return `rgb(${gray},${gray},${gray})`
+}
+
+function drawHeatmap() {
+  const dataCanvas   = heatmapCanvas.value
+  const labelCanvas  = heatmapLabels.value
+  const scrollEl     = heatmapScroll.value
+  if (!dataCanvas || !labelCanvas) return
+  const patches = patchPredictions.value
+  if (!patches.length) return
+
+  const topClasses = hmTopClasses(patches)
+  const numPatches = patches.length
+  const numClasses = topClasses.length
+  const dark       = !isLight.value
+
+  /* True min/max over raw INT8 logits — can be negative */
+  let minScore = Infinity, maxScore = -Infinity
+  topClasses.forEach(cls => patches.forEach(p => {
+    const pred = p.predictions.find(x => x.class === cls)
+    if (pred) { minScore = Math.min(minScore, pred.score); maxScore = Math.max(maxScore, pred.score) }
+  }))
+  if (!isFinite(minScore)) { minScore = 0; maxScore = 1 }
+  const scoreRange = maxScore - minScore || 1
+
+  const scrollW    = scrollEl?.clientWidth || 300
+  const cellW      = Math.max(16, Math.min(60, Math.floor(scrollW / numPatches)))
+  const barW       = cellW * numPatches
+
+  const XAXIS_H = 20
+  const BAR_PAD = 8
+  const BAR_H   = 12
+  const TICK_H  = 14
+  const totalH  = HM_CELL_H * numClasses + XAXIS_H + BAR_PAD + BAR_H + TICK_H
+
+  /* ── Label canvas (fixed, left) ── */
+  labelCanvas.width  = HM_LABEL_W
+  labelCanvas.height = totalH
+  const lctx = labelCanvas.getContext('2d')
+  lctx.clearRect(0, 0, HM_LABEL_W, totalH)
+
+  topClasses.forEach((cls, row) => {
+    lctx.fillStyle    = dark ? '#94a3b8' : '#475569'
+    lctx.font         = '11px system-ui,sans-serif'
+    lctx.textAlign    = 'right'
+    lctx.textBaseline = 'middle'
+    const label = cls.length > 26 ? cls.slice(0, 25) + '…' : cls
+    lctx.fillText(label, HM_LABEL_W - 6, row * HM_CELL_H + HM_CELL_H / 2)
+  })
+
+  // "Logit:" label aligned with colorbar
+  const barY = HM_CELL_H * numClasses + XAXIS_H + BAR_PAD
+  lctx.fillStyle    = dark ? '#64748b' : '#94a3b8'
+  lctx.font         = '10px system-ui,sans-serif'
+  lctx.textAlign    = 'right'
+  lctx.textBaseline = 'middle'
+  lctx.fillText('Logit:', HM_LABEL_W - 6, barY + BAR_H / 2)
+
+  /* ── Data canvas (scrollable, right) ── */
+  dataCanvas.width  = barW
+  dataCanvas.height = totalH
+  const ctx = dataCanvas.getContext('2d')
+  ctx.clearRect(0, 0, barW, totalH)
+
+  /* Heatmap cells */
+  topClasses.forEach((cls, row) => {
+    patches.forEach((p, col) => {
+      const pred     = p.predictions.find(x => x.class === cls)
+      const rawScore = pred ? pred.score : minScore
+      const t        = (rawScore - minScore) / scoreRange
+      ctx.fillStyle  = hmCellColor(t, dark)
+      ctx.fillRect(col * cellW, row * HM_CELL_H, cellW - 1, HM_CELL_H - 1)
+    })
+  })
+
+  /* X-axis patch numbers */
+  const axisY = HM_CELL_H * numClasses
+  ctx.fillStyle    = dark ? '#64748b' : '#94a3b8'
+  ctx.font         = '10px system-ui,sans-serif'
+  ctx.textAlign    = 'center'
+  ctx.textBaseline = 'top'
+  const every = Math.max(1, Math.ceil(numPatches / 8))
+  for (let i = 0; i < numPatches; i += every) {
+    ctx.fillText(String(i), i * cellW + cellW / 2, axisY + 3)
+  }
+
+  /* Colorbar gradient */
+  for (let i = 0; i < barW; i++) {
+    ctx.fillStyle = hmCellColor(i / (barW - 1), dark)
+    ctx.fillRect(i, barY, 1, BAR_H)
+  }
+
+  /* Colorbar ticks + logit labels */
+  const NUM_TICKS = 5
+  ctx.font = '10px system-ui,sans-serif'
+  ctx.textBaseline = 'top'
+  for (let ti = 0; ti < NUM_TICKS; ti++) {
+    const t     = ti / (NUM_TICKS - 1)
+    const logit = minScore + t * scoreRange
+    const x     = Math.round(t * (barW - 1))
+    ctx.fillStyle = dark ? '#64748b' : '#94a3b8'
+    ctx.fillRect(x, barY + BAR_H, 1, 3)
+    ctx.fillStyle = dark ? '#94a3b8' : '#475569'
+    ctx.textAlign = ti === 0 ? 'left' : ti === NUM_TICKS - 1 ? 'right' : 'center'
+    ctx.fillText(logit.toFixed(2), x, barY + BAR_H + 4)
+  }
+
+  /* Auto-scroll data area to keep the latest patch visible */
+  if (scrollEl) scrollEl.scrollLeft = scrollEl.scrollWidth
+}
+
+watch(isLight, () => nextTick(drawHeatmap))
+/* ─────────────────────────────────────────────────────────────────── */
 
 async function loadDevices() {
   try {
@@ -382,6 +556,11 @@ function connectWs() {
         statusMessage.value = msg.message || msg.status || 'Running'
         return
       }
+      if (msg.type === 'patch_predictions' && selectedModel.value === 'yamnet') {
+        patchPredictions.value.push(msg)
+        nextTick(drawHeatmap)
+        return
+      }
       const cls = msg.class || msg.label || msg.event || ''
       if (!cls) return
       modelLoading.value = false
@@ -396,6 +575,7 @@ async function run() {
   if (isRunning.value) return
   errorMsg.value = ''
   results.value = []
+  patchPredictions.value = []
 
   try {
     /* Shared flow for both backends: stop a stale run, open the result socket,
@@ -542,4 +722,12 @@ defineExpose({ run, stop, isRunning, isModelLoading: modelLoading })
 .r-time  { font-size:11px; color:#64748b; flex-shrink:0; }
 
 .model-desc { font-size:11px; color:#64748b; margin-top:4px; }
+
+/* Patch heatmap */
+.heatmap-card         { flex-shrink: 0; }
+.heatmap-hdr          { display:flex; align-items:center; justify-content:space-between; padding-bottom:8px; border-bottom:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); margin-bottom:8px; }
+.heatmap-body         { display:flex; align-items:flex-start; overflow:hidden; }
+.heatmap-labels-canvas{ display:block; flex-shrink:0; }
+.heatmap-scroll       { flex:1; overflow-x:auto; min-width:0; }
+.heatmap-canvas       { display:block; image-rendering:pixelated; }
 </style>
