@@ -437,6 +437,29 @@ module.exports = function registerAudioClassification(app, wss, device) {
     /* Pipeline helpers                                             */
     /* ------------------------------------------------------------ */
 
+    /**
+     * Parse one stdout line from rpmsg_inference_example, update patchBuf in-place,
+     * and dispatch send() for confirmed classifications.
+     * Callers must flush with patchBuf.splice(0) (not reassignment) so the reference
+     * passed here stays valid across flush calls.
+     */
+    function dispatchClassificationLine(line, patchBuf, flushPatch, onClass) {
+        const ranked = parseRankedLine(line);
+        if (ranked) {
+            if (ranked.rank === 1 && patchBuf.length > 0) flushPatch();
+            patchBuf.push({ class: ranked.class, score: ranked.score });
+            if (ranked.rank === 1) {
+                onClass(ranked.class);
+                send({ class: ranked.class, timestamp: Date.now(), backend: 'edge-ai-rpmsg' });
+            }
+            return;
+        }
+        const className = parseClassificationLine(line);
+        if (!className) return;
+        onClass(className);
+        send({ class: className, timestamp: Date.now(), backend: 'edge-ai-rpmsg' });
+    }
+
     /** Start the AM62D JSON pipeline for WAV file input. */
     function runAm62dInference(inputPath, generation, jsonPath, modelLabel, ownerIp) {
         if (generation !== runGeneration) return;
@@ -475,27 +498,14 @@ module.exports = function registerAudioClassification(app, wss, device) {
                 send({ type: 'patch_predictions', patch: patchIdx++,
                        predictions: patchBuf.slice(), timestamp: Date.now(),
                        backend: 'edge-ai-rpmsg' });
-                patchBuf = [];
+                patchBuf.splice(0);
             };
 
             const consumeLine = line => {
                 if (!activeJob || activeJob.generation !== generation) return;
                 activeJob.stdout = appendLogTail(activeJob.stdout, line + '\n');
-
-                const ranked = parseRankedLine(line);
-                if (ranked) {
-                    if (ranked.rank === 1 && patchBuf.length > 0) flushPatch();
-                    patchBuf.push({ class: ranked.class, score: ranked.score });
-                    if (ranked.rank === 1) {
-                        activeJob.classes.push(ranked.class);
-                        send({ class: ranked.class, timestamp: Date.now(), backend: 'edge-ai-rpmsg' });
-                    }
-                    return;
-                }
-                const className = parseClassificationLine(line);
-                if (!className) return;
-                activeJob.classes.push(className);
-                send({ class: className, timestamp: Date.now(), backend: 'edge-ai-rpmsg' });
+                dispatchClassificationLine(line, patchBuf, flushPatch,
+                    cls => activeJob.classes.push(cls));
             };
 
             child.stdout.on('data', data => {
@@ -570,7 +580,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
         const dspError = demoCoordinator.acquireDsp('audio-classification', ownerIp);
         if (dspError) throw new Error(dspError);
 
-        activeJob = { generation }; /* DSP ownership marker */
+        activeJob = { generation, classes: [] };
 
         try {
             const edgeAi = spawn(edgeAiBinary, [jsonPath, '--device', device]);
@@ -591,7 +601,7 @@ module.exports = function registerAudioClassification(app, wss, device) {
                 send({ type: 'patch_predictions', patch: patchIdx++,
                        predictions: patchBuf.slice(), timestamp: Date.now(),
                        backend: 'edge-ai-rpmsg' });
-                patchBuf = [];
+                patchBuf.splice(0);
             };
 
             edgeAi.stdout.on('data', data => {
@@ -599,22 +609,10 @@ module.exports = function registerAudioClassification(app, wss, device) {
                 stdoutRemainder += data.toString();
                 const lines = stdoutRemainder.split(/\r?\n/);
                 stdoutRemainder = lines.pop() || '';
-                lines.forEach(line => {
-                    const ranked = parseRankedLine(line);
-                    if (ranked) {
-                        if (ranked.rank === 1 && patchBuf.length > 0) flushStreamPatch();
-                        patchBuf.push({ class: ranked.class, score: ranked.score });
-                        if (ranked.rank === 1) {
-                            lastResult = { classes: [ranked.class], timestamp: Date.now() };
-                            send({ class: ranked.class, timestamp: Date.now(), backend: 'edge-ai-rpmsg' });
-                        }
-                        return;
-                    }
-                    const className = parseClassificationLine(line);
-                    if (!className) return;
-                    lastResult = { classes: [className], timestamp: Date.now() };
-                    send({ class: className, timestamp: Date.now(), backend: 'edge-ai-rpmsg' });
-                });
+                lines.forEach(line => dispatchClassificationLine(
+                    line, patchBuf, flushStreamPatch,
+                    cls => { lastResult = { classes: [cls], timestamp: Date.now() }; }
+                ));
             });
 
             edgeAi.stderr.on('data', data =>

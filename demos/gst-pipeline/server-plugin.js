@@ -27,6 +27,7 @@
 const { spawn, execFileSync } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
+const demoCoordinator = require('../demo-coordinator');
 
 const WS_OPEN        = 1;
 const MAX_UPLOAD_MB  = 200;
@@ -120,6 +121,13 @@ function validateGstCommand(command) {
 function rateLimit(maxRequests, windowMs) {
     /** @type {Map<string, number[]>} */
     const hits = new Map();
+    /* Evict IPs whose entire hit history has expired to prevent unbounded growth. */
+    setInterval(() => {
+        const cutoff = Date.now() - windowMs;
+        hits.forEach((timestamps, ip) => {
+            if (timestamps.every(t => t <= cutoff)) hits.delete(ip);
+        });
+    }, windowMs).unref();
     return (req, res, next) => {
         const ip  = req.ip || req.socket?.remoteAddress || 'unknown';
         const now = Date.now();
@@ -177,8 +185,9 @@ function archiveUncompressedSize(tmpFile, isTar) {
  * @param {import('express').Application} app
  * @param {import('ws').WebSocketServer} wss
  * @param {object} device - Parsed device.json
+ * @param {{ express: import('express') }} ctx - Server context (express injected by server.js)
  */
-module.exports = function registerGstPipeline(app, wss, device) {
+module.exports = function registerGstPipeline(app, wss, device, { express } = {}) {
     const config       = (device.demoConfig || {})['gst-pipeline'] || {};
     const artifactsDir = config.artifactsDir || '/usr/share/tvm_inference/artifacts';
     const inputDir     = config.inputDir     || '/usr/share/tvm_inference/input';
@@ -201,30 +210,13 @@ module.exports = function registerGstPipeline(app, wss, device) {
         clients.forEach(ws => { if (ws.readyState === WS_OPEN) ws.send(data); });
     }
 
-    /**
-     * @param {import('http').IncomingMessage} req
-     * @param {import('http').ServerResponse}  res
-     * @param {number}   maxBytes
-     * @param {Function} cb - Called with the accumulated Buffer on success.
-     */
-    function readRawBody(req, res, maxBytes, cb) {
-        const chunks = [];
-        let total = 0;
-        req.on('data', chunk => {
-            total += chunk.length;
-            if (total > maxBytes) { res.status(413).send('Payload too large'); req.destroy(); return; }
-            chunks.push(chunk);
-        });
-        req.on('end',   () => cb(Buffer.concat(chunks)));
-        req.on('error', () => res.status(400).send('Bad request'));
-    }
-
     function killActive() {
         if (!activeProc) return;
         try { activeProc.kill('SIGINT');  } catch (_) {}
         try { activeProc.kill('SIGTERM'); } catch (_) {}
         activeProc    = null;
         activeOwnerIp = null;
+        demoCoordinator.releaseDsp('gst-pipeline');
     }
 
     /* ── GET /gst/artifacts ─────────────────────────────────────── */
@@ -251,8 +243,10 @@ module.exports = function registerGstPipeline(app, wss, device) {
 
     /* ── POST /gst/upload-artifact?name=<dir> ───────────────────── */
 
-    app.post('/gst/upload-artifact', uploadLimiter, (req, res) => {
-        readRawBody(req, res, MAX_UPLOAD_MB * 1024 * 1024, body => {
+    app.post('/gst/upload-artifact', uploadLimiter,
+        express.raw({ type: '*/*', limit: `${MAX_UPLOAD_MB}mb` }),
+        (req, res) => {
+            const body = req.body;
             /* sanitise artifact directory name */
             const rawName = ((req.query.name || req.query.filename || '') + '')
                 .replace(/\s+/g, '_')
@@ -289,8 +283,8 @@ module.exports = function registerGstPipeline(app, wss, device) {
             } finally {
                 try { fs.unlinkSync(tmpFile); } catch (_) {}
             }
-        });
-    });
+        }
+    );
 
     /* ── GET /gst/input-files ──────────────────────────────────── */
 
@@ -316,8 +310,10 @@ module.exports = function registerGstPipeline(app, wss, device) {
 
     /* ── POST /gst/upload-input?filename=<name> ─────────────────── */
 
-    app.post('/gst/upload-input', uploadLimiter, (req, res) => {
-        readRawBody(req, res, 50 * 1024 * 1024, body => {
+    app.post('/gst/upload-input', uploadLimiter,
+        express.raw({ type: '*/*', limit: '50mb' }),
+        (req, res) => {
+            const body = req.body;
             const rawName = ((req.query.filename || '') + '')
                 .replace(/\s+/g, '_')
                 .replace(/[^a-zA-Z0-9._-]/g, '')
@@ -331,8 +327,8 @@ module.exports = function registerGstPipeline(app, wss, device) {
             } catch (e) {
                 res.status(400).json({ error: e.message });
             }
-        });
-    });
+        }
+    );
 
     /* ── GET /gst/saved-pipelines ──────────────────────────────── */
 
@@ -391,6 +387,9 @@ module.exports = function registerGstPipeline(app, wss, device) {
         try { tokens = validateGstCommand(command); }
         catch (e) { return res.status(400).json({ error: e.message }); }
 
+        const dspError = demoCoordinator.acquireDsp('gst-pipeline', req.ip);
+        if (dspError) return res.status(409).json({ error: dspError });
+
         try {
             /* spawn the GStreamer binary directly — no shell, no metacharacter expansion */
             const proc = spawn(tokens[0], tokens.slice(1), { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -403,11 +402,17 @@ module.exports = function registerGstPipeline(app, wss, device) {
             proc.stderr.on('data', relay('stderr'));
 
             proc.on('error', err => {
-                if (activeProc === proc) { activeProc = null; activeOwnerIp = null; }
+                if (activeProc === proc) {
+                    activeProc = null; activeOwnerIp = null;
+                    demoCoordinator.releaseDsp('gst-pipeline');
+                }
                 broadcast({ type: 'error', message: err.message });
             });
             proc.on('close', code => {
-                if (activeProc === proc) { activeProc = null; activeOwnerIp = null; }
+                if (activeProc === proc) {
+                    activeProc = null; activeOwnerIp = null;
+                    demoCoordinator.releaseDsp('gst-pipeline');
+                }
                 broadcast({ type: 'exit', code });
             });
 
@@ -415,6 +420,7 @@ module.exports = function registerGstPipeline(app, wss, device) {
         } catch (e) {
             activeProc    = null;
             activeOwnerIp = null;
+            demoCoordinator.releaseDsp('gst-pipeline');
             res.status(500).json({ error: e.message });
         }
     });

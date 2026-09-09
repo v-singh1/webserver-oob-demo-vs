@@ -177,7 +177,7 @@ for (const demoId of device.demos) {
     }
     try {
         const plugin = require(pluginPath);
-        plugin(app, wss, device);
+        plugin(app, wss, device, { express });
         console.log(`[Server] Loaded demo plugin: ${demoId}`);
     } catch (err) {
         console.error(`[Server] Failed to load demo plugin ${demoId}:`, err);

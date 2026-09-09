@@ -342,7 +342,6 @@ const saveAsName          = ref('')
 const saveAsInputEl       = ref(null)
 
 let ws = null
-let mounted = true
 
 /* ── Computed ───────────────────────────────────────────────────── */
 
@@ -704,7 +703,6 @@ connectWs()
 loadSavedPipelines()
 
 onUnmounted(() => {
-  mounted = false
   if (ws) { try { ws.close() } catch (_) {} ws = null }
 })
 

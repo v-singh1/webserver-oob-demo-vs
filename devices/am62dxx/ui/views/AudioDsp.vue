@@ -126,7 +126,10 @@ const activeIdx        = ref(0)
 const activeDemo       = ref(null)
 const currentComponent = shallowRef(demos[0].component)
 const demoRunning      = ref(false)
-const canRun = computed(() => demos[activeIdx.value].canRun && (tvmReady.value || tvmWasReady.value))
+const canRun = computed(() => {
+  const demo = demos[activeIdx.value]
+  return demo.canRun && (demo.skipTvmCheck || tvmReady.value || tvmWasReady.value)
+})
 
 const tvmReady      = ref(false)
 const tvmWasReady   = ref(false)   // latched true once tvmReady ever becomes true
