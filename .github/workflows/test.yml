@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: common/webserver/package-lock.json
+          cache-dependency-path: common/webserver/package.json
 
       - name: Install dependencies
         run: npm install
