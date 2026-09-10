@@ -1160,7 +1160,7 @@ make dev DEVICE=&lt;id&gt; MOCK=1</pre>
 
       <h3>6.3 Audio Classification — Live Microphone (YAMNet)</h3>
       <pre><span class="lang-label">bash">gst-launch-1.0 -v \
-  alsasrc device=hw:1,0 ! \
+  alsasrc device=hw:0,0 ! \
   audioconvert ! audioresample ! \
   audio/x-raw,format=S16LE,rate=16000,channels=1 ! \
   tidspkernel name=stft msg-type=0x1020 \
@@ -1176,9 +1176,9 @@ make dev DEVICE=&lt;id&gt; MOCK=1</pre>
   filesrc location=/usr/share/tvm_inference/input/urbansound_16k.wav ! \
   wavparse ! audio/x-raw,format=S16LE,rate=16000,channels=1 ! \
   tidspkernel name=stft msg-type=0x1020 \
-    model-path=/usr/share/tvm_inference/artifacts/vggish11/ \
+    model-path=/usr/share/tvm_inference/artifacts/vggish/ \
     hop-size=160 window-frames=126 batch-size=64 ! \
-  titvm model-path=/usr/share/tvm_inference/artifacts/vggish11/ \
+  titvm model-path=/usr/share/tvm_inference/artifacts/vggish/ \
     class-map-path=/usr/share/tvm_inference/labels/vggish_label_list.txt \
     top-k=3 ! \
   filesink location=vggish_inference_output.bin</pre>
@@ -1188,7 +1188,7 @@ make dev DEVICE=&lt;id&gt; MOCK=1</pre>
 /usr/share/tvm_inference/
   <span class="ft-dir">artifacts/</span>
     <span class="ft-hi">yamnet/</span>         <span class="ft-cm"># compiled YAMNet TVM model (audio classification)</span>
-    <span class="ft-hi">vggish11/</span>       <span class="ft-cm"># compiled VGGish TVM model (audio classification)</span>
+    <span class="ft-hi">vggish/</span>       <span class="ft-cm"># compiled VGGish TVM model (audio classification)</span>
     <span class="ft-hi">gcrn/</span>           <span class="ft-cm"># compiled GCRN model (speech enhancement)</span>
   <span class="ft-dir">labels/</span>
     <span class="ft-file">yamnet_label_list.txt</span>
