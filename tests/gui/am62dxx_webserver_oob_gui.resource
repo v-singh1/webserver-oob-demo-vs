@@ -412,16 +412,15 @@ UPLOAD MODEL FILE
     [Documentation]    Runs the full AI Model Inspector upload flow (ModelInspector.vue): opens
     ...    the upload dialog, sets the given file on the hidden file input directly (bypassing
     ...    click/drag-drop, which Playwright can't drive for native OS file pickers), fills
-    ...    Model Name/Task Type/Quantization, submits, and waits for the "Uploaded successfully!"
-    ...    status. Posts to /upload-model-file, which writes into the Model-Inspector folder on
+    ...    Model Name/Task Type, submits, and waits for the "Uploaded successfully!" status.
+    ...    Posts to /upload-model-file, which writes into the Model-Inspector folder on
     ...    whatever host is serving the GUI (local checkout offline, the board's rootfs on EVM) -
     ...    callers on the EVM suite are responsible for cleaning up if that matters for the lab.
-    [Arguments]    ${file_path}    ${model_name}    ${task_type}=Image Classification    ${quant}=INT8
+    [Arguments]    ${file_path}    ${model_name}    ${task_type}=Audio Classification
     Browser.Click    button:has-text("Upload")
     Browser.Wait For Elements State    ${SEL_DROP_ZONE}    visible
     Browser.Upload File By Selector    input[type="file"]    ${file_path}
     Browser.Fill Text    input[placeholder="e.g. MobileNet v2"]    ${model_name}
     Browser.Select Options By    select.field-select >> nth=0    label    ${task_type}
-    Browser.Select Options By    select.field-select >> nth=1    label    ${quant}
     Browser.Click    ${SEL_MI_UPLOAD_SUBMIT_BTN}
     Browser.Wait For Elements State    ${SEL_MI_UPLOAD_STATUS_OK}    visible    timeout=10s
